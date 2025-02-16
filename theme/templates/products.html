@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %} Products {% endblock %}
+
+{% block content %}
+<div class="border-b mt-8 pt-6 pb-6 border-gray-200">
+    <h3 class="text-base font-semibold text-gray-900">Trending Products</h3>
+</div>
+
+<!-- Carousel Container -->
+<div class="relative w-full overflow-hidden">
+    <!-- Slider -->
+    <div class="flex gap-4 transition-transform duration-300 ease-in-out" id="slider">
+        <!-- Product Card 1 -->
+        <div class="min-w-[300px] bg-white shadow-md rounded-lg p-4 hover:shadow-lg">
+            <img class="w-full h-48 object-cover rounded-md" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-1.jpg" alt="Product Image">
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold text-gray-800">Product Name</h3>
+                <p class="text-sm text-gray-500">Short product description.</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-green-600">K49.99</span>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buy Now</button>
+                </div>
+            </div>
+        </div>
+        <!-- Product Card 2 -->
+        <div class="min-w-[300px] bg-white shadow-md rounded-lg p-4 hover:shadow-lg">
+            <img class="w-full h-48 object-cover rounded-md" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-10.jpg" alt="Product Image">
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold text-gray-800">Product Name</h3>
+                <p class="text-sm text-gray-500">Short product description.</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-green-600">K59.99</span>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buy Now</button>
+                </div>
+            </div>
+        </div>
+        <!-- Product Card 3 -->
+        <div class="min-w-[300px] bg-white shadow-md rounded-lg p-4 hover:shadow-lg">
+            <img class="w-full h-48 object-cover rounded-md" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-8.jpg" alt="Product Image">
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold text-gray-800">Product Name</h3>
+                <p class="text-sm text-gray-500">Short product description.</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-green-600">K69.99</span>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buy Now</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="min-w-[300px] bg-white shadow-md rounded-lg p-4 hover:shadow-lg">
+            <img class="w-full h-48 object-cover rounded-md" <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-11.jpg" alt="Product Image">
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold text-gray-800">Product Name</h3>
+                <p class="text-sm text-gray-500">Short product description.</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-green-600">K69.99</span>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buy Now</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="min-w-[300px] bg-white shadow-md rounded-lg p-4 hover:shadow-lg">
+            <img class="w-full h-48 object-cover rounded-md" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-8.jpg" alt="Product Image">
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold text-gray-800">Product Name</h3>
+                <p class="text-sm text-gray-500">Short product description.</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-green-600">K69.99</span>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buy Now</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="min-w-[300px] bg-white shadow-md rounded-lg p-4 hover:shadow-lg">
+            <img class="w-full h-48 object-cover rounded-md" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-8.jpg" alt="Product Image">
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold text-gray-800">Product Name</h3>
+                <p class="text-sm text-gray-500">Short product description.</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-lg font-bold text-green-600">K69.99</span>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buy Now</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Navigation Buttons -->
+    <button id="prev" class="absolute top-1/2 left-2 -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full hover:bg-gray-700">
+        &larr;
+    </button>
+    <button id="next" class="absolute top-1/2 right-2 -translate-y-1/2 bg-gray-800 text-white p-2 rounded-full hover:bg-gray-700">
+        &rarr;
+    </button>
+</div>
+
+<!--Product List -->
+
+<div class="bg-white">
+    <div class="mx-auto max-w-7xl overflow-hidden px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+      <div class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-6 lg:gap-x-8">
+        <a href="#" class="group text-sm">
+          <img src="https://tailwindui.com/plus/img/ecommerce-images/category-page-07-product-01.jpg" alt="White fabric pouch with white zipper, black zipper pull, and black elastic loop." class="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75">
+          <h3 class="mt-4 font-medium text-gray-900">Nomad Pouch</h3>
+          <p class="italic text-gray-500">White and Black</p>
+          <p class="mt-2 font-medium text-gray-900">k50</p>
+        </a>
+        <a href="{% url 'product_details' %}" class="group text-sm">
+          <img src="https://tailwindui.com/plus/img/ecommerce-images/category-page-07-product-02.jpg" alt="Front of tote bag with washed black canvas body, black straps, and tan leather handles and accents." class="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75">
+          <h3 class="mt-4 font-medium text-gray-900">Zip Tote Basket</h3>
+          <p class="italic text-gray-500">Washed Black</p>
+          <p class="mt-2 font-medium text-gray-900">k140</p>
+        </a>
+        <a href="#" class="group text-sm">
+          <img src="https://tailwindui.com/plus/img/ecommerce-images/category-page-07-product-03.jpg" alt="Front of satchel with blue canvas body, black straps and handle, drawstring top, and front zipper pouch." class="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75">
+          <h3 class="mt-4 font-medium text-gray-900">Medium Stuff Satchel</h3>
+          <p class="italic text-gray-500">Blue</p>
+          <p class="mt-2 font-medium text-gray-900">k220</p>
+        </a>
+
+        <a href="#" class="group text-sm">
+            <img src="https://tailwindui.com/plus/img/ecommerce-images/category-page-07-product-03.jpg" alt="Front of satchel with blue canvas body, black straps and handle, drawstring top, and front zipper pouch." class="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75">
+            <h3 class="mt-4 font-medium text-gray-900">Medium Stuff Satchel</h3>
+            <p class="italic text-gray-500">Blue</p>
+            <p class="mt-2 font-medium text-gray-900">k220</p>
+          </a>
+
+          <a href="#" class="group text-sm">
+            <img src="https://tailwindui.com/plus/img/ecommerce-images/category-page-07-product-02.jpg" alt="Front of tote bag with washed black canvas body, black straps, and tan leather handles and accents." class="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75">
+            <h3 class="mt-4 font-medium text-gray-900">Zip Tote Basket</h3>
+            <p class="italic text-gray-500">Washed Black</p>
+            <p class="mt-2 font-medium text-gray-900">k140</p>
+          </a>
+
+          <a href="#" class="group text-sm">
+            <img src="https://tailwindui.com/plus/img/ecommerce-images/category-page-07-product-03.jpg" alt="Front of satchel with blue canvas body, black straps and handle, drawstring top, and front zipper pouch." class="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75">
+            <h3 class="mt-4 font-medium text-gray-900">Medium Stuff Satchel</h3>
+            <p class="italic text-gray-500">Blue</p>
+            <p class="mt-2 font-medium text-gray-900">k220</p>
+          </a>
+  
+        <!-- More products... -->
+      </div>
+    </div>
+  </div>
+  
+
+<!-- Add this script for basic navigation functionality -->
+<script>
+    const slider = document.getElementById("slider");
+    const prev = document.getElementById("prev");
+    const next = document.getElementById("next");
+
+    prev.addEventListener("click", () => {
+        slider.scrollLeft -= 320; // Adjust scroll amount as per card width
+    });
+
+    next.addEventListener("click", () => {
+        slider.scrollLeft += 320; // Adjust scroll amount as per card width
+    });
+</script>
+
+{% endblock %}
