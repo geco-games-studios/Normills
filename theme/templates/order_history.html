@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Order History - Marketplace{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-8">Order History</h1>
+
+{% if orders %}
+<div class="space-y-6">
+    {% for order in orders %}
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h2 class="text-lg font-medium text-gray-900">Order #{{ order.id }}</h2>
+                    <p class="text-sm text-gray-500">Placed on {{ order.created|date:"F j, Y" }}</p>
+                </div>
+                <span class="px-3 py-1 {% if order.status == 'delivered' %}bg-green-100 text-green-800{% elif order.status == 'cancelled' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-full text-sm font-medium">
+                    {{ order.get_status_display }}
+                </span>
+            </div>
+            
+            <div class="border-t border-gray-200 pt-4">
+                <div class="space-y-4">
+                    {% for item in order.items.all %}
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 w-16 h-16">
+                            {% if item.product.image %}
+                            <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="w-full h-full object-cover rounded">
+                            {% else %}
+                            <img src="/placeholder.svg?height=64&width=64" alt="{{ item.product.name }}" class="w-full h-full object-cover rounded">
+                            {% endif %}
+                        </div>
+                        
+                        <div class="ml-4 flex-1">
+                            <h3 class="text-sm font-medium text-gray-900">{{ item.product.name }}</h3>
+                            {% if item.variant_info %}
+                            <p class="mt-1 text-xs text-gray-500">{{ item.variant_info }}</p>
+                            {% endif %}
+                            <div class="flex justify-between mt-1">
+                                <span class="text-xs text-gray-500">Qty: {{ item.quantity }}</span>
+                                <span class="text-sm font-medium text-gray-900">K{{ item.price }} each</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-200 mt-6 pt-4 flex justify-between items-center">
+                <div>
+                    <span class="text-gray-600">Total</span>
+                    <span class="ml-2 text-lg font-medium text-gray-900">K{{ order.total }}</span>
+                </div>
+                
+                <a href="{% url 'order_confirmation' order.id %}" class="text-indigo-600 hover:text-indigo-800 font-medium">View Details</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-12 bg-white rounded-lg shadow-sm">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+    <h2 class="mt-4 text-lg font-medium text-gray-900">No orders yet</h2>
+    <p class="mt-2 text-gray-500">You haven't placed any orders yet.</p>
+    <div class="mt-6">
+        <a href="{% url 'home' %}" class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-md font-medium hover:bg-indigo-700">Start Shopping</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+

@@ -1,121 +1,33 @@
 {% extends "base.html" %}
+{% load custom_filters %}
 
+{% block title %}Home{% endblock %}
 {% block content %}
-
-
 <div class="border-b border-gray-200 pb-5">
   <h3 class="text-base font-semibold text-gray-900">Categories</h3>
 </div>
 
-
 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-  <a href="{%  url 'products' %}">
+  {% for category in categories %}
+  <a href="{% url 'category_detail' category.slug %}">
     <div>
-      
-       
-      <img class="h-auto max-w-full border-t-0 rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image.jpg" alt="">
-
-      <h3 class="p-3 my-2">Herbs</h3>
-      
+      {% if category.image %}
+        <img class="h-auto max-w-full rounded-lg" src="{{ category.image.url }}" alt="{{ category.name }}">
+      {% else %}
+        <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-{{ forloop.counter0|divisibleby:12|default:0 }}.jpg" alt="{{ category.name }}">
+      {% endif %}
+      <h3 class="p-3 my-2">{{ category.name }}</h3>
     </div>
-
   </a>
-
-  <a href="{%  url 'products' %}">
-
+  {% empty %}
+    <!-- Display some default categories if no categories exist in the database -->
+    <a href="{% url 'home' %}">
       <div>
-        <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-1.jpg" alt="">
-        <h3 class="p-3 my-2">Shop deals in Fashion</h3>
+        <img class="h-auto max-w-full border-t-0 rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image.jpg" alt="">
+        <h3 class="p-3 my-2">Herbs</h3>
       </div>
-
-
-  </a>
-
-  <a href=""> 
-
-    <div>
-      <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-2.jpg" alt="">
-      <h3 class="p-3 my-2">Best Sellers in Home & Kitchen</h3>
-    </div>
-  </a>
-
-  <a href=""> 
-
-    <div>
-      <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-3.jpg" alt="">
-      <h3 class="p-3 my-2">International top sellers in Kitchen </h3>
-    </div>
-
-  </a>
-
-
- <a href=""> 
-
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-4.jpg" alt="">
-    <h3 class="p-3 my-2">Most-loved watches</h3>
-  </div>
-
- </a>
-
-<a href=""> 
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-5.jpg" alt="">
-    <h3 class="p-3 my-2">Shop deals in Fashion</h3>
-  </div>
-  
-</a>
-
-<a href=""> 
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-6.jpg" alt="">
-    <h3 class="p-3 my-2">Best Sellers in Beauty & Personal Care</h3>
-  </div>
-</a>
-
-
-<a href=""> 
-
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-7.jpg" alt="">
-    <h3 class="p-3 my-2">Shop deals in Fashion</h3>
-  </div>
-</a>
-
-<a href=""> 
-
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-8.jpg" alt="">
-    <h3 class="p-3 my-2">Wireless Tech</h3>
-  </div>
-</a>
-
-<a href="">
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-9.jpg" alt="">
-    <h3 class="p-3 my-2">Best Sellers in Computers & Accessories</h3>
-  </div>
-
-</a>
- 
-<a href="">
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-10.jpg" alt="">
-    <h3 class="p-3 my-2">Level up your gaming</h3>
-  </div>
-</a>
-
-<a href="">
-  <div>
-    <img class="h-auto max-w-full rounded-lg" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-11.jpg" alt="">
-    <h3 class="p-3 my-2">Shop deals in Fashion</h3>
-  </div>
-  
-</a>
+    </a>
+    <!-- Repeat for other default categories -->
+  {% endfor %}
 </div>
-
 {% endblock %}
-
-
-
-
