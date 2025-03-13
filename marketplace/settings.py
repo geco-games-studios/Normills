@@ -33,6 +33,10 @@ INSTALLED_APPS = [
 ]
 
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://normills.onrender.com',
+]
+
 TAILWIND_APP_NAME = 'theme'
 
 
