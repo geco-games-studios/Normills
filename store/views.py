@@ -90,7 +90,7 @@ def signup(request):
     else:
         form = CustomUserCreationForm()
     
-    return render(request, 'signup.html', {'form': form})
+    return render(request, 'registration/signup.html', {'form': form})
 
 def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id, available=True)
