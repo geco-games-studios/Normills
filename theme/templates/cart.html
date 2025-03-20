@@ -16,7 +16,7 @@
                     {% if item.product.image %}
                     <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="w-full h-full object-cover">
                     {% else %}
-                    <img src="/placeholder.svg?height=100&width=100" alt="{{ item.product.name }}" class="w-full h-full object-cover">
+                    <img src="https://via.placeholder.com/100" alt="{{ item.product.name }}" class="w-full h-full object-cover">
                     {% endif %}
                 </div>
                 
@@ -35,9 +35,9 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="update">
                             <div class="flex items-center border border-gray-300 rounded-md">
-                                <button type="button" class="decrease-qty px-2 py-1 text-gray-600">-</button>
+                                <button type="button" class="decrease-qty px-2 py-1 text-gray-600" aria-label="Decrease quantity">-</button>
                                 <input type="number" name="quantity" value="{{ item.quantity }}" min="1" class="w-12 text-center border-x border-gray-300 py-1">
-                                <button type="button" class="increase-qty px-2 py-1 text-gray-600">+</button>
+                                <button type="button" class="increase-qty px-2 py-1 text-gray-600" aria-label="Increase quantity">+</button>
                             </div>
                             <button type="submit" class="ml-2 text-sm text-gray-600 hover:text-gray-900">Update</button>
                         </form>
@@ -47,7 +47,7 @@
                             <form action="{% url 'update_cart_item' item.id %}" method="post" class="ml-4">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="remove">
-                                <button type="submit" class="text-gray-400 hover:text-gray-600">
+                                <button type="submit" class="text-gray-400 hover:text-gray-600" aria-label="Remove item">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                                     </svg>
@@ -72,15 +72,11 @@
                 </div>
             </div>
             
-            <div class="border-b border-gray-200 py-4">
+            {% comment %} <div class="border-b border-gray-200 py-4">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">Shipping estimate</span>
                     <span class="text-gray-900 font-medium">K0.00</span>
                 </div>
-                {% comment %} <div class="flex justify-between items-center">
-                  <span class="text-gray-600">Payment Processing</span>
-                  <span class="text-gray-900 font-medium">K{{ cart.payment_processing_rate }}</span>
-              </div> {% endcomment %}
                 <div class="mt-1">
                     <span class="text-gray-500 text-sm flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -89,12 +85,12 @@
                         Standard shipping
                     </span>
                 </div>
-            </div>
+            </div> {% endcomment %}
             
             <div class="border-b border-gray-200 py-4">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">Tax estimate</span>
-                    <span class="text-gray-900 font-medium">K{{ cart.total|floatformat:2|multiply:0.08|floatformat:2 }}</span>
+                    <span class="text-gray-900 font-medium">K{{ cart.total|multiply:0.015|floatformat:2 }}</span>
                 </div>
                 <div class="mt-1">
                     <span class="text-gray-500 text-sm flex items-center">
@@ -109,7 +105,7 @@
             <div class="py-4">
                 <div class="flex justify-between items-center">
                     <span class="text-lg font-medium text-gray-900">Order total</span>
-                    <span class="text-lg font-medium text-gray-900">K{{ cart.total|add:5.00|add:cart.total|multiply:0.08|floatformat:2 }}</span>
+                    <span class="text-lg font-medium text-gray-900">K{{ cart.total|multiply:0.015|add:cart.total }}</span>
                 </div>
             </div>
             
@@ -143,6 +139,7 @@
                 const currentValue = parseInt(input.value);
                 if (currentValue > 1) {
                     input.value = currentValue - 1;
+                    input.dispatchEvent(new Event('change')); // Trigger form submission
                 }
             });
         });
@@ -152,9 +149,17 @@
                 const input = this.parentNode.querySelector('input');
                 const currentValue = parseInt(input.value);
                 input.value = currentValue + 1;
+                input.dispatchEvent(new Event('change')); // Trigger form submission
+            });
+        });
+
+        // Automatically submit the form when quantity changes
+        const quantityInputs = document.querySelectorAll('input[name="quantity"]');
+        quantityInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                this.form.submit();
             });
         });
     });
 </script>
 {% endblock %}
-

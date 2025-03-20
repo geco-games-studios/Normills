@@ -45,7 +45,38 @@ def get_or_create_cart(request):
 
 def home(request):
     categories = Category.objects.all()
-    return render(request, 'index.html', {'categories': categories})
+    products = Product.objects.all()
+
+    # Get filter parameters from the request
+    price_filter = request.GET.get('price')
+    availability_filter = request.GET.get('availability')
+
+    # Apply price filter
+    if price_filter:
+        products = products.filter(price__lte=float(price_filter))
+
+    # Apply availability filter
+    if availability_filter:
+        if availability_filter == 'in_stock':
+            products = products.filter(stock__gt=0)
+        elif availability_filter == 'out_of_stock':
+            products = products.filter(stock=0)
+
+    return render(request, 'index.html', {
+        'categories': categories,
+        'products': products,
+    })
+    
+    
+def search_products(request):
+    query = request.GET.get('q')
+    if query:
+        products = Product.objects.filter(
+            Q(name__icontains=query) | Q(description__icontains=query)
+        )
+    else:
+        products = Product.objects.all()
+    return render(request, 'search_results.html', {'products': products})
 
 def category_detail(request, slug):
     category = get_object_or_404(Category, slug=slug)
@@ -58,7 +89,7 @@ def category_detail(request, slug):
 def product_detail(request, slug):
     product = get_object_or_404(Product, slug=slug, available=True)
     variants = product.variants.all()
-    return render(request, 'product_detail.html', {
+    return render(request, 'product_details.html', {
         'product': product,
         'variants': variants
     })
@@ -166,7 +197,7 @@ def checkout(request):
         if form.is_valid():
             subtotal = cart.total
             shipping = Decimal('5.00')
-            tax = subtotal * Decimal('0.08')
+            tax = subtotal * Decimal('0.02')
             total = subtotal + shipping + tax
             
             # Create the order

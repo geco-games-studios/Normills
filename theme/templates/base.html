@@ -7,11 +7,58 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-white">
+    <!-- Header -->
     <header class="border-b border-gray-200">
-        <div class="container mx-auto px-4 py-4 flex items-center justify-between">
-            <a href="{% url 'home' %}" class="text-xl font-bold text-gray-900">Geco Mart</a>
-            
-            <div class="w-full max-w-md mx-4">
+        <div class="container mx-auto px-4 py-4">
+            <!-- Top Row: Logo, Notifications, Username, Cart -->
+            <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+                <!-- Logo -->
+                <a href="{% url 'home' %}" class="text-xl font-bold text-gray-900">Geco Mart</a>
+
+                <!-- User Actions -->
+                <div class="flex items-center space-x-4">
+                    <!-- Notifications -->
+                    <a href="#" class="text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                    </a>
+
+                    <!-- User Menu -->
+                    {% if user.is_authenticated %}
+                        <div class="relative group">
+                            <button class="text-gray-900 font-medium">{{ user.username }}</button>
+                            <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
+                                <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
+                                <form action="{% url 'logout' %}" method="post" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        Logout
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% else %}
+                        <a href="{% url 'signup' %}" class="text-gray-900 font-medium">Sign Up</a>
+                        <a href="{% url 'login' %}" class="text-gray-900 font-medium">Login</a>
+                    {% endif %}
+
+                    <!-- Cart -->
+                    <a href="{% url 'cart' %}" class="text-gray-900 relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        {% if cart.item_count > 0 %}
+                            <span class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                                {{ cart.item_count }}
+                            </span>
+                        {% endif %}
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search Bar (Below the top row) -->
+            <div class="mt-4 w-full md:max-w-md mx-auto">
                 <form action="{% url 'search_products' %}" method="get" class="relative">
                     <input type="text" name="q" placeholder="Search" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-200">
                     <button type="submit" class="absolute right-3 top-2.5">
@@ -21,46 +68,10 @@
                     </button>
                 </form>
             </div>
-            
-            <div class="flex items-center space-x-4">
-                <a href="#" class="text-gray-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                </a>
-                
-                {% if user.is_authenticated %}
-                    <div class="relative group">
-                        <button class="text-gray-900 font-medium">{{ user.username }}</button>
-                        <div class="absolute right-0 mt-0 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-                            <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
-                            <form action="{% url 'logout' %}" method="post" class="inline">
-								{% csrf_token %}
-								<button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-									Logout
-								</button>
-							</form>
-                        </div>
-                    </div>
-                {% else %}
-                    <a href="{% url 'signup' %}" class="text-gray-900 font-medium">Sign Up</a>
-                    <a href="{% url 'login' %}" class="text-gray-900 font-medium">Login</a>
-                {% endif %}
-                
-                <a href="{% url 'cart' %}" class="text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    {% if cart.item_count > 0 %}
-                        <span class="absolute top-4 right-10 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-                            {{ cart.item_count }}
-                        </span>
-                    {% endif %}
-                </a>
-            </div>
         </div>
     </header>
-    
+
+    <!-- Main Content -->
     <main class="container mx-auto px-4 py-8">
         {% if messages %}
             <div class="mb-6">
@@ -71,17 +82,21 @@
                 {% endfor %}
             </div>
         {% endif %}
-        
+
         {% block content %}{% endblock %}
     </main>
-    
+
+    <!-- Footer -->
     <footer class="bg-gray-100 py-8 mt-12">
         <div class="container mx-auto px-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- About Us -->
                 <div>
                     <h3 class="text-lg font-semibold mb-4">About Us</h3>
                     <p class="text-gray-600">Your marketplace for quality products at affordable prices.</p>
                 </div>
+
+                <!-- Customer Service -->
                 <div>
                     <h3 class="text-lg font-semibold mb-4">Customer Service</h3>
                     <ul class="space-y-2">
@@ -90,6 +105,8 @@
                         <li><a href="#" class="text-gray-600 hover:text-gray-900">Returns & Refunds</a></li>
                     </ul>
                 </div>
+
+                <!-- Follow Us -->
                 <div>
                     <h3 class="text-lg font-semibold mb-4">Follow Us</h3>
                     <div class="flex space-x-4">
@@ -100,7 +117,6 @@
                         </a>
                         <a href="#" class="text-gray-600 hover:text-gray-900">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                                <path   class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723 10.1 10.1 0 01-3.127 1.184 4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
                             </svg>
                         </a>
@@ -112,11 +128,12 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Copyright -->
             <div class="mt-8 pt-8 border-t border-gray-200 text-center">
-                <p class="text-gray-600">&copy; 2025 Marketplace. All rights reserved.</p>
+                <p class="text-gray-600">&copy; 2025 Geco Mart. All rights reserved.</p>
             </div>
         </div>
     </footer>
 </body>
 </html>
-

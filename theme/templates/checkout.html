@@ -135,10 +135,10 @@
                 </div>
 
                 
-                <div class="flex justify-between py-2">
+                {% comment %} <div class="flex justify-between py-2">
                     <span class="text-gray-600">Shipping</span>
                     <span class="text-gray-900 font-medium">K5.00</span>
-                </div>
+                </div> {% endcomment %}
 {% comment %} 
                 <div class="flex justify-between py-2">
                     <span class="text-gray-600">Payment Processing</span>
@@ -147,12 +147,12 @@
                 
                 <div class="flex justify-between py-2">
                     <span class="text-gray-600">Tax</span>
-                    <span class="text-gray-900 font-medium">K{{ cart.total|floatformat:2|multiply:0.08|floatformat:2 }}</span>
+                    <span class="text-gray-900 font-medium">K{{ cart.total|multiply:0.015|floatformat:2 }}</span>
                 </div>
                 
                 <div class="flex justify-between py-2 border-t border-gray-200 mt-2">
                     <span class="text-lg font-medium text-gray-900">Total</span>
-                    <span class="text-lg font-medium text-gray-900">K{{ cart.total|add:5.00|add:cart.total|multiply:0.08|floatformat:2 }}</span>
+                    <span class="text-lg font-medium text-gray-900">K{{ cart.total|multiply:0.015|add:cart.total }}</span>
                 </div>
             </div>
             

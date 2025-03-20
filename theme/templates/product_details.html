@@ -52,8 +52,14 @@
                 </div>
             </div>
             
-            <div class="mt-6">
-                <button type="submit" class="w-full bg-gray-900 text-white px-6 py-3 rounded-md hover:bg-gray-800">Add to Cart</button>
+            <div class="grid">
+                <div class="mt-6 mx-2">
+                    <form action="{% url 'add_to_cart' product.id %}" method="post" class="flex">
+                        {% csrf_token %}
+                        <input type="hidden" name="quantity" value="1">
+                    <button type="submit" class="w-full bg-gray-900 text-white px-6 py-3 rounded-md hover:bg-gray-800">Add to Cart</button>
+                    <form>
+                </div>
             </div>
         </form>
         

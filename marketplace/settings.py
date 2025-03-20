@@ -29,13 +29,17 @@ INSTALLED_APPS = [
     'tailwind',
     'theme',
     'django_browser_reload',
-    'store',  # our marketplace app
+    'store',
+    'manager',
+    'users',
 ]
 
 
 CSRF_TRUSTED_ORIGINS = [
     'https://normills.onrender.com',
 ]
+
+AUTH_USER_MODEL = 'users.User'
 
 TAILWIND_APP_NAME = 'theme'
 

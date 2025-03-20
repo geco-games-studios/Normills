@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from manager.models import Store
+from users.models import User
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -12,11 +14,12 @@ class Category(models.Model):
     
     def __str__(self):
         return self.name
-
+    
 class Product(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='products')  # Link to Store
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     image = models.ImageField(upload_to='products/')
@@ -24,14 +27,14 @@ class Product(models.Model):
     available = models.BooleanField(default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
-    store = models.TextField(blank=True)
-    
+
     class Meta:
         ordering = ['-created']
-    
+
     def __str__(self):
         return self.name
-
+    
+    
 class ProductVariant(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
     color = models.CharField(max_length=50, blank=True)
@@ -78,7 +81,7 @@ class CartItem(models.Model):
         if self.variant:
             base_price += self.variant.price_adjustment
         return base_price * self.quantity
-
+    
 class Order(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
@@ -87,7 +90,7 @@ class Order(models.Model):
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
     )
-    
+
     PAYMENT_STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -95,14 +98,15 @@ class Order(models.Model):
         ('failed', 'Failed'),
         ('refunded', 'Refunded'),
     )
-    
+
     PAYMENT_METHOD_CHOICES = (
         ('mobile_money', 'Mobile Money'),
         ('card', 'Credit/Debit Card'),
         ('cash', 'Cash on Delivery'),
     )
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='orders')  # Link to Store
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField()
@@ -117,16 +121,16 @@ class Order(models.Model):
     shipping = models.DecimalField(max_digits=10, decimal_places=2)
     tax = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
     # Payment fields
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='mobile_money')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     payment_reference = models.CharField(max_length=100, blank=True, null=True)
     payment_details = models.JSONField(blank=True, null=True)
-    
+
     class Meta:
         ordering = ['-created']
-    
+
     def __str__(self):
         return f'Order {self.id}'
 
@@ -144,3 +148,17 @@ class OrderItem(models.Model):
     def subtotal(self):
         return self.price * self.quantity
 
+class Store(models.Model):
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    description = models.TextField(blank=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stores')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def total_revenue(self):
+        return sum(order.total for order in self.orders.all())
