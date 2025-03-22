@@ -97,7 +97,7 @@
     </div>
     
     <div class="lg:col-span-1">
-        <div class="bg-gray-50 rounded-lg p-6 sticky top-6">
+        <div class="bg-gray-50 rounded-lg p-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
             
             <div class="max-h-64 overflow-y-auto mb-4">
@@ -134,17 +134,6 @@
                     <span class="text-gray-900 font-medium">K{{ cart.total }}</span>
                 </div>
 
-                
-                {% comment %} <div class="flex justify-between py-2">
-                    <span class="text-gray-600">Shipping</span>
-                    <span class="text-gray-900 font-medium">K5.00</span>
-                </div> {% endcomment %}
-{% comment %} 
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600">Payment Processing</span>
-                    <span class="text-gray-900 font-medium">K{{ cart.payment_processing_fee }}</span>
-                </div> {% endcomment %}
-                
                 <div class="flex justify-between py-2">
                     <span class="text-gray-600">Tax</span>
                     <span class="text-gray-900 font-medium">K{{ cart.total|multiply:0.015|floatformat:2 }}</span>
@@ -164,13 +153,6 @@
 </div>
 
 <script>
-    // Function to log responses
-    function logResponse(stage, response) {
-        console.log(`=== ${stage} ===`);
-        console.log(JSON.stringify(response, null, 2));
-        console.log('=================');
-    }
-
     async function submitForm(event) {
         event.preventDefault(); // Prevent the default form submission
 
@@ -184,7 +166,6 @@
 
         try {
             // Submit the form data to the server
-            console.log('Submitting form data...');
             const response = await fetch('{% url "checkout" %}', {
                 method: 'POST',
                 body: formData,
@@ -194,43 +175,14 @@
             });
 
             const data = await response.json();
-            logResponse('Form Submission Response', data);
 
             if (!data.status) {
                 throw new Error(data.message || 'Failed to submit the form');
             }
 
-            // Check if OTP is required
-            if (data.data && data.data.payment_reference) {
-                const otp = prompt('Please enter the OTP sent to your phone:');
-                if (!otp) {
-                    throw new Error('OTP is required');
-                }
-
-                console.log('Submitting OTP...');
-                const otpResponse = await fetch(`{% url "submit_otp" order_id=0 %}`.replace('0', data.data.order_id), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
-                    },
-                    body: JSON.stringify({
-                        otp: otp
-                    }),
-                });
-
-                const otpData = await otpResponse.json();
-                logResponse('OTP Submission Response', otpData);
-
-                if (!otpData.status) {
-                    throw new Error(otpData.message || 'OTP submission failed');
-                }
-
-                // Redirect to the order confirmation page
-                window.location.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', otpData.data.order_id);
-            } else if (data.data && data.data.order_id) {
-                // If no OTP required (e.g., cash payment or instant success), redirect to confirmation
-                window.location.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', data.data.order_id);
+            // Redirect to the order confirmation page
+            if (data.data && data.data.order_id) {
+                window.location.href = `{% url 'confirm_payment' order_id=0 %}`.replace('0', data.data.order_id);
             } else {
                 throw new Error(data.message || 'Form submission failed');
             }
@@ -246,6 +198,4 @@
     }
 </script>
 
-
 {% endblock %}
-

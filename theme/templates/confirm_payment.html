@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-8">Confirm Payment</h1>
+
+<div class="bg-white rounded-lg shadow-sm p-6">
+    <h2 class="text-lg font-medium text-gray-900">Order #{{ order.id }}</h2>
+    <p class="text-sm text-gray-500">Total Amount: K{{ order.total }}</p>
+    
+    <!-- Countdown Timer -->
+    <div class="mt-6 text-center">
+        <p class="text-gray-700">Transaction will be cancelled in:</p>
+        <div class="mt-4">
+            <div id="countdown-timer" class="w-16 h-16 mx-auto rounded-full border-4 border-indigo-600 flex items-center justify-center text-xl font-bold text-indigo-600">
+                60
+            </div>
+        </div>
+    </div>
+
+    <!-- Proceed Button (Hidden by default) -->
+    <div id="proceed-button" class="mt-6 hidden">
+        <a href="{% url 'order_confirmation' order.id %}" class="w-full bg-green-600 text-white px-6 py-3 rounded-md font-medium hover:bg-green-700 text-center block">
+            Proceed to Confirmation
+        </a>
+    </div>
+
+    <!-- Cancel Message (Hidden by default) -->
+    <div id="cancel-message" class="mt-6 text-center text-red-600 hidden">
+        <p>Transaction cancelled. Redirecting to order confirmation...</p>
+    </div>
+</div>
+
+<script>
+    // Countdown Timer Logic
+    let timeLeft = 60; // 1 minute
+    const countdownTimer = document.getElementById('countdown-timer');
+    const proceedButton = document.getElementById('proceed-button');
+    const cancelMessage = document.getElementById('cancel-message');
+
+    const countdownInterval = setInterval(() => {
+        timeLeft--;
+        countdownTimer.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+            clearInterval(countdownInterval);
+            countdownTimer.textContent = '0';
+            cancelMessage.classList.remove('hidden');
+            setTimeout(() => {
+                window.location.href = "{% url 'order_confirmation' order.id %}";
+            }, 2000); // Redirect after 2 seconds
+        }
+    }, 1000);
+
+    // Simulate payment status check (replace with actual API call)
+    function checkPaymentStatus() {
+        // Replace this with an actual API call to check payment status
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({ status: 'success' }); // Simulate success after 5 seconds
+            }, 5000);
+        });
+    }
+
+    // Check payment status periodically
+    const paymentCheckInterval = setInterval(async () => {
+        const paymentStatus = await checkPaymentStatus();
+        if (paymentStatus.status === 'success') {
+            clearInterval(countdownInterval); // Stop the countdown
+            clearInterval(paymentCheckInterval); // Stop checking payment status
+            proceedButton.classList.remove('hidden'); // Show the proceed button
+        }
+    }, 2000); // Check every 2 seconds
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+<h1>Order Details</h1>
+<p>Transaction ID: {{ order.transaction_id }}</p>
+<p>Status: {{ order.status }}</p>
+<p>Payment Status: {{ order.payment_status }}</p>
+
+{% if order.status == 'processing' %}
+    <a href="{% url 'add_on_delivery' order.id %}" class="btn btn-primary">Add on Delivery</a>
+{% endif %}
+
+{% if order.status == 'shipped' %}
+    <a href="{% url 'received_parcel' order.id %}" class="btn btn-success">Received Parcel</a>
+{% endif %}
+
+{% if order.status == 'delivered' and not order.payment_confirmed %}
+    <a href="{% url 'confirm_payment' order.id %}" class="btn btn-warning">Confirm Payment</a>
+{% endif %}

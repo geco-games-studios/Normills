@@ -118,6 +118,20 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Error Dialog Modal -->
+    <div id="error-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center hidden">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+            <h2 class="text-lg font-bold text-red-600">Error</h2>
+            <p id="error-message" class="text-gray-700 mt-2"></p>
+            <div class="mt-4 text-right">
+                <button id="close-error-modal" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     
     <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Shipping Information</h2>
@@ -144,11 +158,16 @@
 </div>
 
 {% if order.payment_method == 'mobile_money' and order.payment_status == 'processing' %}
+
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const checkStatusBtn = document.getElementById('check-payment-status');
         const statusMessage = document.getElementById('payment-status-message');
-        
+        const errorModal = document.getElementById('error-modal');
+        const errorMessage = document.getElementById('error-message');
+        const closeErrorModal = document.getElementById('close-error-modal');
+
         checkStatusBtn.addEventListener('click', function() {
             statusMessage.textContent = 'Checking payment status...';
             
@@ -170,13 +189,20 @@
                     }
                 })
                 .catch(error => {
-                    statusMessage.textContent = 'Error checking payment status. Please try again.';
-                    statusMessage.className = 'ml-3 text-sm text-red-700';
+                    // Show error modal instead of alert
+                    errorMessage.textContent = 'Error checking payment status. Please try again.';
+                    errorModal.classList.remove('hidden');
                     console.error('Error:', error);
                 });
         });
+
+        // Close modal when clicking the button
+        closeErrorModal.addEventListener('click', function() {
+            errorModal.classList.add('hidden');
+        });
     });
 </script>
+
 {% endif %}
 {% endblock %}
 

@@ -1,0 +1,17 @@
+<h1>{{ store.name }} Dashboard</h1>
+
+<h2>Products</h2>
+<ul>
+    {% for product in products %}
+        <li>{{ product.name }} - ${{ product.price }}</li>
+    {% endfor %}
+</ul>
+
+<h2>Orders</h2>
+<ul>
+    {% for order in orders %}
+        <li>Order #{{ order.id }} - ${{ order.total }} ({{ order.status }})</li>
+    {% endfor %}
+</ul>
+
+<h2>Total Revenue: ${{ store.total_revenue }}</h2>

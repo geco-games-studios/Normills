@@ -6,14 +6,21 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.utils.crypto import get_random_string
 from decimal import Decimal
+import uuid
 import json
+from decimal import Decimal
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem
 from .forms import CustomUserCreationForm, CheckoutForm
-from .payment import process_lenco_payment, logger, submit_lenco_otp
+from .payment import process_lenco_payment, logger
+
+from django.contrib import messages
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_or_create_cart(request):
     if request.user.is_authenticated:
@@ -94,21 +101,21 @@ def product_detail(request, slug):
         'variants': variants
     })
 
-def search_products(request):
-    query = request.GET.get('q', '')
-    if query:
-        products = Product.objects.filter(
-            Q(name__icontains=query) | 
-            Q(description__icontains=query) |
-            Q(category__name__icontains=query)
-        ).filter(available=True)
-    else:
-        products = Product.objects.none()
+# def search_products(request):
+#     query = request.GET.get('q', '')
+#     if query:
+#         products = Product.objects.filter(
+#             Q(name__icontains=query) | 
+#             Q(description__icontains=query) |
+#             Q(category__name__icontains=query)
+#         ).filter(available=True)
+#     else:
+#         products = Product.objects.none()
     
-    return render(request, 'search_results.html', {
-        'products': products,
-        'query': query
-    })
+#     return render(request, 'search_results.html', {
+#         'products': products,
+#         'query': query
+#     })
 
 def signup(request):
     if request.method == 'POST':
@@ -182,6 +189,7 @@ def cart(request):
     return render(request, 'cart.html', {'cart': cart})
 
 @login_required
+@login_required
 def checkout(request):
     cart = get_or_create_cart(request)
     
@@ -190,7 +198,6 @@ def checkout(request):
         return redirect('cart')
     
     if request.method == 'POST':
-        # Log the raw POST data for debugging
         logger.info(f"Checkout POST data: {request.POST}")
         
         form = CheckoutForm(request.POST)
@@ -246,35 +253,29 @@ def checkout(request):
             
             if payment_method == 'mobile_money':
                 try:
-                    # Format the phone number properly
                     phone = form.cleaned_data['phone']
-                    
-                    # Get the mobile operator and ensure it's lowercase
                     mobile_operator = request.POST.get('mobile_operator', 'airtel').lower()
-                    
-                    # Validate that the operator is either "airtel" or "mtn"
                     if mobile_operator not in ['airtel', 'mtn']:
                         mobile_operator = 'airtel'  # Default to airtel if invalid
                     
-                    # Log the payment request with operator
                     logger.info(f"Payment request - Order ID: {order.id}, Amount: {total}, Phone: {phone}, Operator: {mobile_operator}")
+                    
+                    # Generate a unique reference
+                    reference = f"ORDER-{order.id}-{uuid.uuid4().hex[:6]}"
                     
                     payment_response = process_lenco_payment(
                         amount=float(total),
                         phone_number=phone,
-                        reference=f"ORDER-{order.id}",
-                        operator=mobile_operator  # Pass the validated operator
+                        reference=reference,
+                        operator=mobile_operator
                     )
-                    
-                    # Log the full payment response for debugging
+
                     logger.info(f"Payment response - Order ID: {order.id}, Response: {json.dumps(payment_response, indent=2)}")
-                    
-                    # Check if the payment response indicates an error
+
                     if not payment_response.get('status', False):
                         error_message = payment_response.get('message', 'Payment processing failed')
                         logger.error(f"Payment error - Order ID: {order.id}, Error: {error_message}")
                         
-                        # Update order with error details
                         order.payment_status = 'failed'
                         order.payment_details = payment_response
                         order.save()
@@ -284,44 +285,43 @@ def checkout(request):
                             'message': error_message,
                             'data': None
                         }, status=400)
-                    
-                    # Extract payment details
+
                     payment_data = payment_response.get('data', {})
-                    
-                    # Save payment details to order
                     order.payment_reference = payment_data.get('lencoReference') or payment_data.get('reference', '')
                     order.payment_details = payment_response
-                    
-                    # Update payment status based on response
+
                     payment_status = payment_data.get('status', 'pending')
                     order.payment_status = payment_status
                     order.save()
-                    
-                    # Log the order update
+
                     logger.info(f"Order updated - ID: {order.id}, Status: {payment_status}, Reference: {order.payment_reference}")
-                    
-                    # Prepare the JSON response
+
                     json_response = None
-                    
-                    # Handle different payment statuses
+
                     if payment_status == 'otp-required':
-                        # OTP is required
+                        # Notify the user to enter their mobile money PIN
                         json_response = {
                             'status': True,
-                            'message': 'OTP required. Please check your phone.',
+                            'message': 'Please enter your mobile money PIN to authorize the payment.',
                             'data': {
                                 'order_id': order.id,
                                 'payment_reference': order.payment_reference,
+                                'status': 'otp-required'
+                            }
+                        }
+                    elif payment_status == 'pay-offline':
+                        # Notify the user to authorize the payment on their phone
+                        json_response = {
+                            'status': True,
+                            'message': 'Please authorize the payment on your mobile money app.',
+                            'data': {
+                                'order_id': order.id,
+                                'payment_reference': order.payment_reference,
+                                'status': 'pay-offline'
                             }
                         }
                     elif payment_status == 'successful':
-                        # Payment was successful
-                        messages.success(request, "Payment successful! Your order has been placed.")
-                        
-                        # Clear the cart
                         cart.items.all().delete()
-                        
-                        # Send order confirmation email
                         send_order_confirmation_email(order)
                         
                         json_response = {
@@ -332,10 +332,8 @@ def checkout(request):
                             }
                         }
                     else:
-                        # Payment failed or other status
                         reason = payment_data.get('reasonForFailure', 'Unknown error')
-                        status_message = f"Payment status: {payment_status}"
-                        message = reason if reason else status_message
+                        message = reason if reason else f"Payment status: {payment_status}"
                         
                         messages.error(request, message)
                         
@@ -344,12 +342,10 @@ def checkout(request):
                             'message': message,
                             'data': None
                         }
-                    
-                    # Log the JSON response being sent to the client
+
                     logger.info(f"JSON response to client - Order ID: {order.id}, Response: {json.dumps(json_response, indent=2)}")
-                    
                     return JsonResponse(json_response, status=400 if not json_response['status'] else 200)
-                
+
                 except Exception as e:
                     logger.error(f"Payment processing error - Order ID: {order.id}, Error: {str(e)}")
                     order.payment_status = 'failed'
@@ -361,20 +357,14 @@ def checkout(request):
                         'data': None
                     }
                     
-                    # Log the error response
                     logger.info(f"Error response to client - Order ID: {order.id}, Response: {json.dumps(error_response, indent=2)}")
-                    
                     messages.error(request, "An error occurred while processing your payment. Please try again.")
                     return JsonResponse(error_response, status=500)
-            
+
             elif payment_method == 'cash':
                 order.payment_status = 'pending'
                 order.save()
-                
-                # Clear the cart
                 cart.items.all().delete()
-                
-                # Send order confirmation email
                 send_order_confirmation_email(order)
                 
                 json_response = {
@@ -385,25 +375,18 @@ def checkout(request):
                     }
                 }
                 
-                # Log the JSON response
                 logger.info(f"Cash payment response - Order ID: {order.id}, Response: {json.dumps(json_response, indent=2)}")
-                
                 messages.success(request, "Your order has been placed successfully! You'll pay on delivery.")
                 return JsonResponse(json_response)
         else:
-            # Return form errors as JSON
             errors = {field: error[0] for field, error in form.errors.items()}
-            
             error_response = {
                 'status': False,
                 'message': 'Form validation failed',
                 'errors': errors,
                 'data': None
             }
-            
-            # Log the validation errors
             logger.error(f"Form validation errors: {json.dumps(errors, indent=2)}")
-            
             return JsonResponse(error_response, status=400)
     else:
         initial_data = {}
@@ -421,8 +404,6 @@ def checkout(request):
         'form': form
     })
 
-
-
 def send_order_confirmation_email(order):
     subject = f"Order Confirmation - #{order.id}"
     html_message = render_to_string('emails/order_confirmation.html', {'order': order})
@@ -432,6 +413,7 @@ def send_order_confirmation_email(order):
     
     send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
 
+@login_required
 @login_required
 def submit_otp(request, order_id):
     """Handle OTP submission for mobile money payments"""
@@ -558,8 +540,6 @@ def submit_otp(request, order_id):
         
         return JsonResponse(error_response, status=500)
 
-
-
 @login_required
 def order_confirmation(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
@@ -571,15 +551,80 @@ def order_history(request):
     return render(request, 'order_history.html', {'orders': orders})
 
 @login_required
+@login_required
 def verify_payment(request, order_id):
     """Endpoint to verify payment status"""
     order = get_object_or_404(Order, id=order_id, user=request.user)
     
-    # In a real implementation, you would check with the payment gateway
-    # For now, we'll just return the current status
-    return JsonResponse({
-        'order_id': order.id,
-        'payment_status': order.payment_status,
-        'payment_reference': order.payment_reference
-    })
+    # Check payment status with Lenco API
+    payment_status = get_collection_status(order.payment_reference)
+    
+    if payment_status.get('status', False):
+        order.payment_status = payment_status['data'].get('status', 'pending')
+        order.save()
+        
+        return JsonResponse({
+            'order_id': order.id,
+            'payment_status': order.payment_status,
+            'payment_reference': order.payment_reference
+        })
+    else:
+        return JsonResponse({
+            'status': False,
+            'message': payment_status.get('message', 'Failed to verify payment'),
+            'data': None
+        }, status=400)
 
+@login_required
+def add_on_delivery(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    order.notify_shipped()
+    messages.success(request, 'Order marked as shipped and notifications sent.')
+    return redirect('order_detail', order_id=order.id)
+
+@login_required
+def received_parcel(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    order.notify_delivered()
+    messages.success(request, 'Order marked as delivered and notifications sent.')
+    return redirect('order_detail', order_id=order.id)
+
+@login_required
+def confirm_payment(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    
+    if request.method == 'POST':
+        pin = request.POST.get('pin')
+        
+        # Process the payment using the Lenco API
+        payment_response = process_lenco_payment(
+            amount=order.total,
+            phone_number=order.phone,
+            reference=order.transaction_id,
+            operator="airtel"  # or any other operator
+        )
+        
+        # Update the order status based on the payment response
+        if payment_response['status'] == 'success':
+            order.payment_status = 'completed'
+            order.status = 'processing'
+            messages.success(request, 'Payment successful! Your order is being processed.')
+        elif payment_response['status'] == 'insufficient_balance':
+            order.payment_status = 'failed'
+            order.status = 'cancelled'
+            messages.error(request, 'Payment failed: Insufficient balance.')
+        else:
+            order.payment_status = 'failed'
+            order.status = 'cancelled'
+            messages.error(request, 'Payment failed. Please try again.')
+        
+        order.save()
+        
+        return redirect('order_confirmation', order_id=order.id)
+    
+    return render(request, 'confirm_payment.html', {'order': order})
+
+def buy_now(request, slug):
+    product = get_object_or_404(Product, slug=slug)
+    # Add logic to handle the "Buy Now" action
+    return redirect('checkout')  # Redirect to the checkout page

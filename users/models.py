@@ -27,25 +27,25 @@ class User(AbstractUser):
     def __str__(self):
         return self.username
     
-    
+# class User(AbstractUser):
+#     is_store_owner = models.BooleanField(default=False)
+
 class StoreOwnerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='store_owner_profile')
     store_name = models.CharField(max_length=200)
+    phone_number = models.CharField(max_length=20)
+    address = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"{self.user.username} - Store Owner"
+    
+    
+class ClientProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
     phone_number = models.CharField(max_length=20)
     address = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.store_name}"
-    
-    
-# class ClientProfile(models.Model):
-#     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
-#     phone_number = models.CharField(max_length=20)
-#     address = models.CharField(max_length=255)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-
-#     def __str__(self):
-#         return f"{self.user.username} - Client"
+        return f"{self.user.username} - Client"

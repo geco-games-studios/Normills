@@ -106,7 +106,7 @@ class Order(models.Model):
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='orders')  # Link to Store
+    store = models.ForeignKey('Store', on_delete=models.CASCADE, null=True, blank=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField()
@@ -121,18 +121,109 @@ class Order(models.Model):
     shipping = models.DecimalField(max_digits=10, decimal_places=2)
     tax = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
+    
 
     # Payment fields
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='mobile_money')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     payment_reference = models.CharField(max_length=100, blank=True, null=True)
     payment_details = models.JSONField(blank=True, null=True)
+    
+    # Delivery Fields
+    delivered_at = models.DateTimeField(null=True, blank=True)  # Timestamp when the order is delivered
+    payment_confirmed = models.BooleanField(default=False)  # Whether payment is confirmed
+    transaction_id = models.CharField(max_length=100, unique=True, blank=True, null=True)  # Unique transaction ID
 
     class Meta:
         ordering = ['-created']
 
+    # def __str__(self):
+    #     return f'Order {self.id}'
+    
     def __str__(self):
-        return f'Order {self.id}'
+        return f'Order {self.id} - {self.transaction_id}'
+    
+    def send_sms_notification(self, message, recipient_phone):
+        """
+        Utility method to send an SMS notification.
+        """
+        try:
+            send_sms(recipient_phone, message)
+        except Exception as e:
+            print(f"Failed to send SMS: {e}")
+            
+    def notify_shipped(self):
+        """
+        Notify the user and store owner that the order has been shipped.
+        """
+        if self.status != 'shipped':
+            self.status = 'shipped'
+            self.save()
+
+            # Prepare messages
+            user_message = (
+                f"Your order with transaction ID {self.transaction_id} has been shipped. "
+                f"Product: {self.product_details()}, Price: {self.total}"
+            )
+            store_owner_message = (
+                f"Order with transaction ID {self.transaction_id} has been shipped. "
+                f"Product: {self.product_details()}, Price: {self.total}"
+            )
+
+            # Send SMS to user and store owner
+            self.send_sms_notification(user_message, self.phone)
+            self.send_sms_notification(store_owner_message, self.store.owner.phone_number)
+
+    def notify_delivered(self):
+        """
+        Notify the user and store owner that the order has been delivered.
+        """
+        if self.status != 'delivered':
+            self.status = 'delivered'
+            self.delivered_at = timezone.now()
+            self.save()
+
+            # Prepare messages
+            user_message = (
+                f"Your order with transaction ID {self.transaction_id} has been delivered. "
+                f"Product: {self.product_details()}, Price: {self.total}"
+            )
+            store_owner_message = (
+                f"Order with transaction ID {self.transaction_id} has been delivered. "
+                f"Product: {self.product_details()}, Price: {self.total}"
+            )
+
+            # Send SMS to user and store owner
+            self.send_sms_notification(user_message, self.phone)
+            self.send_sms_notification(store_owner_message, self.store.owner.phone_number)
+
+    def notify_payment_confirmed(self):
+        """
+        Notify the user and store owner that the payment has been confirmed.
+        """
+        if not self.payment_confirmed:
+            self.payment_confirmed = True
+            self.save()
+
+            # Prepare receipt message
+            receipt_message = (
+                f"Receipt for Transaction ID: {self.transaction_id}\n"
+                f"Product Details: {self.product_details()}\n"
+                f"Price: {self.total}\n"
+                f"Delivered At: {self.delivered_at}\n"
+                f"Store Owner: {self.store.owner.username}\n"
+                f"Thank you for your purchase!"
+            )
+
+            # Send SMS to user and store owner
+            self.send_sms_notification(receipt_message, self.phone)
+            self.send_sms_notification(receipt_message, self.store.owner.phone_number)
+
+    def product_details(self):
+        """
+        Returns a string with details of all products in the order.
+        """
+        return ", ".join([f"{item.product.name} (x{item.quantity})" for item in self.items.all()])
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
