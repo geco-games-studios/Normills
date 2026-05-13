@@ -125,6 +125,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # For production
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 # Media files
@@ -139,7 +140,13 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 
+# Security settings for production
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False  # Set to True if using HTTPS
+SESSION_COOKIE_SECURE = False  # Set to True if using HTTPS
+CSRF_COOKIE_SECURE = False  # Set to True if using HTTPS
+
 
 # Lenco Payment Gateway Settings
-LENCO_API_BASE_URL = "https://api.lenco.co/access/v2"
-LENCO_API_KEY = "f6b09f335a525b56c373270078d2c64697216f246273ea075b18cccb762dc804"
+# LENCO_API_BASE_URL = "https://api.lenco.co/access/v2"
+# LENCO_API_KEY = "f6b09f335a525b56c373270078d2c64697216f246273ea075b18cccb762dc804"
