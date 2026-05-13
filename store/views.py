@@ -194,8 +194,15 @@ def checkout(request):
     cart = get_or_create_cart(request)
     
     if not cart.items.exists():
-        messages.warning(request, "Your cart is empty.")
-        return redirect('cart')
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.META.get('HTTP_ACCEPT', '').find('application/json') != -1:
+            return JsonResponse({
+                'status': False,
+                'message': 'Your cart is empty.',
+                'data': None
+            }, status=400)
+        else:
+            messages.warning(request, "Your cart is empty.")
+            return redirect('cart')
     
     if request.method == 'POST':
         logger.info(f"Checkout POST data: {request.POST}")
