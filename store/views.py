@@ -306,7 +306,7 @@ def checkout(request):
                     json_response = None
 
                     if payment_status == 'otp-required':
-                        # Notify the user to enter their mobile money PIN
+                        // ...existing code...
                         json_response = {
                             'status': True,
                             'message': 'Please enter your mobile money PIN to authorize the payment.',
@@ -317,7 +317,7 @@ def checkout(request):
                             }
                         }
                     elif payment_status == 'pay-offline':
-                        # Notify the user to authorize the payment on their phone
+                        // ...existing code...
                         json_response = {
                             'status': True,
                             'message': 'Please authorize the payment on your mobile money app.',
@@ -330,10 +330,9 @@ def checkout(request):
                     elif payment_status == 'successful':
                         cart.items.all().delete()
                         send_order_confirmation_email(order)
-                        
                         json_response = {
                             'status': True,
-                            'message': 'Payment successful',
+                            'message': 'Order placed successfully! Your payment was successful.',
                             'data': {
                                 'order_id': order.id
                             }
@@ -376,12 +375,11 @@ def checkout(request):
                 
                 json_response = {
                     'status': True,
-                    'message': 'Order placed successfully',
+                    'message': 'Order placed successfully! You will pay on delivery.',
                     'data': {
                         'order_id': order.id
                     }
                 }
-                
                 logger.info(f"Cash payment response - Order ID: {order.id}, Response: {json.dumps(json_response, indent=2)}")
                 messages.success(request, "Your order has been placed successfully! You'll pay on delivery.")
                 return JsonResponse(json_response)
