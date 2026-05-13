@@ -306,7 +306,6 @@ def checkout(request):
                     json_response = None
 
                     if payment_status == 'otp-required':
-                        // ...existing code...
                         json_response = {
                             'status': True,
                             'message': 'Please enter your mobile money PIN to authorize the payment.',
@@ -317,7 +316,6 @@ def checkout(request):
                             }
                         }
                     elif payment_status == 'pay-offline':
-                        // ...existing code...
                         json_response = {
                             'status': True,
                             'message': 'Please authorize the payment on your mobile money app.',
