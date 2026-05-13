@@ -149,4 +149,4 @@ CSRF_COOKIE_SECURE = False  # Set to True if using HTTPS
 
 # Lenco Payment Gateway Settings
 LENCO_API_BASE_URL = "https://api.lenco.co/access/v2"
-LENCO_API_KEY = "f6b09f335a525b56c373270078d2c64697216f246273ea075b18cccb762dc804"
+LENCO_API_KEY = "ebbdf8030d34cd5d25052ed44fd757adcd96b93cd47d02bf72dc063bda8ae5b9"

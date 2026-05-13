@@ -174,9 +174,15 @@
                 },
             });
 
-            const data = await response.json();
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                // If response is not JSON, show a generic error
+                throw new Error('Server error: Invalid response format. Please try again or contact support.');
+            }
 
-            if (!data.status) {
+            if (!response.ok || !data.status) {
                 throw new Error(data.message || 'Failed to submit the form');
             }
 
