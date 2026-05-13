@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
+# SQLite database
+db.sqlite3
+
+# Media files
+media/
 
 # C extensions
 *.so
