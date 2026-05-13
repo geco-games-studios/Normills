@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'tailwind',
     'theme',
-    'django_browser_reload',
+    # 'django_browser_reload',
     'store',
     'manager',
     'users',
@@ -36,7 +36,7 @@ INSTALLED_APPS = [
 
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://normills.onrender.com',
+    'https://marketplace.gecogames.com',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -52,7 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django_browser_reload.middleware.BrowserReloadMiddleware',
+    # 'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
 
 ROOT_URLCONF = 'marketplace.urls'
@@ -76,9 +76,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'marketplace.wsgi.application'
 
-INTERNAL_IPS = [
-    "127.0.0.1",
-]
+# INTERNAL_IPS = [
+#     "127.0.0.1",
+# ]
 
 
 # Database
