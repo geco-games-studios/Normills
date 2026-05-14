@@ -1,5 +1,10 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand
+@admin.register(Brand)
+class BrandAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug']
+    prepopulated_fields = {'slug': ('name',)}
+
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -12,8 +17,8 @@ class ProductVariantInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'stock', 'available', 'created', 'updated']
-    list_filter = ['available', 'created', 'updated', 'category']
+    list_display = ['name', 'category', 'brand', 'price', 'stock', 'available', 'created', 'updated']
+    list_filter = ['available', 'created', 'updated', 'category', 'brand']
     list_editable = ['price', 'stock', 'available']
     prepopulated_fields = {'slug': ('name',)}
     inlines = [ProductVariantInline]

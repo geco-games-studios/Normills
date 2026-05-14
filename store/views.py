@@ -219,10 +219,10 @@ def checkout(request):
                 user=request.user,
                 first_name=form.cleaned_data['first_name'],
                 last_name=form.cleaned_data['last_name'],
-                email=form.cleaned_data['email'],
-                address=form.cleaned_data['address'],
-                city=form.cleaned_data['city'],
-                postal_code=form.cleaned_data['postal_code'],
+                email=form.cleaned_data.get('email', ''),
+                address=form.cleaned_data.get('address', ''),
+                city=form.cleaned_data.get('city', ''),
+                postal_code=form.cleaned_data.get('postal_code', ''),
                 phone=form.cleaned_data['phone'],
                 subtotal=subtotal,
                 shipping=shipping,
@@ -370,7 +370,9 @@ def checkout(request):
                 order.save()
                 cart.items.all().delete()
                 send_order_confirmation_email(order)
-                
+                # Send SMS to user and store owner
+                from .sms_service import send_order_sms
+                send_order_sms(order)
                 json_response = {
                     'status': True,
                     'message': 'Order placed successfully! You will pay on delivery.',

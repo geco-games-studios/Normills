@@ -37,7 +37,8 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": f"Bearer {settings.LENCO_API_KEY}"
+        "Authorization": f"Bearer {settings.LENCO_API_KEY}",
+        "User-Agent": "Mozilla/5.0 (compatible; GecoMarketplaceBot/1.0; +https://marketplace.gecogames.com)"
     }
     
     # Log the request for debugging

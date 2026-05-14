@@ -24,13 +24,22 @@ class CustomUserCreationForm(UserCreationForm):
 class CheckoutForm(forms.Form):
     first_name = forms.CharField(max_length=100, required=True)
     last_name = forms.CharField(max_length=100, required=True)
-    email = forms.EmailField(required=True)
-    address = forms.CharField(max_length=255, required=True)
-    city = forms.CharField(max_length=100, required=True)
-    postal_code = forms.CharField(max_length=20, required=True)
+    email = forms.EmailField(required=False)
+    address = forms.CharField(max_length=255, required=False)
+    city = forms.CharField(max_length=100, required=False)
+    postal_code = forms.CharField(max_length=20, required=False)
     phone = forms.CharField(max_length=20, required=True)
-    
-    # Define the payment method choices
+
+    def clean(self):
+        cleaned_data = super().clean()
+        payment_method = cleaned_data.get('payment_method')
+        if payment_method == 'mobile_money':
+            # Require all fields for mobile money
+            required_fields = ['email', 'address', 'city', 'postal_code']
+            for field in required_fields:
+                if not cleaned_data.get(field):
+                    self.add_error(field, 'This field is required for Mobile Money payment.')
+        return cleaned_data
     PAYMENT_CHOICES = [
         ('mobile_money', 'Mobile Money'),
         ('cash', 'Cash on Delivery'),

@@ -3,156 +3,129 @@
 
 {% block title %}Home{% endblock %}
 {% block content %}
-<div class="flex flex-col md:flex-row">
-  <!-- Filters Sidebar -->
-  <div class="w-full md:w-64 p-4 border-b md:border-r border-gray-200">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
-    
-    <!-- Price Range Filter -->
+<!-- Hero Section -->
+<section class="w-full bg-gray-100 flex flex-col md:flex-row items-center justify-between px-4 md:px-12 py-8 md:py-16 rounded-xl mb-8 relative overflow-hidden">
+  <div class="z-10">
+    <h1 class="text-4xl md:text-6xl font-bold text-gray-900 mb-4">Simple<br>is More</h1>
+    <p class="text-lg text-gray-600 mb-6">Designed to stand out. Limited editions. Styles for everyone.</p>
+  </div>
+  <div class="hidden md:block absolute right-0 top-0 h-full w-1/3 bg-cover bg-center" style="background-image: url('/static/img/hero.jpg'); opacity: 0.2;"></div>
+</section>
+
+<div class="flex flex-col md:flex-row gap-8">
+  <!-- Sidebar Filter (stacks below on mobile) -->
+  <aside class="w-full md:w-64 bg-white rounded-xl shadow p-4 mb-4 md:mb-0 order-2 md:order-1">
+    <h3 class="text-xl font-semibold mb-6">Filter</h3>
+    <!-- Brand Filter -->
     <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Price Range</h4>
-      <input type="range" id="priceRange" min="0" max="1000" class="w-full" value="{{ request.GET.price|default:'100000' }}">
-      <div class="flex justify-between text-xs text-gray-600 mt-1">
-        <span>K0</span>
-        <span>K1,00,000</span>
+      <h4 class="text-sm font-medium text-gray-700 mb-2">Brand</h4>
+      <ul class="space-y-2 max-h-32 overflow-y-auto">
+        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Nike</label></li>
+        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Adidas</label></li>
+        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Apple</label></li>
+        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> New Balance</label></li>
+        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Puma</label></li>
+      </ul>
+    </div>
+    <!-- Price Filter -->
+    <div class="mb-6">
+      <h4 class="text-sm font-medium text-gray-700 mb-2">Price</h4>
+      <input type="range" min="0" max="300000" class="w-full">
+      <div class="flex justify-between text-xs text-gray-500 mt-1">
+        <span>2,900 ZMW</span>
+        <span>300,000 ZMW</span>
       </div>
     </div>
-
-    <!-- Category Filter -->
+    <!-- Size Filter -->
     <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Categories</h4>
-      <ul class="space-y-2">
-        {% for category in categories %}
-        <li>
-          <label class="flex items-center">
-            <input type="checkbox" name="category" value="{{ category.id }}" class="categoryFilter form-checkbox h-4 w-4 text-gray-600"
-              {% if category.id|stringformat:"s" in request.GET.getlist|default:'' %}checked{% endif %}>
-            <span class="ml-2 text-sm text-gray-700">{{ category.name }}</span>
-          </label>
-        </li>
-        {% endfor %}
-      </ul>
+      <h4 class="text-sm font-medium text-gray-700 mb-2">Size</h4>
+      <div class="flex flex-wrap gap-2">
+        <span class="px-2 py-1 border rounded text-xs">XXS</span>
+        <span class="px-2 py-1 border rounded text-xs">XS</span>
+        <span class="px-2 py-1 border rounded text-xs">S</span>
+        <span class="px-2 py-1 border rounded text-xs">M</span>
+        <span class="px-2 py-1 border rounded text-xs">L</span>
+        <span class="px-2 py-1 border rounded text-xs">XL</span>
+        <span class="px-2 py-1 border rounded text-xs">XXL</span>
+      </div>
     </div>
-
-    <!-- Availability Filter -->
+    <!-- Color Filter -->
     <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Availability</h4>
-      <ul class="space-y-2">
-        <li>
-          <label class="flex items-center">
-            <input type="checkbox" id="inStock" name="availability" value="in_stock" class="form-checkbox h-4 w-4 text-gray-600"
-              {% if 'in_stock' in request.GET.getlist|default:'' %}checked{% endif %}>
-            <span class="ml-2 text-sm text-gray-700">In Stock</span>
-          </label>
-        </li>
-        <li>
-          <label class="flex items-center">
-            <input type="checkbox" id="outOfStock" name="availability" value="out_of_stock" class="form-checkbox h-4 w-4 text-gray-600"
-              {% if 'out_of_stock' in request.GET.getlist|default:'' %}checked{% endif %}>
-            <span class="ml-2 text-sm text-gray-700">Out of Stock</span>
-          </label>
-        </li>
-      </ul>
+      <h4 class="text-sm font-medium text-gray-700 mb-2">Color</h4>
+      <div class="flex gap-2">
+        <span class="w-5 h-5 rounded-full bg-black border"></span>
+        <span class="w-5 h-5 rounded-full bg-gray-400 border"></span>
+        <span class="w-5 h-5 rounded-full bg-blue-500 border"></span>
+        <span class="w-5 h-5 rounded-full bg-red-500 border"></span>
+        <span class="w-5 h-5 rounded-full bg-green-500 border"></span>
+        <span class="w-5 h-5 rounded-full bg-yellow-400 border"></span>
+      </div>
     </div>
-
-    <!-- Apply Filters Button -->
-    <button id="applyFilters" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-      Apply Filters
-    </button>
-  </div>
+    <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Apply Filters</button>
+  </aside>
 
   <!-- Main Content -->
-  <div class="flex-1 p-4">
+  <main class="flex-1 order-1 md:order-2">
     <!-- Categories Section -->
-    <div>
-      <h3 class="text-base font-semibold text-gray-900">Categories</h3>
-    </div>
-
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
-      {% for category in categories %}
-      <a href="{% url 'category_detail' category.slug %}">
-        <div class="text-center">
-          {% if category.image %}
-            <img class="h-10 w-10 rounded-full mx-auto" src="{{ category.image.url }}" alt="{{ category.name }}">
-          {% else %}
-            <img class="h-10 w-10 rounded-full mx-auto" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-{{ forloop.counter0|divisibleby:12|default:0 }}.jpg" alt="{{ category.name }}">
-          {% endif %}
-          <h3 class="p-2 my-1 text-gray-900 font-medium">{{ category.name }}</h3>
-        </div>
-      </a>
-      {% empty %}
-      <a href="{% url 'home' %}">
-        <div class="text-center">
-          <img class="h-10 w-10 rounded-full mx-auto" src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image.jpg" alt="">
-          <h3 class="p-2 my-1 text-gray-900 font-medium">No Categories Here</h3>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-
-    <!-- Products Section -->
-    <div class="border-b border-gray-200 pb-5 mt-10 mb-4">
-      <h3 class="text-base font-semibold text-gray-900">Featured Products</h3>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {% for product in products %}
-        <a href="{% url 'product_detail' product.slug %}" aria-label="{{ product.name }}">
-          <div class="bg-white shadow-md rounded-lg overflow-hidden">
-            {% if product.image %}
-              <img class="w-full h-48 object-cover" src="{{ product.image.url }}" alt="{{ product.name }}">
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Categories</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {% for category in categories %}
+        <a href="{% url 'category_detail' category.slug %}" class="block group">
+          <div class="flex flex-col items-center p-4 bg-white rounded-xl shadow hover:shadow-lg transition">
+            {% if category.image %}
+              <img class="h-16 w-16 rounded-full object-cover mb-2 border-2 border-gray-200 group-hover:border-blue-400 transition" src="{{ category.image.url }}" alt="{{ category.name }}">
             {% else %}
-              <img class="w-full h-48 object-cover" src="https://via.placeholder.com/300x200?text=No+Image" alt="No Image Available">
+              <div class="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center mb-2 border-2 border-gray-200 group-hover:border-blue-400 transition">
+                <span class="text-gray-400 text-xl font-bold">{{ category.name|slice:1 }}</span>
+              </div>
             {% endif %}
-            <div class="p-4">
-              <h3 class="text-lg font-medium text-gray-900">{{ product.name }}</h3>
-              <p class="text-gray-700">K{{ product.price|floatformat:2 }}</p>
-              <span class="text-gray-500 text-sm">
-                {% if product.store %}{{ product.store }}{% else %}Unknown Store{% endif %}
-              </span>
-            </div>
+            <span class="text-sm font-medium text-gray-800 group-hover:text-blue-600 transition">{{ category.name }}</span>
           </div>
         </a>
+        {% empty %}
+        <div class="col-span-full text-center text-gray-400">No categories found.</div>
+        {% endfor %}
+      </div>
+    </div>
+    <!-- Product Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
+      {% for product in products %}
+      <div class="bg-white rounded-xl shadow hover:shadow-lg transition overflow-hidden relative group flex flex-col">
+        {% if product.is_new %}
+          <span class="absolute top-3 left-3 bg-cyan-100 text-cyan-700 text-xs font-semibold px-2 py-1 rounded">New Arrival</span>
+        {% endif %}
+        <!-- Wishlist Icon -->
+        <button class="absolute top-3 right-3 z-20 bg-white/80 rounded-full p-2 shadow hover:bg-pink-100 transition group/wishlist" title="Add to wishlist">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-400 group-hover/wishlist:text-pink-500 transition">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.623 0-3.06.936-3.812 2.25-.752-1.314-2.189-2.25-3.812-2.25C5.099 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+          </svg>
+        </button>
+        <a href="{% url 'product_detail' product.slug %}" class="block">
+          {% if product.image %}
+            <img class="w-full h-64 object-cover object-center transition-transform group-hover:scale-105" src="{{ product.image.url }}" alt="{{ product.name }}">
+          {% else %}
+            <img class="w-full h-64 object-cover object-center transition-transform group-hover:scale-105" src="https://via.placeholder.com/300x300?text=No+Image" alt="No Image Available">
+          {% endif %}
+        </a>
+        <div class="p-4 flex-1 flex flex-col justify-between">
+          <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-1">{{ product.name }}</h3>
+            <div class="mb-2 flex items-end gap-2">
+              <span class="text-xl font-bold text-pink-600">ZMW {{ product.price|floatformat:2 }}</span>
+              <span class="text-xs text-gray-400 line-through">{% if product.old_price %}ZMW {{ product.old_price|floatformat:2 }}{% endif %}</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between mt-2">
+            <span class="text-xs text-gray-500">Uniglo</span>
+            <span class="text-xs text-red-500">{% if product.stock < 15 %}{{ product.stock }} items left{% endif %}</span>
+          </div>
+        </div>
+      </div>
       {% empty %}
-        <a href="{% url 'home' %}" aria-label="No Products">
-          <div class="bg-white shadow-md rounded-lg overflow-hidden">
-            <img class="w-full h-48 object-cover" src="https://via.placeholder.com/300x200?text=No+Products" alt="No Products">
-            <div class="p-4">
-              <h3 class="text-lg font-medium text-gray-900">No Products Available</h3>
-              <p class="text-gray-700">Check back later!</p>
-            </div>
-          </div>
-        </a>
+      <div class="col-span-full text-center py-12 text-gray-400">No products found.</div>
       {% endfor %}
     </div>
-  </div>
+  </main>
 </div>
-
-<!-- JavaScript for Filters -->
-<script>
-  document.getElementById('applyFilters').addEventListener('click', function () {
-    // Get price range value
-    const priceRange = document.getElementById('priceRange').value;
-
-    // Get availability filter values
-    const inStock = document.getElementById('inStock').checked;
-    const outOfStock = document.getElementById('outOfStock').checked;
-
-    // Determine availability filter
-    let availability = '';
-    if (inStock && !outOfStock) {
-      availability = 'in_stock';
-    } else if (!inStock && outOfStock) {
-      availability = 'out_of_stock';
-    }
-
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (priceRange) params.set('price', priceRange);
-    if (availability) params.set('availability', availability);
-
-    // Redirect to the filtered URL
-    window.location.href = `?${params.toString()}`;
-  });
-</script>
-{%endblock%}
+{% endblock %}
