@@ -17,7 +17,6 @@ class SMSClient:
 
     def send_sms(self, recipient, message, sms_type='plain', schedule_time=None, dlt_template_id=None):
         payload = {
-            'api_token': self.api_token,
             'recipient': recipient,
             'sender_id': self.sender_id,
             'type': sms_type,
@@ -32,6 +31,7 @@ class SMSClient:
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            'Authorization': f'Bearer {self.api_token}',
         }
 
         try:

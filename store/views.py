@@ -372,7 +372,10 @@ def checkout(request):
                 send_order_confirmation_email(order)
                 # Send SMS to user and store owner
                 from .sms_service import send_order_sms
-                send_order_sms(order)
+                try:
+                    send_order_sms(order)
+                except Exception as sms_exc:
+                    logger.exception('SMS notification failed for Order ID %s', order.id)
                 json_response = {
                     'status': True,
                     'message': 'Order placed successfully! You will pay on delivery.',
