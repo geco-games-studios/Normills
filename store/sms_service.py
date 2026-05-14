@@ -3,7 +3,7 @@ from django.conf import settings
 from users.models import User
 from manager.models import Store
 from .models import Order
-from sms_client import SMSClient  # You should place your SMSClient in a shared location, e.g., store/sms_client.py
+from .sms_client import SMSClient
 
 logger = logging.getLogger(__name__)
 

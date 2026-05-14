@@ -1,8 +1,8 @@
 from django.db import models
-from django.contrib.auth.models import User
 from django.utils import timezone
 from manager.models import Store
 from users.models import User
+from .sms_client import SMSClient
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -162,7 +162,8 @@ class Order(models.Model):
         Utility method to send an SMS notification.
         """
         try:
-            send_sms(recipient_phone, message)
+            sms_client = SMSClient()
+            sms_client.send_sms(recipient_phone, message)
         except Exception as e:
             print(f"Failed to send SMS: {e}")
             
