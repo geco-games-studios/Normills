@@ -19,7 +19,7 @@ def send_order_sms(order: Order):
         f"Last Name\n{order.last_name}\n"
         f"Phone Number\n{order.phone}\n"
         f"Order Number: {order.id}\n"
-        f"Product(s): {', '.join([item.product.name for item in order.orderitem_set.all()])}"
+        f"Product(s): {', '.join([item.product.name for item in order.items.all()])}"
     )
     sms_client.send_sms(order.phone, user_message)
 
@@ -36,6 +36,6 @@ def send_order_sms(order: Order):
             f"Order Number: {order.id}\n"
             f"Customer: {order.first_name} {order.last_name}\n"
             f"Phone: {order.phone}\n"
-            f"Product(s): {', '.join([item.product.name for item in order.orderitem_set.all()])}"
+            f"Product(s): {', '.join([item.product.name for item in order.items.all()])}"
         )
         sms_client.send_sms(num, owner_message)
