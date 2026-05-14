@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Order Confirmation</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #222; }
+        .container { max-width: 600px; margin: 0 auto; padding: 24px; background: #f9f9f9; border-radius: 8px; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .order-details { background: #fff; padding: 16px; border-radius: 6px; margin-bottom: 24px; }
+        .order-details h2 { margin-top: 0; }
+        .footer { text-align: center; color: #888; font-size: 13px; margin-top: 32px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Thank you for your order!</h1>
+            <p>Your order <strong>#{{ order.id }}</strong> has been placed successfully.</p>
+        </div>
+        <div class="order-details">
+            <h2>Order Summary</h2>
+            <ul>
+                {% for item in order.items.all %}
+                <li>{{ item.product.name }}{% if item.variant_info %} ({{ item.variant_info }}){% endif %} &times; {{ item.quantity }} — K{{ item.price }}</li>
+                {% endfor %}
+            </ul>
+            <p><strong>Subtotal:</strong> K{{ order.subtotal }}</p>
+            <p><strong>Shipping:</strong> K{{ order.shipping }}</p>
+            <p><strong>Tax:</strong> K{{ order.tax }}</p>
+            <p><strong>Total:</strong> K{{ order.total }}</p>
+        </div>
+        <div>
+            <h2>Shipping Information</h2>
+            <p>{{ order.first_name }} {{ order.last_name }}</p>
+            <p>{{ order.address }}, {{ order.city }}, {{ order.postal_code }}</p>
+            <p>{{ order.email }}</p>
+            <p>{{ order.phone }}</p>
+        </div>
+        <div class="footer">
+            <p>If you have any questions, reply to this email.<br>Thank you for shopping with us!</p>
+        </div>
+    </div>
+</body>
+</html>
