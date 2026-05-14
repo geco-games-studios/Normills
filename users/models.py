@@ -34,6 +34,7 @@ class StoreOwnerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='store_owner_profile')
     store_name = models.CharField(max_length=200)
     phone_number = models.CharField(max_length=20)
+    alt_phone_number = models.CharField(max_length=20, blank=True, null=True)
     address = models.CharField(max_length=255)
 
     def __str__(self):

@@ -1,11 +1,3 @@
-# Email (SMTP) settings for Outlook
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp-mail.outlook.com'
-EMAIL_PORT = 587
-EMAIL_HOST_USER = 'hello@gecogames.com'
-EMAIL_HOST_PASSWORD = 'Worldwar@2026?'
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'Geco Marketplace <hello@gecogames.com>'
 import os
 from pathlib import Path
 
@@ -158,3 +150,12 @@ CSRF_COOKIE_SECURE = False  # Set to True if using HTTPS
 # Lenco Payment Gateway Settings
 LENCO_API_BASE_URL = "https://api.lenco.co/access/v2"
 LENCO_API_KEY = "ebbdf8030d34cd5d25052ed44fd757adcd96b93cd47d02bf72dc063bda8ae5b9"
+
+# Email (SMTP) settings for Outlook
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp-mail.outlook.com'
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'hello@gecogames.com'
+EMAIL_HOST_PASSWORD = 'Worldwar@2026?'
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = 'Geco Marketplace <hello@gecogames.com>'

@@ -12,14 +12,28 @@ class Category(models.Model):
     class Meta:
         verbose_name_plural = 'Categories'
     
+
     def __str__(self):
         return self.name
-    
+
+
+# Move Brand to top-level
+class Brand(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(unique=True)
+
+    def __str__(self):
+        return self.name
+
+
+
+# Move Product to top-level
 class Product(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='products')  # Link to Store
+    brand = models.ForeignKey('Brand', on_delete=models.CASCADE, related_name='products', null=True, blank=True)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     image = models.ImageField(upload_to='products/')
