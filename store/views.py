@@ -411,7 +411,7 @@ def send_order_confirmation_email(order):
     subject = f"Order Confirmation - #{order.id}"
     html_message = render_to_string('emails/order_confirmation.html', {'order': order})
     plain_message = strip_tags(html_message)
-    from_email = 'noreply@example.com'
+    from_email = 'hello@gecogames.com'  # Must match your SMTP user and DEFAULT_FROM_EMAIL
     to_email = order.email
     
     send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
