@@ -4,7 +4,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-EXCITESMS_HTTP_SEND_URL = "https://gateway.excitesms.com/api/http/sms/send"
+EXCITESMS_HTTP_SEND_URL = "https://gateway.excitesms.com/api/v3/sms/send"
 
 class SMSClient:
     def __init__(self, api_token=None, sender_id=None, request_timeout=10):
