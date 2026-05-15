@@ -607,6 +607,14 @@ def confirm_payment(request, order_id):
         order.payment_status = 'completed'
         order.status = 'processing'
         order.save()
+
+        # Send SMS confirmation for cash on delivery orders
+        from .sms_service import send_order_sms
+        try:
+            send_order_sms(order)
+        except Exception as sms_exc:
+            logger.exception('SMS notification failed for COD Order ID %s', order.id)
+
         messages.success(request, 'Order placed successfully! Your order is being processed.')
         return redirect('order_confirmation', order_id=order.id)
 
