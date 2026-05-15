@@ -16,6 +16,7 @@ from django.utils.html import strip_tags
 from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem
 from .forms import CustomUserCreationForm, CheckoutForm
 from .payment import process_lenco_payment, logger
+from .sms_service import send_order_sms
 
 from django.contrib import messages
 import logging
@@ -255,6 +256,12 @@ def checkout(request):
                     quantity=cart_item.quantity
                 )
             
+            # Send SMS immediately when the order is created
+            try:
+                send_order_sms(order)
+            except Exception as sms_exc:
+                logger.exception('Immediate order SMS failed for Order ID %s', order.id)
+
             # Process payment based on selected method
             payment_method = form.cleaned_data['payment_method']
             
@@ -370,12 +377,6 @@ def checkout(request):
                 order.save()
                 cart.items.all().delete()
                 send_order_confirmation_email(order)
-                # Send SMS to user and store owner
-                from .sms_service import send_order_sms
-                try:
-                    send_order_sms(order)
-                except Exception as sms_exc:
-                    logger.exception('SMS notification failed for Order ID %s', order.id)
                 json_response = {
                     'status': True,
                     'message': 'Order placed successfully! You will pay on delivery.',
@@ -607,13 +608,6 @@ def confirm_payment(request, order_id):
         order.payment_status = 'completed'
         order.status = 'processing'
         order.save()
-
-        # Send SMS confirmation for cash on delivery orders
-        from .sms_service import send_order_sms
-        try:
-            send_order_sms(order)
-        except Exception as sms_exc:
-            logger.exception('SMS notification failed for COD Order ID %s', order.id)
 
         messages.success(request, 'Order placed successfully! Your order is being processed.')
         return redirect('order_confirmation', order_id=order.id)
