@@ -4,11 +4,11 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-EXCITESMS_HTTP_SEND_URL = "https://gateway.excitesms.com/api/v3/sms/send"
+EXCITESMS_HTTP_SEND_URL = "https://gateway.excitesms.com/api/http/sms/send"
 
 class SMSClient:
     def __init__(self, api_token=None, sender_id=None, request_timeout=10):
-        self.api_token = api_token or getattr(settings, 'EXCITESMS_API_TOKEN', None)
+        self.api_token = api_token or getattr(settings, 'EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJfEVzyD2e44Vo8I0jpWZw65ec96a2')
         self.sender_id = sender_id or getattr(settings, 'EXCITESMS_SENDER_ID', 'GecoGames')
         self.timeout = request_timeout
 
@@ -16,15 +16,16 @@ class SMSClient:
             raise ValueError('ExciteSMS API token is required. Set EXCITESMS_API_TOKEN in settings.')
 
     def send_sms(self, recipient, message, sms_type='plain', schedule_time=None, dlt_template_id=None):
-        # Format phone number - add Uganda country code if not present
+        # Format phone number - add Zambia country code if not present
         if recipient.startswith('0') and len(recipient) == 10:
-            # Convert 0761308936 to 260761308936
+            # Convert 0978516926 to 260978516926 (Zambia country code)
             recipient = '260' + recipient[1:]
         elif recipient.startswith('+'):
             # Remove + if present
             recipient = recipient[1:]
         
         payload = {
+            'api_token': self.api_token,
             'recipient': recipient,
             'sender_id': self.sender_id,
             'type': sms_type,
@@ -39,7 +40,6 @@ class SMSClient:
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.api_token}',
         }
 
         try:
@@ -53,13 +53,13 @@ class SMSClient:
         except requests.HTTPError as http_err:
             # Handle specific HTTP errors
             if response.status_code == 403:
+                logger.warning('SMS service does not have permission for this region: %s', recipient)
+                return {'status': 'skipped', 'message': 'Region not enabled for SMS'}
+            elif response.status_code == 400:
                 try:
                     error_data = response.json()
-                    error_message = error_data.get('message', 'Forbidden')
-                    if 'Permission to send an SMS has not been enabled' in error_message:
-                        logger.warning('SMS service does not have permission for this region: %s', recipient)
-                        return {'status': 'skipped', 'message': 'Region not enabled for SMS'}
-                    elif 'invalid phone number' in error_message:
+                    error_message = error_data.get('message', 'Bad Request')
+                    if 'invalid phone number' in error_message.lower():
                         logger.warning('Invalid phone number format: %s', recipient)
                         return {'status': 'skipped', 'message': 'Invalid phone number'}
                 except:
@@ -90,9 +90,6 @@ class SMSClient:
                 return {'status': 'skipped', 'message': 'Invalid phone number'}
             else:
                 raise Exception(f'ExciteSMS error: {error_message}')
-
-        logger.info('ExciteSMS SMS sent successfully to %s', recipient)
-        return data
 
         logger.info('ExciteSMS SMS sent successfully to %s', recipient)
         return data
