@@ -138,7 +138,7 @@ class Order(models.Model):
     
 
     # Payment fields
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='mobile_money')
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     payment_reference = models.CharField(max_length=100, blank=True, null=True)
     payment_details = models.JSONField(blank=True, null=True)

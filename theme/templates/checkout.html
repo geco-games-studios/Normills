@@ -70,13 +70,31 @@
                         }
                     }
                 }
+                
+                // Toggle mobile money options visibility
+                function toggleMobileMoneyOptions() {
+                    const cashRadio = document.getElementById('payment_method_cash');
+                    const mobileRadio = document.getElementById('payment_method_mobile_money');
+                    const mobileOptions = document.getElementById('mobile-money-options');
+                    if (cashRadio && mobileRadio && mobileOptions) {
+                        if (mobileRadio.checked) {
+                            mobileOptions.style.display = 'block';
+                        } else {
+                            mobileOptions.style.display = 'none';
+                        }
+                    }
+                }
+                
                 document.addEventListener('DOMContentLoaded', function() {
                     const cashRadio = document.getElementById('payment_method_cash');
                     const mobileRadio = document.getElementById('payment_method_mobile_money');
                     if (cashRadio && mobileRadio) {
                         cashRadio.addEventListener('change', toggleExtraFields);
                         mobileRadio.addEventListener('change', toggleExtraFields);
+                        cashRadio.addEventListener('change', toggleMobileMoneyOptions);
+                        mobileRadio.addEventListener('change', toggleMobileMoneyOptions);
                         toggleExtraFields();
+                        toggleMobileMoneyOptions();
                     }
                 });
             </script>
@@ -89,20 +107,20 @@
             <div class="space-y-4">
                 <!-- Add explicit payment method radio buttons -->
                 <div class="flex items-center">
-                    <input id="payment_method_mobile_money" name="payment_method" value="mobile_money" type="radio" checked form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                    <input id="payment_method_mobile_money" name="payment_method" value="mobile_money" type="radio" form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                     <label for="payment_method_mobile_money" class="ml-3 block text-sm font-medium text-gray-700">
                         Mobile Money
                     </label>
                 </div>
                 <div class="flex items-center">
-                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" checked form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                     <label for="payment_method_cash" class="ml-3 block text-sm font-medium text-gray-700">
                         Cash on Delivery
                     </label>
                 </div>
                 
                 <!-- Mobile Money Options (show only when mobile_money is selected) -->
-                <div id="mobile-money-options" class="ml-7 mt-2 mb-4">
+                <div id="mobile-money-options" class="ml-7 mt-2 mb-4" style="display: none;">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Select Mobile Money Provider</label>
                     <div class="space-y-2">
                         <div class="flex items-center">

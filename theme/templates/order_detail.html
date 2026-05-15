@@ -12,5 +12,9 @@
 {% endif %}
 
 {% if order.status == 'delivered' and not order.payment_confirmed %}
-    <a href="{% url 'confirm_payment' order.id %}" class="btn btn-warning">Confirm Payment</a>
+    {% if order.payment_method == 'cash' %}
+        <a href="{% url 'confirm_payment' order.id %}" class="btn btn-success">Confirm Cash Payment</a>
+    {% else %}
+        <a href="{% url 'confirm_payment' order.id %}" class="btn btn-warning">Confirm Payment</a>
+    {% endif %}
 {% endif %}

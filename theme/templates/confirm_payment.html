@@ -1,15 +1,16 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1 class="text-3xl font-bold mb-8">Confirm Payment</h1>
+<h1 class="text-3xl font-bold mb-8">Confirm Mobile Money Payment</h1>
 
 <div class="bg-white rounded-lg shadow-sm p-6">
     <h2 class="text-lg font-medium text-gray-900">Order #{{ order.id }}</h2>
     <p class="text-sm text-gray-500">Total Amount: K{{ order.total }}</p>
+    <p class="text-sm text-gray-600 mt-2">Payment Method: Mobile Money</p>
     
     <!-- Countdown Timer -->
     <div class="mt-6 text-center">
-        <p class="text-gray-700">Transaction will be cancelled in:</p>
+        <p class="text-gray-700">Please complete the mobile money payment on your phone. Transaction will be cancelled in:</p>
         <div class="mt-4">
             <div id="countdown-timer" class="w-16 h-16 mx-auto rounded-full border-4 border-indigo-600 flex items-center justify-center text-xl font-bold text-indigo-600">
                 60

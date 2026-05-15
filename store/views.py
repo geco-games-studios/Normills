@@ -600,10 +600,19 @@ def received_parcel(request, order_id):
 @login_required
 def confirm_payment(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
-    
+
+    # For cash on delivery, skip the timer and go directly to confirmation
+    if order.payment_method == 'cash':
+        # Mark payment as completed for cash on delivery
+        order.payment_status = 'completed'
+        order.status = 'processing'
+        order.save()
+        messages.success(request, 'Order placed successfully! Your order is being processed.')
+        return redirect('order_confirmation', order_id=order.id)
+
     if request.method == 'POST':
         pin = request.POST.get('pin')
-        
+
         # Process the payment using the Lenco API
         payment_response = process_lenco_payment(
             amount=order.total,
@@ -611,7 +620,7 @@ def confirm_payment(request, order_id):
             reference=order.transaction_id,
             operator="airtel"  # or any other operator
         )
-        
+
         # Update the order status based on the payment response
         if payment_response['status'] == 'success':
             order.payment_status = 'completed'
@@ -625,11 +634,11 @@ def confirm_payment(request, order_id):
             order.payment_status = 'failed'
             order.status = 'cancelled'
             messages.error(request, 'Payment failed. Please try again.')
-        
+
         order.save()
-        
+
         return redirect('order_confirmation', order_id=order.id)
-    
+
     return render(request, 'confirm_payment.html', {'order': order})
 
 def buy_now(request, slug):
