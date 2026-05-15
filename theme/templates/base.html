@@ -94,6 +94,7 @@
             </a>
 
             <!-- Desktop User -->
+            {% if user.is_authenticated %}
             <div class="relative group">
                 <button class="flex items-center space-x-1 bg-gray-100 rounded-full px-3 py-1.5">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -102,12 +103,19 @@
                     <span class="font-medium text-sm">{{ user.get_full_name|default:user.username }}</span>
                 </button>
                 <div class="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg py-2 hidden group-hover:block">
-                    <a href="/orders/" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
-                    <form action="/logout/" method="post" class="inline">
+                    <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
+                    <form action="{% url 'logout' %}" method="post" class="inline">
+                        {% csrf_token %}
                         <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
                     </form>
                 </div>
             </div>
+            {% else %}
+            <div class="flex items-center gap-3">
+                <a href="{% url 'login' %}" class="text-sm font-medium text-gray-700 hover:text-gray-900">Sign in</a>
+                <a href="{% url 'signup' %}" class="text-sm font-semibold text-white bg-black px-4 py-2 rounded-full hover:bg-gray-800">Sign up</a>
+            </div>
+            {% endif %}
         </div>
     </header>
 
@@ -145,13 +153,16 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     <span>Cart <span id="mobile-cart-count" class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span></span>
                 </a>
-                <a href="/orders/" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
+                {% if user.is_authenticated %}
+                <a href="{% url 'order_history' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                     <span>My Orders</span>
                 </a>
+                {% endif %}
             </nav>
 
             <!-- User Info & Actions -->
+            {% if user.is_authenticated %}
             <div class="border-t border-gray-200 pt-6 mt-2">
                 <div class="flex items-center space-x-3 mb-4">
                     <span class="bg-gray-200 rounded-full w-12 h-12 flex items-center justify-center">
@@ -164,7 +175,8 @@
                         <p class="text-xs text-gray-500">{{ user.email }}</p>
                     </div>
                 </div>
-                <form action="/logout/" method="post" class="w-full">
+                <form action="{% url 'logout' %}" method="post" class="w-full">
+                    {% csrf_token %}
                     <button type="submit" class="w-full bg-red-600 text-white rounded-xl py-3 font-semibold hover:bg-red-700 transition flex items-center justify-center space-x-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         <span>Logout</span>
@@ -174,6 +186,15 @@
                     © 2026 Normils Boutique
                 </div>
             </div>
+            {% else %}
+            <div class="border-t border-gray-200 pt-6 mt-2 space-y-3">
+                <a href="{% url 'login' %}" class="block w-full text-center bg-black text-white rounded-xl py-3 font-semibold hover:bg-gray-800 transition">Sign in</a>
+                <a href="{% url 'signup' %}" class="block w-full text-center border border-gray-200 rounded-xl py-3 font-semibold text-gray-900 hover:bg-gray-50 transition">Sign up</a>
+                <div class="mt-5 text-center text-xs text-gray-400">
+                    © 2026 Normils Boutique
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -370,30 +391,28 @@
             // also handle any existing "Add to cart" demo buttons? just to keep consistent
             document.querySelectorAll('.bg-black.text-white.px-3').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    // demo: update cart badge to show interactivity but not needed for fix
-                    const mobileBadge = document.getElementById('mobile-cart-count');
-                    const desktopBadge = document.getElementById('desktop-cart-badge');
-                    if (mobileBadge) {
-                        let count = parseInt(mobileBadge.innerText) || 0;
-                        count++;
-                        mobileBadge.innerText = count;
-                        if(desktopBadge) { desktopBadge.innerText = count; desktopBadge.classList.remove('hidden'); }
-                    }
-                    // simple alert to demonstrate menu works alongside content 
+                    // demo: show toast but don't update cart count since this is just demo
                     const toastMsg = document.createElement('div');
-                    toastMsg.innerText = '✨ Added to cart (demo)';
+                    toastMsg.innerText = '✨ Demo: Item added to cart (not actually added)';
                     toastMsg.className = 'fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-black text-white px-4 py-2 rounded-full text-sm z-[1100] animate-pulse';
                     document.body.appendChild(toastMsg);
                     setTimeout(() => toastMsg.remove(), 1500);
                 });
             });
             
-            // Initial cart badge: show demo badge
-            const cartCountDemo = 3;
+            // Initial cart badge: use actual cart count
+            const actualCartCount = {{ cart.item_count|default:0 }};
             const mobCartSpan = document.getElementById('mobile-cart-count');
             const deskCartSpan = document.getElementById('desktop-cart-badge');
-            if (mobCartSpan) mobCartSpan.innerText = cartCountDemo;
-            if (deskCartSpan) { deskCartSpan.innerText = cartCountDemo; deskCartSpan.classList.remove('hidden'); }
+            if (mobCartSpan) mobCartSpan.innerText = actualCartCount;
+            if (deskCartSpan) {
+                if (actualCartCount > 0) {
+                    deskCartSpan.innerText = actualCartCount;
+                    deskCartSpan.classList.remove('hidden');
+                } else {
+                    deskCartSpan.classList.add('hidden');
+                }
+            }
         })();
     </script>
 </body>
