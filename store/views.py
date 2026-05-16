@@ -137,7 +137,7 @@ def signup(request):
 
             try:
                 sms_client = SMSClient()
-                result = sms_client.send_sms(phone, f"Your Geco Marketplace verification code is {code}")
+                result = sms_client.send_sms(phone, f"Your Normils verification code is {code}")
                 logger.warning('OTP SMS send result for user=%s phone=%s: %s', user.id, phone, result)
                 logger.debug('Generated OTP for user=%s: %s (phone=%s)', user.id, code, phone)
                 if isinstance(result, dict) and result.get('status') != 'success':
@@ -228,7 +228,7 @@ def resend_otp(request):
 
     try:
         sms_client = SMSClient()
-        result = sms_client.send_sms(phone, f"Your Geco Marketplace verification code is {code}")
+        result = sms_client.send_sms(phone, f"Your Normils verification code is {code}")
         logger.warning('Resent OTP SMS result for user=%s phone=%s: %s', user.id, phone, result)
         if isinstance(result, dict) and result.get('status') != 'success':
             messages.warning(request, 'Verification code was generated, but could not be sent by SMS. Please check your phone number.')
