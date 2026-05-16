@@ -130,7 +130,8 @@ def signup(request):
             from users.models import PhoneOTP, ClientProfile
             import random
             code = f"{random.randint(100000, 999999)}"
-            phone = form.cleaned_data.get('phone', '') or request.POST.get('phone', '')
+            # Use the cleaned, normalized phone from the validated form
+            phone = form.cleaned_data.get('phone', '')
 
             expires = timezone.now() + timedelta(minutes=10)
             PhoneOTP.objects.create(user=user, phone=phone, code=code, expires_at=expires)
@@ -201,16 +202,22 @@ def verify_otp(request):
 
 def resend_otp(request):
     pending_user_id = request.session.get('pending_user_id')
+    is_json = request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.META.get('HTTP_ACCEPT', '').find('application/json') != -1
     if not pending_user_id:
+        if is_json:
+            return JsonResponse({'status': False, 'message': 'No pending registration to resend OTP for.'}, status=400)
         messages.error(request, 'No pending registration to resend OTP for.')
         return redirect('signup')
 
     from users.models import PhoneOTP, User
     user = User.objects.filter(id=pending_user_id).first()
     if not user:
+        if is_json:
+            return JsonResponse({'status': False, 'message': 'No pending registration found.'}, status=400)
         messages.error(request, 'No pending registration found.')
         return redirect('signup')
 
+    # Normalize and validate stored phone before resending
     phone = ''
     try:
         phone = user.client_profile.phone_number
@@ -218,8 +225,18 @@ def resend_otp(request):
         phone = ''
 
     if not phone:
+        if is_json:
+            return JsonResponse({'status': False, 'message': 'Cannot resend OTP because the phone number is missing.'}, status=400)
         messages.error(request, 'Cannot resend OTP because the phone number is missing.')
         return redirect('signup')
+
+    normalized = ''.join(ch for ch in phone if ch.isdigit() or ch == '+')
+    digits = ''.join(ch for ch in normalized if ch.isdigit())
+    if len(digits) < 9:
+        if is_json:
+            return JsonResponse({'status': False, 'message': 'Cannot resend OTP: stored phone number is incomplete.'}, status=400)
+        messages.error(request, 'Cannot resend OTP: stored phone number is incomplete.')
+        return redirect('verify_otp')
 
     import random
     code = f"{random.randint(100000, 999999)}"
@@ -231,11 +248,17 @@ def resend_otp(request):
         result = sms_client.send_sms(phone, f"Your Normils verification code is {code}")
         logger.warning('Resent OTP SMS result for user=%s phone=%s: %s', user.id, phone, result)
         if isinstance(result, dict) and result.get('status') != 'success':
+            if is_json:
+                return JsonResponse({'status': False, 'message': 'Verification code was generated, but could not be sent by SMS. Please check your phone number.'}, status=502)
             messages.warning(request, 'Verification code was generated, but could not be sent by SMS. Please check your phone number.')
         else:
+            if is_json:
+                return JsonResponse({'status': True, 'message': 'A new verification code has been sent to your phone.'})
             messages.success(request, 'A new verification code has been sent to your phone.')
     except Exception:
         logger.exception('Failed to resend OTP SMS for user %s', user.id)
+        if is_json:
+            return JsonResponse({'status': False, 'message': 'Failed to resend OTP SMS. Please try again later.'}, status=500)
         messages.error(request, 'Failed to resend OTP SMS. Please try again later.')
 
     return redirect('verify_otp')

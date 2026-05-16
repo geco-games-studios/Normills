@@ -47,6 +47,16 @@ class CustomUserCreationForm(UserCreationForm):
             )
         return user
 
+    def clean_phone(self):
+        phone = (self.cleaned_data.get('phone') or '').strip()
+        normalized = ''.join(ch for ch in phone if ch.isdigit() or ch == '+')
+        if normalized.count('+') > 1 or ('+' in normalized and not normalized.startswith('+')):
+            raise forms.ValidationError('Invalid phone number format.')
+        digits = ''.join(ch for ch in normalized if ch.isdigit())
+        if len(digits) < 9:
+            raise forms.ValidationError('Please enter a complete phone number (at least 9 digits).')
+        return normalized
+
 class CheckoutForm(forms.Form):
     first_name = forms.CharField(max_length=100, required=True)
     last_name = forms.CharField(max_length=100, required=True)

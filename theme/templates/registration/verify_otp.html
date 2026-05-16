@@ -17,10 +17,71 @@
                 <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-3 rounded-md font-medium hover:bg-indigo-700">Verify</button>
             </div>
         </form>
-        <form method="post" action="{% url 'resend_otp' %}" class="mt-4">
-            {% csrf_token %}
-            <button type="submit" class="w-full bg-gray-200 text-gray-900 px-4 py-3 rounded-md font-medium hover:bg-gray-300">Resend verification code</button>
-        </form>
+        <div class="mt-4">
+            <div id="resend-message" class="mb-3" aria-live="polite"></div>
+            <form method="post" action="{% url 'resend_otp' %}" class="mt-2" id="resend-otp-form">
+                {% csrf_token %}
+                <button type="submit" id="resend-otp-button" class="w-full bg-gray-200 text-gray-900 px-4 py-3 rounded-md font-medium hover:bg-gray-300">Resend verification code</button>
+            </form>
+        </div>
+        <script>
+            (function(){
+                function getCookie(name) {
+                    let cookieValue = null;
+                    if (document.cookie && document.cookie !== '') {
+                        const cookies = document.cookie.split(';');
+                        for (let i = 0; i < cookies.length; i++) {
+                            const cookie = cookies[i].trim();
+                            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                break;
+                            }
+                        }
+                    }
+                    return cookieValue;
+                }
+
+                const form = document.getElementById('resend-otp-form');
+                const btn = document.getElementById('resend-otp-button');
+                const msg = document.getElementById('resend-message');
+
+                if (!form) return;
+
+                form.addEventListener('submit', function(e){
+                    e.preventDefault();
+                    msg.textContent = '';
+                    btn.disabled = true;
+                    const url = form.getAttribute('action');
+                    fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Accept': 'application/json'
+                        }
+                    }).then(function(response){
+                        return response.json().then(function(data){
+                            return {status: response.status, body: data};
+                        }).catch(function(){
+                            return {status: response.status, body: null};
+                        });
+                    }).then(function(res){
+                        btn.disabled = false;
+                        if (res.body && res.body.status) {
+                            msg.innerHTML = '<div class="p-3 bg-green-100 text-green-800 rounded">' + (res.body.message || 'Verification code sent.') + '</div>';
+                        } else if (res.body && !res.body.status) {
+                            msg.innerHTML = '<div class="p-3 bg-yellow-100 text-yellow-800 rounded">' + (res.body.message || 'Could not resend verification code.') + '</div>';
+                        } else {
+                            msg.innerHTML = '<div class="p-3 bg-red-100 text-red-800 rounded">An unexpected error occurred.</div>';
+                        }
+                    }).catch(function(err){
+                        btn.disabled = false;
+                        msg.innerHTML = '<div class="p-3 bg-red-100 text-red-800 rounded">Network error. Please try again.</div>';
+                    });
+                });
+            })();
+        </script>
     </div>
 </div>
 {% endblock %}
