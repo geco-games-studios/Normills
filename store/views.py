@@ -16,7 +16,7 @@ from django.utils.html import strip_tags
 from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem
 from .forms import CustomUserCreationForm, CheckoutForm
 from .payment import process_lenco_payment, logger
-from .sms_service import send_order_sms
+from .sms_service import send_order_sms, send_order_receipt_sms
 
 from django.contrib import messages
 import logging
@@ -258,7 +258,10 @@ def checkout(request):
             
             # Send SMS immediately when the order is created
             try:
-                send_order_sms(order)
+                if form.cleaned_data['payment_method'] == 'cash':
+                    send_order_receipt_sms(order)
+                else:
+                    send_order_sms(order)
             except Exception as sms_exc:
                 logger.exception('Immediate order SMS failed for Order ID %s', order.id)
 
@@ -335,6 +338,7 @@ def checkout(request):
                     elif payment_status == 'successful':
                         cart.items.all().delete()
                         send_order_confirmation_email(order)
+                        order.notify_payment_confirmed()
                         json_response = {
                             'status': True,
                             'message': 'Order placed successfully! Your payment was successful.',
@@ -505,6 +509,7 @@ def submit_otp(request, order_id):
             
             # Send order confirmation email
             send_order_confirmation_email(order)
+            order.notify_payment_confirmed()
             
             json_response = {
                 "status": True,
@@ -627,6 +632,8 @@ def confirm_payment(request, order_id):
         if payment_response['status'] == 'success':
             order.payment_status = 'completed'
             order.status = 'processing'
+            order.save()
+            order.notify_payment_confirmed()
             messages.success(request, 'Payment successful! Your order is being processed.')
         elif payment_response['status'] == 'insufficient_balance':
             order.payment_status = 'failed'
