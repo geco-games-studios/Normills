@@ -1,3 +1,4 @@
+import json
 import logging
 
 from django.db import models
@@ -300,3 +301,20 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.price * self.quantity
+
+
+class OutboundSMSLog(models.Model):
+    recipient = models.CharField(max_length=50)
+    message = models.TextField()
+    payload = models.JSONField(blank=True, null=True)
+    response = models.JSONField(blank=True, null=True)
+    status = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Outbound SMS Log'
+        verbose_name_plural = 'Outbound SMS Logs'
+
+    def __str__(self):
+        return f"SMS {self.status} to {self.recipient} at {self.created_at.isoformat()}"

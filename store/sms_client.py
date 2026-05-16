@@ -1,4 +1,6 @@
+import json
 import logging
+from django.apps import apps
 from django.conf import settings
 import requests
 
@@ -34,11 +36,32 @@ class SMSClient:
 
         return digits
 
+    def _log_outbound_sms(self, recipient, message, payload, response, status):
+        try:
+            OutboundSMSLog = apps.get_model('store', 'OutboundSMSLog')
+            OutboundSMSLog.objects.create(
+                recipient=recipient,
+                message=message,
+                payload=payload,
+                response=response,
+                status=status,
+            )
+        except Exception:
+            logger.exception('Failed to persist outbound SMS log for recipient=%s', recipient)
+
     def send_sms(self, recipient, message, sms_type='plain', schedule_time=None, dlt_template_id=None):
+        original_recipient = recipient
         try:
             recipient = self._normalize_phone(recipient)
         except ValueError as exc:
             logger.warning('Invalid phone number format: %s (%s)', recipient, exc)
+            self._log_outbound_sms(
+                original_recipient,
+                message,
+                {'sender_id': self.sender_id, 'message': message},
+                {'error': str(exc)},
+                'skipped',
+            )
             return {'status': 'skipped', 'message': 'Invalid phone number'}
 
         payload = {
@@ -68,39 +91,46 @@ class SMSClient:
             )
             response.raise_for_status()
         except requests.HTTPError as http_err:
+            response_body = None
+            try:
+                response_body = response.json()
+            except Exception:
+                response_body = {'text': response.text}
+
             # Handle specific HTTP errors
             if response.status_code == 403:
                 logger.warning('SMS service does not have permission for this region: %s', recipient)
+                self._log_outbound_sms(recipient, message, payload, response_body, 'skipped')
                 return {'status': 'skipped', 'message': 'Region not enabled for SMS'}
             elif response.status_code == 400:
-                try:
-                    error_data = response.json()
-                    error_message = error_data.get('message', 'Bad Request')
-                    if 'invalid phone number' in error_message.lower():
-                        logger.warning('Invalid phone number format: %s', recipient)
-                        return {'status': 'skipped', 'message': 'Invalid phone number'}
-                except:
-                    pass
+                error_message = response_body.get('message', 'Bad Request') if isinstance(response_body, dict) else str(response_body)
+                if 'invalid phone number' in error_message.lower():
+                    logger.warning('Invalid phone number format: %s', recipient)
+                    self._log_outbound_sms(recipient, message, payload, response_body, 'skipped')
+                    return {'status': 'skipped', 'message': 'Invalid phone number'}
             logger.exception('ExciteSMS HTTP error for recipient=%s: %s', recipient, http_err)
+            self._log_outbound_sms(recipient, message, payload, response_body, 'error')
             raise
         except requests.RequestException as exc:
             logger.exception('ExciteSMS request failed for recipient=%s', recipient)
+            self._log_outbound_sms(recipient, message, payload, {'error': str(exc)}, 'error')
             raise
 
         try:
             data = response.json()
         except ValueError:
             logger.error('ExciteSMS response was not valid JSON: %s', response.text)
+            self._log_outbound_sms(recipient, message, payload, {'text': response.text}, 'error')
             raise
 
         if data.get('status') != 'success':
             error_message = data.get('message', response.text)
             logger.error('ExciteSMS returned error: %s', error_message)
+            self._log_outbound_sms(recipient, message, payload, data, 'skipped')
             
             # Check for specific error types
             if 'Permission to send an SMS has not been enabled' in error_message:
                 logger.warning('SMS service does not have permission for this region. SMS not sent.')
-                # Don't raise exception for permission issues - just log and continue
                 return {'status': 'skipped', 'message': 'Region not enabled for SMS'}
             elif 'invalid phone number' in error_message:
                 logger.warning('Invalid phone number format: %s', recipient)
@@ -108,5 +138,6 @@ class SMSClient:
             else:
                 raise Exception(f'ExciteSMS error: {error_message}')
 
+        self._log_outbound_sms(recipient, message, payload, data, 'success')
         logger.info('ExciteSMS SMS sent successfully to %s', recipient)
         return data

@@ -7,6 +7,20 @@ class CustomUserCreationForm(UserCreationForm):
     email = forms.EmailField(required=True)
     first_name = forms.CharField(max_length=30, required=True)
     last_name = forms.CharField(max_length=30, required=True)
+    phone = forms.CharField(max_length=20, required=True)
+
+    def clean_phone(self):
+        phone = (self.cleaned_data.get('phone') or '').strip()
+        # Allow leading +, digits, and common separators; normalize to + and digits only
+        normalized = ''.join(ch for ch in phone if ch.isdigit() or ch == '+')
+        # Ensure + appears at most once and only at the start
+        if normalized.count('+') > 1 or ('+' in normalized and not normalized.startswith('+')):
+            raise forms.ValidationError('Invalid phone number format.')
+        # Count digits to ensure a complete number (minimum 9 digits)
+        digits = ''.join(ch for ch in normalized if ch.isdigit())
+        if len(digits) < 9:
+            raise forms.ValidationError('Please enter a complete phone number (at least 9 digits).')
+        return normalized
     
     class Meta:
         model = User
@@ -17,8 +31,20 @@ class CustomUserCreationForm(UserCreationForm):
         user.email = self.cleaned_data['email']
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['last_name']
+        # mark as client and keep inactive until phone verified
+        user.is_client = True
+        user.is_active = False
         if commit:
             user.save()
+            # create or update client profile with phone
+            from users.models import ClientProfile
+            ClientProfile.objects.update_or_create(
+                user=user,
+                defaults={
+                    'phone_number': self.cleaned_data.get('phone', ''),
+                    'address': ''
+                }
+            )
         return user
 
 class CheckoutForm(forms.Form):

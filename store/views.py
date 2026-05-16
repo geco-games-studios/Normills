@@ -15,6 +15,9 @@ from django.utils.html import strip_tags
 
 from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem
 from .forms import CustomUserCreationForm, CheckoutForm
+from store.sms_client import SMSClient
+from django.utils import timezone
+from datetime import timedelta
 from .payment import process_lenco_payment, logger
 from .sms_service import send_order_sms, send_order_receipt_sms
 
@@ -123,13 +126,120 @@ def signup(request):
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)
-            messages.success(request, "Account created successfully!")
-            return redirect('home')
+            # create OTP and send via SMS
+            from users.models import PhoneOTP, ClientProfile
+            import random
+            code = f"{random.randint(100000, 999999)}"
+            phone = form.cleaned_data.get('phone', '') or request.POST.get('phone', '')
+
+            expires = timezone.now() + timedelta(minutes=10)
+            PhoneOTP.objects.create(user=user, phone=phone, code=code, expires_at=expires)
+
+            try:
+                sms_client = SMSClient()
+                result = sms_client.send_sms(phone, f"Your Geco Marketplace verification code is {code}")
+                logger.warning('OTP SMS send result for user=%s phone=%s: %s', user.id, phone, result)
+                logger.debug('Generated OTP for user=%s: %s (phone=%s)', user.id, code, phone)
+                if isinstance(result, dict) and result.get('status') != 'success':
+                    logger.warning('OTP SMS likely not sent for user=%s phone=%s: %s', user.id, phone, result)
+            except Exception:
+                logger.exception('Failed to send OTP SMS for user %s', user.id)
+
+            request.session['pending_user_id'] = user.id
+            return redirect('verify_otp')
     else:
         form = CustomUserCreationForm()
     
     return render(request, 'registration/signup.html', {'form': form})
+
+
+def verify_otp(request):
+    pending_user_id = request.session.get('pending_user_id')
+    if not pending_user_id:
+        messages.error(request, 'No pending registration to verify.')
+        return redirect('signup')
+
+    from users.models import PhoneOTP
+    from django.contrib.auth import login
+    from django.shortcuts import redirect
+
+    if request.method == 'POST':
+        code = request.POST.get('code')
+        try:
+            otp = PhoneOTP.objects.filter(user_id=pending_user_id, used=False).order_by('-created_at').first()
+            if not otp:
+                messages.error(request, 'No OTP found. Please request a new code.')
+                return redirect('signup')
+
+            if otp.expires_at and otp.expires_at < timezone.now():
+                messages.error(request, 'OTP has expired. Please signup again to request a new code.')
+                return redirect('signup')
+
+            if otp.code != code:
+                messages.error(request, 'Invalid OTP code. Please try again.')
+                return render(request, 'registration/verify_otp.html')
+
+            # mark used and activate user
+            otp.used = True
+            otp.save()
+            from users.models import User
+            user = User.objects.get(id=pending_user_id)
+            user.is_active = True
+            user.save()
+            # login
+            login(request, user)
+            del request.session['pending_user_id']
+            messages.success(request, 'Your phone has been verified and account activated.')
+            return redirect('home')
+        except Exception as e:
+            logger.exception('OTP verification error: %s', e)
+            messages.error(request, 'An error occurred while verifying OTP.')
+            return render(request, 'registration/verify_otp.html')
+
+    return render(request, 'registration/verify_otp.html')
+
+
+def resend_otp(request):
+    pending_user_id = request.session.get('pending_user_id')
+    if not pending_user_id:
+        messages.error(request, 'No pending registration to resend OTP for.')
+        return redirect('signup')
+
+    from users.models import PhoneOTP, User
+    user = User.objects.filter(id=pending_user_id).first()
+    if not user:
+        messages.error(request, 'No pending registration found.')
+        return redirect('signup')
+
+    phone = ''
+    try:
+        phone = user.client_profile.phone_number
+    except Exception:
+        phone = ''
+
+    if not phone:
+        messages.error(request, 'Cannot resend OTP because the phone number is missing.')
+        return redirect('signup')
+
+    import random
+    code = f"{random.randint(100000, 999999)}"
+    expires = timezone.now() + timedelta(minutes=10)
+    PhoneOTP.objects.create(user=user, phone=phone, code=code, expires_at=expires)
+
+    try:
+        sms_client = SMSClient()
+        result = sms_client.send_sms(phone, f"Your Geco Marketplace verification code is {code}")
+        logger.warning('Resent OTP SMS result for user=%s phone=%s: %s', user.id, phone, result)
+        if isinstance(result, dict) and result.get('status') != 'success':
+            messages.warning(request, 'Verification code was generated, but could not be sent by SMS. Please check your phone number.')
+        else:
+            messages.success(request, 'A new verification code has been sent to your phone.')
+    except Exception:
+        logger.exception('Failed to resend OTP SMS for user %s', user.id)
+        messages.error(request, 'Failed to resend OTP SMS. Please try again later.')
+
+    return redirect('verify_otp')
+
 
 def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id, available=True)
