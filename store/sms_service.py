@@ -93,7 +93,7 @@ def send_order_receipt_sms(order: Order):
     """
     sms_client = SMSClient()
     receipt_message = (
-        f"Receipt for Order #{order.id}\n"
+        f"Receipt for Order #{order.id}\n. Thank you for shopping at Normis. "
         f"Customer: {order.first_name} {order.last_name}\n"
         f"Phone: {order.phone}\n"
         f"Product(s): {', '.join([item.product.name for item in order.items.all()])}\n"

@@ -8,6 +8,8 @@ urlpatterns = [
     #User related urls
     path('', views.home, name='home'),
     path('signup/', views.signup, name='signup'),
+    path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('verify-otp/resend/', views.resend_otp, name='resend_otp'),
     path('search/', views.search_products, name='search_products'),
     
     # Products related urls

@@ -50,3 +50,18 @@ class ClientProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - Client"
+
+
+class PhoneOTP(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='phone_otps')
+    phone = models.CharField(max_length=20)
+    code = models.CharField(max_length=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"OTP {self.code} for {self.phone} (used={self.used})"
