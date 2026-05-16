@@ -15,15 +15,32 @@ class SMSClient:
         if not self.api_token:
             raise ValueError('ExciteSMS API token is required. Set EXCITESMS_API_TOKEN in settings.')
 
+    def _normalize_phone(self, recipient):
+        if not recipient or not isinstance(recipient, str):
+            raise ValueError('Phone number is required')
+
+        recipient = recipient.strip()
+        digits = ''.join(ch for ch in recipient if ch.isdigit())
+
+        if digits.startswith('00'):
+            digits = digits[2:]
+        if digits.startswith('0'):
+            digits = '260' + digits[1:]
+        elif len(digits) == 9:
+            digits = '260' + digits
+
+        if len(digits) < 9:
+            raise ValueError(f'Invalid phone number after normalization: {recipient}')
+
+        return digits
+
     def send_sms(self, recipient, message, sms_type='plain', schedule_time=None, dlt_template_id=None):
-        # Format phone number - add Zambia country code if not present
-        if recipient.startswith('0') and len(recipient) == 10:
-            # Convert 0978516926 to 260978516926 (Zambia country code)
-            recipient = '260' + recipient[1:]
-        elif recipient.startswith('+'):
-            # Remove + if present
-            recipient = recipient[1:]
-        
+        try:
+            recipient = self._normalize_phone(recipient)
+        except ValueError as exc:
+            logger.warning('Invalid phone number format: %s (%s)', recipient, exc)
+            return {'status': 'skipped', 'message': 'Invalid phone number'}
+
         payload = {
             'api_token': self.api_token,
             'recipient': recipient,

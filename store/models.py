@@ -1,8 +1,12 @@
+import logging
+
 from django.db import models
 from django.utils import timezone
 from manager.models import Store
 from users.models import User
 from .sms_client import SMSClient
+
+logger = logging.getLogger(__name__)
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -165,8 +169,39 @@ class Order(models.Model):
             sms_client = SMSClient()
             sms_client.send_sms(recipient_phone, message)
         except Exception as e:
-            print(f"Failed to send SMS: {e}")
-            
+            logger.exception('Failed to send SMS to %s', recipient_phone)
+
+    def get_store_owner_phone_numbers(self):
+        owner = getattr(self.store, 'owner', None)
+        if not owner:
+            return []
+
+        numbers = []
+        if hasattr(owner, 'phone_number') and owner.phone_number:
+            numbers.append(owner.phone_number)
+        if hasattr(owner, 'alt_phone_number') and owner.alt_phone_number:
+            numbers.append(owner.alt_phone_number)
+
+        if hasattr(owner, 'store_owner_profile'):
+            profile = owner.store_owner_profile
+            if hasattr(profile, 'phone_number') and profile.phone_number:
+                numbers.append(profile.phone_number)
+            if hasattr(profile, 'alt_phone_number') and profile.alt_phone_number:
+                numbers.append(profile.alt_phone_number)
+
+        # Deduplicate while preserving order
+        seen = set()
+        return [num for num in numbers if not (num in seen or seen.add(num))]
+
+    def _notify_store_owner(self, message):
+        numbers = self.get_store_owner_phone_numbers()
+        if not numbers:
+            logger.warning('Order %s store owner has no phone numbers configured', self.id)
+            return
+
+        for recipient in numbers:
+            self.send_sms_notification(message, recipient)
+
     def notify_shipped(self):
         """
         Notify the user and store owner that the order has been shipped.
@@ -187,7 +222,7 @@ class Order(models.Model):
 
             # Send SMS to user and store owner
             self.send_sms_notification(user_message, self.phone)
-            self.send_sms_notification(store_owner_message, self.store.owner.phone_number)
+            self._notify_store_owner(store_owner_message)
 
     def notify_delivered(self):
         """
@@ -210,7 +245,7 @@ class Order(models.Model):
 
             # Send SMS to user and store owner
             self.send_sms_notification(user_message, self.phone)
-            self.send_sms_notification(store_owner_message, self.store.owner.phone_number)
+            self._notify_store_owner(store_owner_message)
 
     def notify_payment_confirmed(self):
         """
@@ -232,7 +267,7 @@ class Order(models.Model):
 
             # Send SMS to user and store owner
             self.send_sms_notification(receipt_message, self.phone)
-            self.send_sms_notification(receipt_message, self.store.owner.phone_number)
+            self._notify_store_owner(receipt_message)
 
     def product_details(self):
         """

@@ -41,7 +41,16 @@ def send_order_sms(order: Order):
             numbers.append(store_owner.phone_number)
         if hasattr(store_owner, 'alt_phone_number') and store_owner.alt_phone_number:
             numbers.append(store_owner.alt_phone_number)
-        
+
+        # Deduplicate numbers while preserving order
+        seen = set()
+        numbers = [num for num in numbers if not (num in seen or seen.add(num))]
+
+        if not numbers:
+            logger.warning('Order %s store owner has no phone numbers configured', order.id)
+
+        logger.debug('Store owner SMS recipients for order %s: %s', order.id, numbers)
+
         for num in numbers:
             owner_message = (
                 f"New Order Received!\n"
