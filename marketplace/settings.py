@@ -153,7 +153,7 @@ LENCO_API_KEY = "ebbdf8030d34cd5d25052ed44fd757adcd96b93cd47d02bf72dc063bda8ae5b
 
 # ExciteSMS SMS Gateway Settings
 EXCITESMS_API_TOKEN = os.getenv('EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJfEVzyD2e44Vo8I0jpWZw65ec96a2')
-EXCITESMS_SENDER_ID = os.getenv('EXCITESMS_SENDER_ID', 'GecoGames')
+EXCITESMS_SENDER_ID = os.getenv('EXCITESMS_SENDER_ID', 'Gecogames')
 
 # Email (SMTP) settings for Outlook
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
