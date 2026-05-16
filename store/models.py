@@ -124,7 +124,7 @@ class Order(models.Model):
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
-    store = models.ForeignKey('Store', on_delete=models.CASCADE, null=True, blank=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField()
@@ -260,12 +260,20 @@ class Order(models.Model):
             self.save()
 
             # Prepare receipt message
+            store_owner_name = None
+            if self.store and getattr(self.store, 'owner', None):
+                store_owner_name = self.store.owner.username
+            elif self.items.exists() and getattr(self.items.first().product.store, 'owner', None):
+                store_owner_name = self.items.first().product.store.owner.username
+            else:
+                store_owner_name = 'Store Owner'
+
             receipt_message = (
                 f"Receipt for Transaction ID: {self.transaction_id}\n"
                 f"Product Details: {self.product_details()}\n"
                 f"Price: {self.total}\n"
                 f"Delivered At: {self.delivered_at}\n"
-                f"Store Owner: {self.store.owner.username}\n"
+                f"Store Owner: {store_owner_name}\n"
                 f"Thank you for your purchase!"
             )
 
@@ -292,18 +300,3 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.price * self.quantity
-
-class Store(models.Model):
-    name = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True)
-    description = models.TextField(blank=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stores')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
-
-    @property
-    def total_revenue(self):
-        return sum(order.total for order in self.orders.all())
