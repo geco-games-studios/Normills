@@ -172,7 +172,11 @@ class Order(models.Model):
             logger.exception('Failed to send SMS to %s', recipient_phone)
 
     def get_store_owner_phone_numbers(self):
-        owner = getattr(self.store, 'owner', None)
+        store = self.store
+        if not store and self.items.exists():
+            store = self.items.first().product.store
+
+        owner = getattr(store, 'owner', None)
         if not owner:
             return []
 
@@ -184,14 +188,14 @@ class Order(models.Model):
 
         if hasattr(owner, 'store_owner_profile'):
             profile = owner.store_owner_profile
-            if hasattr(profile, 'phone_number') and profile.phone_number:
+            if profile and hasattr(profile, 'phone_number') and profile.phone_number:
                 numbers.append(profile.phone_number)
-            if hasattr(profile, 'alt_phone_number') and profile.alt_phone_number:
+            if profile and hasattr(profile, 'alt_phone_number') and profile.alt_phone_number:
                 numbers.append(profile.alt_phone_number)
 
         # Deduplicate while preserving order
         seen = set()
-        return [num for num in numbers if not (num in seen or seen.add(num))]
+        return [num for num in numbers if num and not (num in seen or seen.add(num))]
 
     def _notify_store_owner(self, message):
         numbers = self.get_store_owner_phone_numbers()

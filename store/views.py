@@ -215,9 +215,18 @@ def checkout(request):
             tax = subtotal * Decimal('0.02')
             total = subtotal + shipping + tax
             
+            # Determine the store for this order from the first cart item
+            order_store = None
+            first_cart_item = cart.items.first()
+            if first_cart_item:
+                order_store = first_cart_item.product.store
+                if cart.items.exclude(product__store=order_store).exists():
+                    logger.warning('Cart contains products from multiple stores. Using first item store=%s for order %s.', order_store, request.user.id)
+
             # Create the order
             order = Order.objects.create(
                 user=request.user,
+                store=order_store,
                 first_name=form.cleaned_data['first_name'],
                 last_name=form.cleaned_data['last_name'],
                 email=form.cleaned_data.get('email', ''),

@@ -56,7 +56,11 @@ def send_order_sms(order: Order):
         logger.exception('User SMS failed for order %s', order.id)
 
     # Store owner SMS (to two numbers)
-    numbers = _get_store_owner_numbers(order.store)
+    store = order.store
+    if not store and order.items.exists():
+        store = order.items.first().product.store
+
+    numbers = _get_store_owner_numbers(store)
     if not numbers:
         logger.warning('Order %s store owner has no phone numbers configured', order.id)
         return
@@ -98,7 +102,11 @@ def send_order_receipt_sms(order: Order):
         f"Status: {order.payment_status}"
     )
 
-    recipients = [order.phone] + _get_store_owner_numbers(order.store)
+    store = order.store
+    if not store and order.items.exists():
+        store = order.items.first().product.store
+
+    recipients = [order.phone] + _get_store_owner_numbers(store)
     seen = set()
     recipients = [num for num in recipients if num and not (num in seen or seen.add(num))]
 
