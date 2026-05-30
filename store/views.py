@@ -13,7 +13,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
 from django.utils import timezone
@@ -57,10 +57,12 @@ def get_or_create_cart(request):
 def home(request):
     categories = Category.objects.all()
     products = Product.objects.all()
+    brands = Brand.objects.all()
 
     # Get filter parameters from the request
     price_filter = request.GET.get('price')
     availability_filter = request.GET.get('availability')
+    brand_filters = request.GET.getlist('brand')
 
     # Apply price filter
     if price_filter:
@@ -73,9 +75,14 @@ def home(request):
         elif availability_filter == 'out_of_stock':
             products = products.filter(stock=0)
 
+    # Apply brand filter (supports multiple selections)
+    if brand_filters:
+        products = products.filter(brand__slug__in=brand_filters)
+
     return render(request, 'index.html', {
         'categories': categories,
         'products': products,
+        'brands': brands,
     })
     
     
