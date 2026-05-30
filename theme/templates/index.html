@@ -16,21 +16,28 @@
   <!-- Sidebar Filter (stacks below on mobile) -->
   <aside class="w-full md:w-64 bg-white rounded-xl shadow p-4 mb-4 md:mb-0 order-2 md:order-1">
     <h3 class="text-xl font-semibold mb-6">Filter</h3>
+    <form method="get" action="{% url 'home' %}" id="filtersForm">
     <!-- Brand Filter -->
     <div class="mb-6">
       <h4 class="text-sm font-medium text-gray-700 mb-2">Brand</h4>
       <ul class="space-y-2 max-h-32 overflow-y-auto">
-        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Nike</label></li>
-        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Adidas</label></li>
-        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Apple</label></li>
-        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> New Balance</label></li>
-        <li><label class="flex items-center gap-2"><input type="checkbox" class="form-checkbox"> Puma</label></li>
+        {% if brands %}
+          {% for brand in brands %}
+            <li>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" class="form-checkbox" name="brand" value="{{ brand.slug }}"> {{ brand.name }}
+              </label>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="text-gray-400">No brands found.</li>
+        {% endif %}
       </ul>
     </div>
     <!-- Price Filter -->
     <div class="mb-6">
       <h4 class="text-sm font-medium text-gray-700 mb-2">Price</h4>
-      <input type="range" min="0" max="300000" class="w-full">
+      <input type="range" name="price" min="0" max="300000" class="w-full">
       <div class="flex justify-between text-xs text-gray-500 mt-1">
         <span>2,900 ZMW</span>
         <span>300,000 ZMW</span>
@@ -61,7 +68,8 @@
         <span class="w-5 h-5 rounded-full bg-yellow-400 border"></span>
       </div>
     </div>
-    <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Apply Filters</button>
+    <button type="submit" form="filtersForm" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Apply Filters</button>
+    </form>
   </aside>
 
   <!-- Main Content -->
