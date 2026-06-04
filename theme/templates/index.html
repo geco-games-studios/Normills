@@ -96,6 +96,59 @@
         {% endfor %}
       </div>
     </div>
+
+    {% if personalized_products %}
+    <section class="mb-8 bg-white rounded-3xl shadow-sm p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-2xl font-semibold">Recommended for you</h2>
+          <p class="text-sm text-gray-500">Based on your browsing and purchase activity.</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for product in personalized_products %}
+        <a href="{% url 'product_detail' product.slug %}" class="block overflow-hidden rounded-2xl border border-gray-200 hover:shadow-lg transition bg-white">
+          {% if product.image %}
+          <img class="w-full h-48 object-cover" src="{{ product.image.url }}" alt="{{ product.name }}">
+          {% else %}
+          <div class="h-48 bg-gray-100 flex items-center justify-center text-gray-400">No image</div>
+          {% endif %}
+          <div class="p-4">
+            <h3 class="text-lg font-semibold text-gray-900">{{ product.name }}</h3>
+            <p class="mt-2 text-sm text-gray-500">K{{ product.price|floatformat:2 }}</p>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if recently_viewed_products %}
+    <section class="mb-8 bg-white rounded-3xl shadow-sm p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-2xl font-semibold">Recently Viewed</h2>
+          <p class="text-sm text-gray-500">Products you looked at so far.</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for product in recently_viewed_products %}
+        <a href="{% url 'product_detail' product.slug %}" class="block overflow-hidden rounded-2xl border border-gray-200 hover:shadow-lg transition bg-white">
+          {% if product.image %}
+          <img class="w-full h-48 object-cover" src="{{ product.image.url }}" alt="{{ product.name }}">
+          {% else %}
+          <div class="h-48 bg-gray-100 flex items-center justify-center text-gray-400">No image</div>
+          {% endif %}
+          <div class="p-4">
+            <h3 class="text-lg font-semibold text-gray-900">{{ product.name }}</h3>
+            <p class="mt-2 text-sm text-gray-500">K{{ product.price|floatformat:2 }}</p>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
     <!-- Product Grid -->
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
       {% for product in products %}

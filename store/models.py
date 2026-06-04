@@ -34,6 +34,39 @@ class Brand(models.Model):
 
 # Move Product to top-level
 class Product(models.Model):
+    SEASON_CHOICES = [
+        ('spring', 'Spring'),
+        ('summer', 'Summer'),
+        ('fall', 'Fall'),
+        ('winter', 'Winter'),
+        ('all_seasons', 'All Seasons'),
+    ]
+
+    FABRIC_CHOICES = [
+        ('cotton', 'Cotton'),
+        ('silk', 'Silk'),
+        ('linen', 'Linen'),
+        ('wool', 'Wool'),
+        ('leather', 'Leather'),
+    ]
+
+    COLOR_CHOICES = [
+        ('red', 'Red'),
+        ('blue', 'Blue'),
+        ('green', 'Green'),
+        ('black', 'Black'),
+        ('white', 'White'),
+        ('yellow', 'Yellow'),
+    ]
+
+    COST_RANGE_CHOICES = [
+        ('budget', 'Budget'),
+        ('value', 'Value'),
+        ('standard', 'Standard'),
+        ('premium', 'Premium'),
+        ('luxury', 'Luxury'),
+    ]
+
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
@@ -44,6 +77,10 @@ class Product(models.Model):
     image = models.ImageField(upload_to='products/')
     stock = models.PositiveIntegerField(default=1)
     available = models.BooleanField(default=True)
+    season = models.CharField(max_length=20, choices=SEASON_CHOICES, blank=True, null=True)
+    fabric = models.CharField(max_length=20, choices=FABRIC_CHOICES, blank=True, null=True)
+    color = models.CharField(max_length=20, choices=COLOR_CHOICES, blank=True, null=True)
+    cost_range = models.CharField(max_length=20, choices=COST_RANGE_CHOICES, blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
@@ -53,7 +90,25 @@ class Product(models.Model):
     def __str__(self):
         return self.name
     
-    
+
+class LearnedKeyword(models.Model):
+    term = models.CharField(max_length=100, unique=True)
+    normalized_term = models.CharField(max_length=100, unique=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='learned_keywords')
+    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, blank=True, related_name='learned_keywords')
+    product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True, related_name='learned_keywords')
+    usage_count = models.PositiveIntegerField(default=1)
+    first_seen = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-last_seen']
+        verbose_name = 'Learned Keyword'
+        verbose_name_plural = 'Learned Keywords'
+
+    def __str__(self):
+        return self.term
+
 class ProductVariant(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
     color = models.CharField(max_length=50, blank=True)
@@ -318,3 +373,30 @@ class OutboundSMSLog(models.Model):
 
     def __str__(self):
         return f"SMS {self.status} to {self.recipient} at {self.created_at.isoformat()}"
+
+
+class BotConversation(models.Model):
+    user = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='bot_conversations')
+    session_id = models.CharField(max_length=100, null=True, blank=True)
+    product = models.ForeignKey('store.Product', on_delete=models.SET_NULL, null=True, blank=True, related_name='bot_conversations')
+    message = models.TextField()
+    response = models.TextField()
+    category_ids = models.JSONField(blank=True, null=True)
+    brand_ids = models.JSONField(blank=True, null=True)
+    season = models.CharField(max_length=20, blank=True, null=True)
+    fabric = models.CharField(max_length=20, blank=True, null=True)
+    color = models.CharField(max_length=20, blank=True, null=True)
+    cost_range = models.CharField(max_length=20, blank=True, null=True)
+    message_tokens = models.PositiveIntegerField(default=0)
+    response_tokens = models.PositiveIntegerField(default=0)
+    total_tokens = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Bot Conversation'
+        verbose_name_plural = 'Bot Conversations'
+
+    def __str__(self):
+        user_label = self.user.username if self.user else self.session_id or 'Anonymous'
+        return f"Bot conversation for {user_label} at {self.created_at.isoformat()}"

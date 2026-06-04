@@ -1,19 +1,21 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login
+from django.contrib.auth import login, get_user_model
 from django.contrib import messages
-from django.http import JsonResponse
-from django.db.models import Q
+from django.http import JsonResponse, HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q, Min, Max, Sum
 from django.utils.crypto import get_random_string
 from decimal import Decimal
+import re
 import uuid
 import json
-from decimal import Decimal
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword
+from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
 from django.utils import timezone
@@ -54,6 +56,190 @@ def get_or_create_cart(request):
         
         return cart
 
+
+def _get_user_interest_values(request, current_product=None):
+    category_ids = set()
+    brand_ids = set()
+
+    if current_product:
+        category_ids.add(current_product.category_id)
+        if current_product.brand_id:
+            brand_ids.add(current_product.brand_id)
+
+    viewed_product_ids = request.session.get('viewed_product_ids', [])
+    if not isinstance(viewed_product_ids, list):
+        try:
+            viewed_product_ids = json.loads(viewed_product_ids)
+        except Exception:
+            viewed_product_ids = []
+
+    for product_id in viewed_product_ids:
+        try:
+            product_id = int(product_id)
+        except (ValueError, TypeError):
+            continue
+        product = Product.objects.filter(id=product_id).first()
+        if product:
+            category_ids.add(product.category_id)
+            if product.brand_id:
+                brand_ids.add(product.brand_id)
+
+    if request.user.is_authenticated:
+        order_items = OrderItem.objects.filter(order__user=request.user).select_related('product')
+        for item in order_items:
+            product = item.product
+            category_ids.add(product.category_id)
+            if product.brand_id:
+                brand_ids.add(product.brand_id)
+
+    return category_ids, brand_ids
+
+
+def extract_bot_interest(message):
+    category_ids = set()
+    brand_ids = set()
+    season = None
+    fabric = None
+    color = None
+    cost_range = None
+    normalized = (message or '').lower()
+    if not normalized:
+        return category_ids, brand_ids, season, fabric, color, cost_range
+
+    for category in Category.objects.all():
+        if category.name.lower() in normalized:
+            category_ids.add(category.id)
+
+    for brand in Brand.objects.all():
+        if brand.name.lower() in normalized:
+            brand_ids.add(brand.id)
+
+    for code, label in Product.SEASON_CHOICES:
+        if code in normalized or label.lower() in normalized:
+            season = code
+            break
+
+    for code, label in Product.FABRIC_CHOICES:
+        if code in normalized or label.lower() in normalized:
+            fabric = code
+            break
+
+    for code, label in Product.COLOR_CHOICES:
+        if code in normalized or label.lower() in normalized:
+            color = code
+            break
+
+    for code, label in Product.COST_RANGE_CHOICES:
+        if code in normalized or label.lower() in normalized:
+            cost_range = code
+            break
+
+    for product in Product.objects.filter(available=True).select_related('category', 'brand'):
+        product_name = product.name.lower()
+        category_name = product.category.name.lower() if product.category else ''
+        brand_name = product.brand.name.lower() if product.brand else ''
+        if product_name in normalized or category_name in normalized or (brand_name and brand_name in normalized):
+            if product.category_id:
+                category_ids.add(product.category_id)
+            if product.brand_id:
+                brand_ids.add(product.brand_id)
+            if product.season and not season:
+                season = product.season
+            if product.fabric and not fabric:
+                fabric = product.fabric
+            if product.color and not color:
+                color = product.color
+            if product.cost_range and not cost_range:
+                cost_range = product.cost_range
+
+    return category_ids, brand_ids, season, fabric, color, cost_range
+
+
+def get_bot_interest_values(request):
+    category_ids = set()
+    brand_ids = set()
+    seasons = set()
+    fabrics = set()
+    colors = set()
+    cost_ranges = set()
+
+    if request.user.is_authenticated:
+        conversations = BotConversation.objects.filter(user=request.user).order_by('-created_at')[:50]
+    else:
+        session_id = request.session.get('bot_session_id')
+        if not session_id:
+            return category_ids, brand_ids, seasons, fabrics, colors, cost_ranges
+        conversations = BotConversation.objects.filter(session_id=session_id).order_by('-created_at')[:50]
+
+    for convo in conversations:
+        if convo.category_ids:
+            category_ids.update(convo.category_ids)
+        if convo.brand_ids:
+            brand_ids.update(convo.brand_ids)
+        if convo.season:
+            seasons.add(convo.season)
+        if convo.fabric:
+            fabrics.add(convo.fabric)
+        if convo.color:
+            colors.add(convo.color)
+        if convo.cost_range:
+            cost_ranges.add(convo.cost_range)
+
+    return category_ids, brand_ids, seasons, fabrics, colors, cost_ranges
+
+
+def get_personalized_products(request, exclude_product=None, limit=6):
+    category_ids, brand_ids = _get_user_interest_values(request, exclude_product)
+    bot_category_ids, bot_brand_ids, seasons, fabrics, colors, cost_ranges = get_bot_interest_values(request)
+    category_ids.update(bot_category_ids)
+    brand_ids.update(bot_brand_ids)
+
+    category_slug = None
+    brand_slug = None
+    if category_ids:
+        category_slug = Category.objects.filter(id__in=category_ids).values_list('slug', flat=True).first()
+    if brand_ids:
+        brand_slug = Brand.objects.filter(id__in=brand_ids).values_list('slug', flat=True).first()
+
+    ml_recommendations = recommend_products_from_context(
+        category=category_slug,
+        brand=brand_slug,
+        season=next(iter(seasons), None),
+        fabric=next(iter(fabrics), None),
+        color=next(iter(colors), None),
+        cost_range=next(iter(cost_ranges), None),
+        exclude_product=exclude_product,
+        limit=limit,
+    )
+    if ml_recommendations:
+        return ml_recommendations
+
+    products = Product.objects.filter(available=True)
+    if exclude_product:
+        products = products.exclude(id=exclude_product.id)
+
+    filters = Q()
+    if category_ids:
+        filters |= Q(category_id__in=category_ids)
+    if brand_ids:
+        filters |= Q(brand_id__in=brand_ids)
+    if seasons:
+        filters |= Q(season__in=seasons)
+    if fabrics:
+        filters |= Q(fabric__in=fabrics)
+    if colors:
+        filters |= Q(color__in=colors)
+    if cost_ranges:
+        filters |= Q(cost_range__in=cost_ranges)
+
+    if filters:
+        recommended = products.filter(filters).distinct().order_by('-created')[:limit]
+        if recommended.exists():
+            return recommended
+
+    return products.order_by('-created')[:limit]
+
+
 def home(request):
     categories = Category.objects.all()
     products = Product.objects.all()
@@ -79,10 +265,28 @@ def home(request):
     if brand_filters:
         products = products.filter(brand__slug__in=brand_filters)
 
+    personalized_products = []
+    recently_viewed_products = []
+    viewed_product_ids = request.session.get('viewed_product_ids', [])
+    if viewed_product_ids:
+        valid_ids = []
+        for pid in viewed_product_ids:
+            try:
+                valid_ids.append(int(pid))
+            except (ValueError, TypeError):
+                continue
+        if valid_ids:
+            viewed_products = list(Product.objects.filter(id__in=valid_ids, available=True))
+            recently_viewed_products = [p for pid in valid_ids for p in viewed_products if p.id == pid]
+
+    personalized_products = get_personalized_products(request)
+
     return render(request, 'index.html', {
         'categories': categories,
         'products': products,
         'brands': brands,
+        'personalized_products': personalized_products,
+        'recently_viewed_products': recently_viewed_products,
     })
     
     
@@ -107,10 +311,534 @@ def category_detail(request, slug):
 def product_detail(request, slug):
     product = get_object_or_404(Product, slug=slug, available=True)
     variants = product.variants.all()
+
+    viewed_product_ids = request.session.get('viewed_product_ids', [])
+    if not isinstance(viewed_product_ids, list):
+        try:
+            viewed_product_ids = json.loads(viewed_product_ids)
+        except Exception:
+            viewed_product_ids = []
+
+    if product.id not in viewed_product_ids:
+        viewed_product_ids.insert(0, product.id)
+    # Keep the session list short for personalization
+    viewed_product_ids = viewed_product_ids[:12]
+    request.session['viewed_product_ids'] = viewed_product_ids
+
+    recommended_products = get_personalized_products(request, exclude_product=product)
+    product_url = request.build_absolute_uri()
+
     return render(request, 'product_details.html', {
         'product': product,
-        'variants': variants
+        'variants': variants,
+        'recommended_products': recommended_products,
+        'product_url': product_url,
     })
+
+
+@login_required
+def admin_dashboard(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Superuser access only.')
+
+    total_conversations = BotConversation.objects.count()
+    total_learned_keywords = LearnedKeyword.objects.count()
+    total_products = Product.objects.count()
+    total_categories = Category.objects.count()
+    total_brands = Brand.objects.count()
+    total_users = get_user_model().objects.filter(is_active=True)
+    new_users = total_users.filter(date_joined__gte=timezone.now() - timedelta(days=30)).count()
+    old_users = total_users.filter(date_joined__lt=timezone.now() - timedelta(days=30)).count()
+    active_users_last_30_days = total_users.filter(last_login__gte=timezone.now() - timedelta(days=30)).count()
+    average_login_age = 0
+    login_users = total_users.exclude(last_login__isnull=True)
+    if login_users.exists():
+        age_sum = sum((timezone.now() - user.last_login).total_seconds() for user in login_users)
+        average_login_age = age_sum / login_users.count() / 86400
+    total_users = total_users.count()
+    successful_deliveries = Order.objects.filter(status='delivered').count()
+    successful_payments = Order.objects.filter(
+        Q(payment_status='completed') | Q(payment_confirmed=True)
+    ).count()
+    platform_earnings = Order.objects.filter(
+        Q(payment_status='completed') | Q(payment_confirmed=True)
+    ).aggregate(earnings=Sum('total'))['earnings'] or Decimal('0')
+
+    recent_conversations = BotConversation.objects.order_by('-created_at')[:10]
+    top_keywords = LearnedKeyword.objects.order_by('-usage_count')[:10]
+    token_summary = BotConversation.objects.aggregate(
+        total_message_tokens=Sum('message_tokens'),
+        total_response_tokens=Sum('response_tokens'),
+        total_tokens=Sum('total_tokens')
+    )
+    average_tokens = 0
+    if total_conversations:
+        average_tokens = token_summary.get('total_tokens', 0) / total_conversations
+
+    return render(request, 'admin_dashboard.html', {
+        'total_conversations': total_conversations,
+        'total_learned_keywords': total_learned_keywords,
+        'total_products': total_products,
+        'total_categories': total_categories,
+        'total_brands': total_brands,
+        'total_users': total_users,
+        'new_users': new_users,
+        'old_users': old_users,
+        'active_users_last_30_days': active_users_last_30_days,
+        'average_login_age': average_login_age,
+        'successful_deliveries': successful_deliveries,
+        'successful_payments': successful_payments,
+        'platform_earnings': platform_earnings,
+        'recent_conversations': recent_conversations,
+        'top_keywords': top_keywords,
+        'token_summary': token_summary,
+        'average_tokens': average_tokens,
+    })
+
+
+@csrf_exempt
+def shopping_bot(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed. Use POST.'}, status=405)
+
+    try:
+        data = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        data = request.POST
+
+    message = (data.get('message') or '').strip()
+    product_name = (data.get('product_name') or '').strip()
+
+    def normalize_message_text(text):
+        return ' '.join(''.join(ch if ch.isalnum() or ch.isspace() else ' ' for ch in text.lower()).split())
+
+    def normalize_search_terms(search_text):
+        stopwords = {
+            'what', 'do', 'you', 'have', 'for', 'the', 'a', 'an', 'and', 'or', 'to', 'from', 'with', 'on', 'in', 'of',
+            'me', 'show', 'looking', 'find', 'need', 'want', 'show', 'this', 'that', 'it', 'is', 'are', 'my', 'your',
+            'best', 'here', 'there', 'these', 'those'
+        }
+        tokens = [token for token in re.findall(r'\b[a-z]{2,}\b', search_text)]
+        terms = []
+        for token in tokens:
+            if token in stopwords:
+                continue
+            terms.append(token)
+            if token == 'babies':
+                terms.append('baby')
+            if token == 'kids':
+                terms.extend(['kid', 'children'])
+            if token == 'children':
+                terms.extend(['child', 'kids'])
+            if token == 'women':
+                terms.extend(['woman', 'female'])
+            if token == 'men':
+                terms.extend(['man', 'male'])
+            if token.endswith('ies'):
+                terms.append(token[:-3] + 'y')
+            elif token.endswith('s') and len(token) > 3:
+                terms.append(token[:-1])
+        return list(dict.fromkeys(terms))
+
+    def apply_learned_keyword_mapping(search_terms, category_ids, brand_ids, product):
+        if not search_terms:
+            return category_ids, brand_ids, product
+
+        learned = LearnedKeyword.objects.filter(normalized_term__in=search_terms)
+        for keyword in learned:
+            if keyword.category_id:
+                category_ids.add(keyword.category_id)
+            if keyword.brand_id:
+                brand_ids.add(keyword.brand_id)
+            if not product and keyword.product_id:
+                product = keyword.product
+        return category_ids, brand_ids, product
+
+    def learn_new_terms(search_terms, category_ids, brand_ids, product):
+        if not search_terms:
+            return
+        for term in search_terms:
+            keyword, created = LearnedKeyword.objects.get_or_create(
+                normalized_term=term,
+                defaults={'term': term}
+            )
+            if not created:
+                keyword.usage_count = keyword.usage_count + 1 if keyword.usage_count is not None else 1
+            if category_ids and keyword.category_id is None:
+                keyword.category_id = next(iter(category_ids))
+            if brand_ids and keyword.brand_id is None:
+                keyword.brand_id = next(iter(brand_ids))
+            if product and keyword.product_id is None:
+                keyword.product = product
+            keyword.save()
+
+    def generate_bot_response(message_text, product_name=None):
+        normalized = message_text.lower()
+        normalized_search = normalize_message_text(message_text)
+        if not normalized_search:
+            return 'Hi there! Ask me about products, sharing, orders, or personalization.'
+
+        def parse_price_range():
+            price_min = None
+            price_max = None
+            found_numbers = re.findall(r'\d+(?:\.\d+)?', normalized_search)
+            numeric = [Decimal(num) for num in found_numbers]
+            if 'between' in normalized or ('from' in normalized and 'to' in normalized):
+                if len(numeric) >= 2:
+                    price_min, price_max = numeric[0], numeric[1]
+            elif any(keyword in normalized for keyword in ['under', 'below', 'less than', 'max', 'up to']):
+                if numeric:
+                    price_max = numeric[0]
+            elif any(keyword in normalized for keyword in ['over', 'above', 'more than', 'at least', 'minimum']):
+                if numeric:
+                    price_min = numeric[0]
+            elif numeric:
+                price_max = numeric[0]
+
+            if any(keyword in normalized for keyword in ['cheap', 'budget', 'affordable', 'low cost']):
+                price_max = price_max or Decimal('200')
+            if any(keyword in normalized for keyword in ['premium', 'luxury', 'high end', 'expensive']):
+                price_min = price_min or Decimal('1000')
+
+            return price_min, price_max
+
+        def parse_profile():
+            age = None
+            weight = None
+            height_inches = None
+            gender = None
+            if re.search(r'\b(female|girl|daughter|woman|lady|women)\b', normalized):
+                gender = 'female'
+            elif re.search(r'\b(male|boy|son|man|gentleman|men)\b', normalized):
+                gender = 'male'
+
+            age_match = re.search(r'\b(\d{1,2})\s*(?:years?|yrs?|y/o|yo)\b', normalized)
+            if age_match:
+                age = int(age_match.group(1))
+            else:
+                age_match = re.search(r'\b(\d{1,2})\s*(?:months|mos?)\b', normalized)
+                if age_match:
+                    age = 0
+
+            weight_match = re.search(r'\b(\d+(?:\.\d+)?)\s*(?:kg|kilograms?)\b', normalized)
+            if weight_match:
+                try:
+                    weight = Decimal(weight_match.group(1))
+                except Exception:
+                    weight = None
+
+            height_match = re.search(r"\b(\d+)\s*(?:'|feet|ft)\s*(\d+)?\s*(?:\"|inches|in)?\b", normalized)
+            if height_match:
+                feet = int(height_match.group(1))
+                inches = int(height_match.group(2) or 0)
+                height_inches = feet * 12 + inches
+            else:
+                height_match = re.search(r'\b(\d+(?:\.\d+)?)\s*(?:cm|centimeters?)\b', normalized)
+                if height_match:
+                    try:
+                        cm = Decimal(height_match.group(1))
+                        height_inches = int((cm / Decimal('2.54')).quantize(Decimal('1')))
+                    except Exception:
+                        height_inches = None
+
+            return age, weight, height_inches, gender
+
+        def normalize_search_terms(search_text):
+            stopwords = {
+                'what', 'do', 'you', 'have', 'for', 'the', 'a', 'an', 'and', 'or', 'to', 'from', 'with', 'on', 'in', 'of',
+                'me', 'show', 'looking', 'find', 'need', 'want', 'show', 'this', 'that', 'it', 'is', 'are', 'my', 'your',
+                'best', 'here', 'there', 'these', 'those'
+            }
+            tokens = [token for token in re.findall(r'\b[a-z]{2,}\b', search_text)]
+            terms = []
+            for token in tokens:
+                if token in stopwords:
+                    continue
+                terms.append(token)
+                if token == 'babies':
+                    terms.append('baby')
+                if token == 'kids':
+                    terms.extend(['kid', 'children'])
+                if token == 'children':
+                    terms.extend(['child', 'kids'])
+                if token == 'women':
+                    terms.extend(['woman', 'female'])
+                if token == 'men':
+                    terms.extend(['man', 'male'])
+                if token.endswith('ies'):
+                    terms.append(token[:-3] + 'y')
+                elif token.endswith('s') and len(token) > 3:
+                    terms.append(token[:-1])
+            return list(dict.fromkeys(terms))
+
+        def apply_learned_keyword_mapping(search_terms, category_ids, brand_ids, product):
+            if not search_terms:
+                return category_ids, brand_ids, product
+
+            learned = LearnedKeyword.objects.filter(normalized_term__in=search_terms)
+            for keyword in learned:
+                if keyword.category_id:
+                    category_ids.add(keyword.category_id)
+                if keyword.brand_id:
+                    brand_ids.add(keyword.brand_id)
+                if not product and keyword.product_id:
+                    product = keyword.product
+            return category_ids, brand_ids, product
+
+        def learn_new_terms(search_terms, category_ids, brand_ids, product):
+            if not search_terms:
+                return
+            for term in search_terms:
+                keyword, created = LearnedKeyword.objects.get_or_create(
+                    normalized_term=term,
+                    defaults={'term': term}
+                )
+                if not created:
+                    keyword.usage_count = keyword.usage_count + 1 if keyword.usage_count is not None else 1
+                if category_ids and keyword.category_id is None:
+                    keyword.category_id = next(iter(category_ids))
+                if brand_ids and keyword.brand_id is None:
+                    keyword.brand_id = next(iter(brand_ids))
+                if product and keyword.product_id is None:
+                    keyword.product = product
+                keyword.save()
+
+        def build_profile_terms(age=None, gender=None):
+            terms = []
+            if age is not None:
+                if age <= 3:
+                    terms += ['baby', 'toddler', 'infant']
+                elif age <= 8:
+                    terms += ['kids', 'children', 'girls', 'boys']
+                elif age <= 12:
+                    terms += ['kids', 'children', 'youth']
+                elif age <= 17:
+                    terms += ['teen', 'youth', 'kids']
+                else:
+                    terms += ['adult', 'men', 'women', 'women', 'men']
+
+            if gender == 'female':
+                terms += ['girl', 'woman', 'women', 'female']
+            elif gender == 'male':
+                terms += ['boy', 'man', 'men', 'male']
+
+            return list(dict.fromkeys(terms))
+
+        def cost_range_keywords():
+            if any(keyword in normalized for keyword in ['budget', 'cheap', 'affordable', 'economical']):
+                return ['budget', 'value']
+            if any(keyword in normalized for keyword in ['standard', 'midrange', 'mid-range']):
+                return ['standard']
+            if any(keyword in normalized for keyword in ['premium', 'luxury', 'high end', 'expensive']):
+                return ['premium', 'luxury']
+            return []
+
+        def build_product_query(price_min=None, price_max=None, cost_ranges=None, profile_terms=None, search_terms=None, category_ids=None, brand_ids=None, product=None):
+            q = Q(available=True)
+            if search_terms:
+                search_q = Q()
+                for term in search_terms:
+                    search_q |= (
+                        Q(name__icontains=term) |
+                        Q(description__icontains=term) |
+                        Q(category__name__icontains=term) |
+                        Q(brand__name__icontains=term)
+                    )
+                q &= search_q
+            elif product_name:
+                q &= Q(name__icontains=product_name) | Q(description__icontains=product_name)
+
+            if profile_terms:
+                profile_q = Q()
+                for term in profile_terms:
+                    profile_q |= (
+                        Q(name__icontains=term) |
+                        Q(description__icontains=term) |
+                        Q(category__name__icontains=term) |
+                        Q(brand__name__icontains=term)
+                    )
+                q &= profile_q
+
+            if category_ids:
+                q &= Q(category_id__in=category_ids)
+            if brand_ids:
+                q &= Q(brand_id__in=brand_ids)
+            if product is not None:
+                q &= Q(id=product.id)
+
+            if price_min is not None:
+                q &= Q(price__gte=price_min)
+            if price_max is not None:
+                q &= Q(price__lte=price_max)
+            if cost_ranges:
+                q &= Q(cost_range__in=cost_ranges)
+            return q
+
+        def summarize_price(products):
+            if not products.exists():
+                return ''
+            price_info = products.aggregate(min_price=Min('price'), max_price=Max('price'))
+            min_price = price_info.get('min_price')
+            max_price = price_info.get('max_price')
+            if min_price is None or max_price is None:
+                return ''
+            if min_price == max_price:
+                return f' Prices start at {min_price}.'
+            return f' Prices range from {min_price} to {max_price}.'
+
+        if 'recommend' in normalized or 'suggest' in normalized:
+            if product_name:
+                return f"If you like {product_name}, try the product recommendations shown below. I also look at your recent views and order history to personalize suggestions."
+            return 'I can recommend products based on your recently viewed items and order history. Browse a product page or category to get personalized suggestions.'
+
+        if 'stock' in normalized or 'available' in normalized or 'inventory' in normalized:
+            return 'Stock levels are shown on the product page. If an item is available, you can add it to your cart immediately.'
+
+        if 'share' in normalized or 'friend' in normalized or 'whatsapp' in normalized or 'facebook' in normalized:
+            return 'Use the share buttons on the product page to send a direct link, or copy the product link and paste it into chat or email.'
+
+        if 'order' in normalized or 'delivery' in normalized or 'shipping' in normalized:
+            return 'Orders are usually dispatched within 1-2 business days. You can track your order in My Orders once the purchase is placed.'
+
+        if 'personalize' in normalized or 'personalization' in normalized or 'recommendation' in normalized:
+            return 'I personalize recommendations using the products you view and the categories or brands you like. The more you browse, the better the suggestions become.'
+
+        if 'hello' in normalized or 'hi' in normalized or 'hey' in normalized:
+            return 'Hello! I can help you find products, answer shipping questions, or help you share items with friends.'
+
+        categories = Category.objects.filter(name__icontains=normalized_search)
+        brands = Brand.objects.filter(name__icontains=normalized_search)
+        price_min, price_max = parse_price_range()
+        cost_ranges = cost_range_keywords()
+        profile_age, profile_weight, profile_height, profile_gender = parse_profile()
+        profile_terms = build_profile_terms(profile_age, profile_gender)
+        search_terms = normalize_search_terms(normalized_search)
+
+        category_ids = set(categories.values_list('id', flat=True))
+        brand_ids = set(brands.values_list('id', flat=True))
+        product_attachment = None
+        category_ids, brand_ids, product_attachment = apply_learned_keyword_mapping(
+            search_terms, category_ids, brand_ids, product_attachment
+        )
+
+        query = build_product_query(
+            price_min=price_min,
+            price_max=price_max,
+            cost_ranges=cost_ranges,
+            profile_terms=profile_terms,
+            search_terms=search_terms,
+            category_ids=category_ids,
+            brand_ids=brand_ids,
+            product=product_attachment,
+        )
+        search_matches = Product.objects.filter(query).distinct()[:6]
+
+        if profile_age is not None or profile_weight is not None or profile_height is not None or profile_gender is not None:
+            if search_matches.exists():
+                names = ', '.join([p.name for p in search_matches[:3]])
+                age_text = f'{profile_age}-year-old ' if profile_age is not None and profile_age > 0 else ''
+                gender_text = 'girl' if profile_gender == 'female' and (profile_age is None or profile_age <= 17) else \
+                    'boy' if profile_gender == 'male' and (profile_age is None or profile_age <= 17) else \
+                    'woman' if profile_gender == 'female' else \
+                    'man' if profile_gender == 'male' else 'person'
+                weight_text = f' around {profile_weight}kg' if profile_weight is not None else ''
+                height_text = f' and about {profile_height} inches tall' if profile_height is not None else ''
+                return (
+                    f'For a {age_text}{gender_text}{weight_text}{height_text}, I found suitable products like {names}. '
+                    'These recommendations are pulled from all categories in the store, including clothing, accessories, and footwear.'
+                )
+
+        if search_matches.exists():
+            names = ', '.join([p.name for p in search_matches[:3]])
+            context_parts = []
+            if categories.exists():
+                context_parts.append(f"category '{categories.first().name}'")
+            if brands.exists():
+                context_parts.append(f"brand '{brands.first().name}'")
+            if price_min is not None or price_max is not None:
+                low = f'from {price_min}' if price_min is not None else ''
+                high = f'up to {price_max}' if price_max is not None else ''
+                context_parts.append(f'price range {low} {high}'.strip())
+            if cost_ranges:
+                context_parts.append(f'cost level {", ".join(cost_ranges)}')
+            context = ' and '.join(context_parts) if context_parts else 'your query'
+            price_summary = summarize_price(search_matches)
+            return f'I found products for {context}: {names}.{price_summary} Use search or category listings to see more.'
+
+        if any(word in normalized_search for word in ['what do you have', 'show me', 'find', 'looking for', 'do you have', 'need', 'want', 'clothes', 'dress', 'shoes', 'bag']):
+            generic_matches = Product.objects.filter(
+                Q(name__icontains=normalized_search) |
+                Q(description__icontains=normalized_search) |
+                Q(category__name__icontains=normalized_search) |
+                Q(brand__name__icontains=normalized_search)
+            ).distinct()[:6]
+            if generic_matches.exists():
+                names = ', '.join([p.name for p in generic_matches[:3]])
+                price_summary = summarize_price(generic_matches)
+                return f'I found products matching that request: {names}.{price_summary} Try viewing the product list for more.'
+
+        return 'I’m here to help. Try asking about stock, shipping, sharing, or product recommendations.'
+
+    response_text = generate_bot_response(message, product_name)
+
+    session_id = request.session.get('bot_session_id')
+    if not session_id:
+        session_id = get_random_string(32)
+        request.session['bot_session_id'] = session_id
+
+    def count_tokens(text):
+        if not text:
+            return 0
+        return len(text.split())
+
+    message_tokens = count_tokens(message)
+    response_tokens = count_tokens(response_text)
+    total_tokens = message_tokens + response_tokens
+
+    bot_category_ids, bot_brand_ids, season, fabric, color, cost_range = extract_bot_interest(message)
+    product = None
+    if product_name:
+        product = Product.objects.filter(name__iexact=product_name).first()
+        if product:
+            if product.category_id:
+                bot_category_ids.add(product.category_id)
+            if product.brand_id:
+                bot_brand_ids.add(product.brand_id)
+            if not season and product.season:
+                season = product.season
+            if not fabric and product.fabric:
+                fabric = product.fabric
+            if not color and product.color:
+                color = product.color
+            if not cost_range and product.cost_range:
+                cost_range = product.cost_range
+
+    try:
+        BotConversation.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            session_id=session_id,
+            product=product,
+            message=message,
+            response=response_text,
+            category_ids=list(bot_category_ids) if bot_category_ids else None,
+            brand_ids=list(bot_brand_ids) if bot_brand_ids else None,
+            season=season,
+            fabric=fabric,
+            color=color,
+            cost_range=cost_range,
+            message_tokens=message_tokens,
+            response_tokens=response_tokens,
+            total_tokens=total_tokens,
+        )
+    except Exception:
+        logger.exception('Failed to save bot conversation')
+
+    try:
+        learn_new_terms(normalize_search_terms(normalize_message_text(message)), bot_category_ids, bot_brand_ids, product)
+    except Exception:
+        logger.exception('Failed to save learned keyword mappings')
+
+    return JsonResponse({'response': response_text})
 
 # def search_products(request):
 #     query = request.GET.get('q', '')

@@ -16,6 +16,8 @@ urlpatterns = [
     path('category/<slug:slug>/', views.category_detail, name='category_detail'),
     path('product/<slug:slug>/', views.product_detail, name='product_detail'),
     path('product_detail/<slug:slug>/', views.product_detail, name='product_detail'),
+    path('shopping-bot/', views.shopping_bot, name='shopping_bot'),
+    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     
     # Purchase related urls
     # path('buy-now/<slug:slug>/', views.buy_now, name='buy_now'),
