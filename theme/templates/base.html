@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Marketplace | Normils Boutique</title>
+    <title>Normils Boutique | Elegance</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Additional custom styles to ensure mobile menu is always on top and scrollable */
@@ -104,6 +104,9 @@
                 </button>
                 <div class="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg py-2 hidden group-hover:block">
                     <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
+                    {% if user.is_superuser %}
+                    <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
+                    {% endif %}
                     <form action="{% url 'logout' %}" method="post" class="inline">
                         {% csrf_token %}
                         <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
@@ -158,6 +161,12 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                     <span>My Orders</span>
                 </a>
+                {% if user.is_superuser %}
+                <a href="{% url 'admin_dashboard' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /></svg>
+                    <span>Admin Dashboard</span>
+                </a>
+                {% endif %}
                 {% endif %}
             </nav>
 
@@ -216,7 +225,7 @@
                         <h3 class="font-semibold text-lg">Silk Wrap Dress</h3>
                         <p class="text-gray-500 text-sm">Elegant & comfortable</p>
                         <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">$89.00</span>
+                            <span class="text-xl font-bold">ZMW 89.00</span>
                             <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
                         </div>
                     </div>
@@ -230,7 +239,7 @@
                         <h3 class="font-semibold text-lg">Leather Tote Bag</h3>
                         <p class="text-gray-500 text-sm">Handcrafted leather</p>
                         <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">$129.00</span>
+                            <span class="text-xl font-bold">ZMW 129.00</span>
                             <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
                         </div>
                     </div>
@@ -244,7 +253,7 @@
                         <h3 class="font-semibold text-lg">Cashmere Scarf</h3>
                         <p class="text-gray-500 text-sm">Soft & warm</p>
                         <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">$59.00</span>
+                            <span class="text-xl font-bold">ZMW 59.00</span>
                             <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
                         </div>
                     </div>
@@ -258,7 +267,7 @@
                         <h3 class="font-semibold text-lg">Minimalist Watch</h3>
                         <p class="text-gray-500 text-sm">Japanese movement</p>
                         <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">$199.00</span>
+                            <span class="text-xl font-bold">ZMW 199.00</span>
                             <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
                         </div>
                     </div>
@@ -308,6 +317,24 @@
             </div>
         </div>
     </footer>
+
+    <div id="shopping-bot-overlay" class="fixed inset-0 z-[1180] hidden bg-black/60"></div>
+    <div id="shopping-bot-widget" class="fixed bottom-5 left-1/2 z-[1200] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-3xl border border-gray-200 bg-white shadow-2xl overflow-hidden transition-all duration-300 sm:right-5 sm:left-auto sm:w-80 sm:translate-x-0 sm:bottom-5">
+        <div class="flex items-center justify-between bg-black px-4 py-3 text-white">
+            <div>
+                <p class="text-sm font-semibold">Nora</p>
+                <p class="text-xs text-gray-200">Ask about products, sharing, or delivery</p>
+            </div>
+            <button id="shopping-bot-toggle" class="text-gray-200 hover:text-white">Chat</button>
+        </div>
+        <div id="shopping-bot-body" class="hidden p-4">
+            <div id="shopping-bot-messages" class="mb-4 max-h-60 space-y-3 overflow-y-auto text-sm"></div>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <input id="shopping-bot-input" type="text" placeholder="Ask me anything..." class="flex-1 min-w-0 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
+                <button id="shopping-bot-send" class="w-full rounded-full bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 sm:w-auto">Send</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Pure JavaScript mobile menu fix: high z-index sliding panel, ensures menu is ABOVE all content and visible.
@@ -412,6 +439,106 @@
                 } else {
                     deskCartSpan.classList.add('hidden');
                 }
+            }
+
+            const botOverlay = document.getElementById('shopping-bot-overlay');
+            const botToggle = document.getElementById('shopping-bot-toggle');
+            const botBody = document.getElementById('shopping-bot-body');
+            const botWidget = document.getElementById('shopping-bot-widget');
+            const botMessages = document.getElementById('shopping-bot-messages');
+            const botInput = document.getElementById('shopping-bot-input');
+            const botSend = document.getElementById('shopping-bot-send');
+            const productContext = document.getElementById('product-context');
+
+            function appendBotMessage(text, isUser = false) {
+                const message = document.createElement('div');
+                message.className = 'rounded-2xl px-4 py-3 text-sm break-words ' + (isUser ? 'bg-black text-white self-end' : 'bg-gray-100 text-gray-900');
+                message.innerText = text;
+                botMessages.appendChild(message);
+                botMessages.scrollTop = botMessages.scrollHeight;
+            }
+
+            function isMobileView() {
+                return window.innerWidth <= 640;
+            }
+
+            function openBot() {
+                botBody.classList.remove('hidden');
+                if (isMobileView()) {
+                    botWidget.classList.add('h-[85vh]', 'max-h-[85vh]', 'bottom-0', 'left-1/2', '-translate-x-1/2', 'w-[calc(100%-1rem)]', 'max-w-none', 'rounded-t-[28px]');
+                    botWidget.classList.remove('bottom-5');
+                    if (botOverlay) {
+                        botOverlay.classList.remove('hidden');
+                    }
+                    document.documentElement.style.overflow = 'hidden';
+                }
+            }
+
+            function closeBot() {
+                botBody.classList.add('hidden');
+                if (isMobileView()) {
+                    botWidget.classList.remove('h-[85vh]', 'max-h-[85vh]', 'bottom-0', 'left-1/2', '-translate-x-1/2', 'w-[calc(100%-1rem)]', 'max-w-none', 'rounded-t-[28px]');
+                    botWidget.classList.add('bottom-5');
+                    if (botOverlay) {
+                        botOverlay.classList.add('hidden');
+                    }
+                    document.documentElement.style.overflow = '';
+                }
+            }
+
+            if (botToggle && botBody) {
+                botToggle.addEventListener('click', () => {
+                    if (botBody.classList.contains('hidden')) {
+                        openBot();
+                    } else {
+                        closeBot();
+                    }
+                });
+            }
+
+            if (botOverlay) {
+                botOverlay.addEventListener('click', closeBot);
+            }
+
+            async function sendBotQuestion() {
+                const question = botInput.value.trim();
+                if (!question) {
+                    return;
+                }
+
+                appendBotMessage(question, true);
+                botInput.value = '';
+
+                const payload = {
+                    message: question,
+                    product_name: productContext ? productContext.dataset.productName : ''
+                };
+
+                try {
+                    const response = await fetch('{% url "shopping_bot" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    appendBotMessage(result.response || 'Sorry, I could not respond right now.');
+                } catch (error) {
+                    appendBotMessage('Sorry, the bot is unavailable right now.');
+                    console.error(error);
+                }
+            }
+
+            if (botSend && botInput) {
+                botSend.addEventListener('click', sendBotQuestion);
+                botInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        sendBotQuestion();
+                    }
+                });
             }
         })();
     </script>

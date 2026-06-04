@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
     list_display = ['name', 'slug']
@@ -35,6 +35,19 @@ class CartAdmin(admin.ModelAdmin):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
+
+@admin.register(BotConversation)
+class BotConversationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'session_id', 'product', 'created_at', 'message_tokens', 'response_tokens', 'total_tokens']
+    list_filter = ['created_at', 'product']
+    search_fields = ['message', 'response', 'session_id']
+    readonly_fields = ['created_at']
+
+@admin.register(LearnedKeyword)
+class LearnedKeywordAdmin(admin.ModelAdmin):
+    list_display = ['term', 'category', 'brand', 'product', 'usage_count', 'last_seen']
+    search_fields = ['term', 'normalized_term']
+    list_filter = ['category', 'brand']
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):

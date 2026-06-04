@@ -14,6 +14,7 @@
     
     <div>
         <h1 class="text-2xl font-bold">{{ product.name }}</h1>
+        <div id="product-context" data-product-name="{{ product.name }}" class="hidden"></div>
         <p class="text-xl font-semibold mt-2">K{{ product.price }}</p>
         
         {% if product.description %}
@@ -52,17 +53,22 @@
                 </div>
             </div>
             
-            <div class="grid">
-                <div class="mt-6 mx-2">
-                    <form action="{% url 'add_to_cart' product.id %}" method="post" class="flex">
-                        {% csrf_token %}
-                        <input type="hidden" name="quantity" value="1">
-                    <button type="submit" class="w-full bg-gray-900 text-white px-6 py-3 rounded-md hover:bg-gray-800">Add to Cart</button>
-                    <form>
-                </div>
+            <div class="mt-6 mx-2">
+                <button type="submit" class="w-full bg-gray-900 text-white px-6 py-3 rounded-md hover:bg-gray-800">Add to Cart</button>
             </div>
         </form>
-        
+
+        <div class="mt-8 p-4 rounded-xl border border-gray-200 bg-gray-50">
+            <h2 class="text-lg font-semibold mb-3">Share this product</h2>
+            <div class="flex flex-wrap gap-2">
+                <a href="https://wa.me/?text={{ product_url|urlencode }}" target="_blank" class="inline-flex items-center justify-center rounded-full border border-green-500 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100">WhatsApp</a>
+                <a href="https://www.facebook.com/sharer/sharer.php?u={{ product_url|urlencode }}" target="_blank" class="inline-flex items-center justify-center rounded-full border border-blue-500 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100">Facebook</a>
+                <a href="mailto:?subject={{ product.name|urlencode }}&body=Check%20out%20this%20product:%20{{ product_url|urlencode }}" class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">Email</a>
+                <button id="copy-product-link" type="button" class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">Copy link</button>
+            </div>
+            <p id="share-success" class="mt-3 text-sm text-green-600 hidden">Link copied to clipboard.</p>
+        </div>
+
         {% if product.stock > 0 %}
         <div class="mt-4 flex items-center text-green-600">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -80,6 +86,27 @@
         {% endif %}
     </div>
 </div>
+
+{% if recommended_products %}
+<div class="mt-12">
+    <h2 class="text-2xl font-semibold mb-4">Recommended for you</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for item in recommended_products %}
+        <a href="{% url 'product_detail' item.slug %}" class="block overflow-hidden rounded-2xl border border-gray-200 hover:shadow-lg transition bg-white">
+            {% if item.image %}
+            <img src="{{ item.image.url }}" alt="{{ item.name }}" class="h-48 w-full object-cover">
+            {% else %}
+            <div class="h-48 w-full bg-gray-100 flex items-center justify-center text-gray-400">No image</div>
+            {% endif %}
+            <div class="p-4">
+                <h3 class="font-semibold text-lg text-gray-900">{{ item.name }}</h3>
+                <p class="mt-2 text-sm text-gray-500">K{{ item.price|floatformat:2 }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -101,6 +128,22 @@
                 quantityInput.value = currentValue + 1;
             }
         });
+
+        const copyButton = document.getElementById('copy-product-link');
+        const shareSuccess = document.getElementById('share-success');
+        if (copyButton) {
+            copyButton.addEventListener('click', async function() {
+                try {
+                    await navigator.clipboard.writeText('{{ product_url|escapejs }}');
+                    if (shareSuccess) {
+                        shareSuccess.classList.remove('hidden');
+                        setTimeout(() => shareSuccess.classList.add('hidden'), 2500);
+                    }
+                } catch (error) {
+                    console.error('Copy failed', error);
+                }
+            });
+        }
     });
 </script>
 {% endblock %}
