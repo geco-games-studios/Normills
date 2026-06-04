@@ -111,9 +111,9 @@
         </button>
         <a href="{% url 'product_detail' product.slug %}" class="block">
           {% if product.image %}
-            <img class="w-full h-64 object-cover object-center transition-transform group-hover:scale-105" src="{{ product.image.url }}" alt="{{ product.name }}">
+            <img class="w-full h-64 object-contain object-center bg-white transition-transform group-hover:scale-105" src="{{ product.image.url }}" alt="{{ product.name }}">
           {% else %}
-            <img class="w-full h-64 object-cover object-center transition-transform group-hover:scale-105" src="https://via.placeholder.com/300x300?text=No+Image" alt="No Image Available">
+            <img class="w-full h-64 object-contain object-center bg-white transition-transform group-hover:scale-105" src="https://via.placeholder.com/300x300?text=No+Image" alt="No Image Available">
           {% endif %}
         </a>
         <div class="p-4 flex-1 flex flex-col justify-between">
