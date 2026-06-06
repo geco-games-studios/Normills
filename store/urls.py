@@ -10,6 +10,9 @@ urlpatterns = [
     path('signup/', views.signup, name='signup'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),
     path('verify-otp/resend/', views.resend_otp, name='resend_otp'),
+    path('password-reset/', views.password_reset_request, name='password_reset_request'),
+    path('password-reset/verify/', views.password_reset_verify, name='password_reset_verify'),
+    path('password-reset/new/', views.password_reset_form, name='password_reset_form'),
     path('search/', views.search_products, name='search_products'),
     
     # Products related urls
@@ -18,6 +21,12 @@ urlpatterns = [
     path('product_detail/<slug:slug>/', views.product_detail, name='product_detail'),
     path('shopping-bot/', views.shopping_bot, name='shopping_bot'),
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('wishlist/', views.wishlist, name='wishlist'),
+    path('wishlist/add/', views.add_to_wishlist, name='add_to_wishlist'),
+    path('wishlist/remove/', views.remove_from_wishlist, name='remove_from_wishlist'),
+    path('contact-us/', views.contact_us, name='contact_us'),
+    path('shipping-policy/', views.shipping_policy, name='shipping_policy'),
+    path('returns-refunds/', views.returns_refunds, name='returns_refunds'),
     
     # Purchase related urls
     # path('buy-now/<slug:slug>/', views.buy_now, name='buy_now'),

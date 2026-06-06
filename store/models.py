@@ -400,3 +400,21 @@ class BotConversation(models.Model):
     def __str__(self):
         user_label = self.user.username if self.user else self.session_id or 'Anonymous'
         return f"Bot conversation for {user_label} at {self.created_at.isoformat()}"
+
+
+class WishlistItem(models.Model):
+    """Stores wishlist items for authenticated users or session-based for anonymous users.
+    If `user` is null, `session_id` identifies the anonymous owner.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='wishlist_items')
+    session_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='wishlisted_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['session_id']),]
+
+    def __str__(self):
+        owner = self.user.username if self.user else (self.session_id or 'Anonymous')
+        return f"WishlistItem {self.product.name} for {owner}"

@@ -92,6 +92,11 @@
                 </svg>
                 <span id="desktop-cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold hidden">0</span>
             </a>
+            <a href="{% url 'wishlist' %}" class="ml-4 bg-gray-100 rounded-full p-2 hover:bg-gray-200 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21.682l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                </svg>
+            </a>
 
             <!-- Desktop User -->
             {% if user.is_authenticated %}
@@ -298,9 +303,9 @@
                 <div>
                     <h3 class="text-lg font-semibold mb-4">Customer Service</h3>
                     <ul class="space-y-2">
-                        <li><a href="#" class="text-gray-600 hover:text-gray-900">Contact Us</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-gray-900">Shipping Policy</a></li>
-                        <li><a href="#" class="text-gray-600 hover:text-gray-900">Returns & Refunds</a></li>
+                                <li><a href="{% url 'contact_us' %}" class="text-gray-600 hover:text-gray-900">Contact Us</a></li>
+                        <li><a href="{% url 'shipping_policy' %}" class="text-gray-600 hover:text-gray-900">Shipping Policy</a></li>
+                        <li><a href="{% url 'returns_refunds' %}" class="text-gray-600 hover:text-gray-900">Returns & Refunds</a></li>
                     </ul>
                 </div>
                 <div>
@@ -319,19 +324,26 @@
     </footer>
 
     <div id="shopping-bot-overlay" class="fixed inset-0 z-[1180] hidden bg-black/60"></div>
-    <div id="shopping-bot-widget" class="fixed bottom-5 left-1/2 z-[1200] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-3xl border border-gray-200 bg-white shadow-2xl overflow-hidden transition-all duration-300 sm:right-5 sm:left-auto sm:w-80 sm:translate-x-0 sm:bottom-5">
-        <div class="flex items-center justify-between bg-black px-4 py-3 text-white">
-            <div>
+    <div id="shopping-bot-widget" class="fixed bottom-5 left-1/2 z-[1200] w-12 h-12 -translate-x-1/2 rounded-full border-2 border-blue-300 bg-gradient-to-br from-blue-300 via-sky-500 to-blue-900 shadow-2xl shadow-blue-500/50 overflow-hidden transition-all duration-300 sm:right-5 sm:left-auto sm:translate-x-0 sm:bottom-5 hover:shadow-lg hover:shadow-blue-600/70">
+        <div class="flex items-center justify-between bg-gradient-to-r from-blue-300 via-sky-500 to-blue-900 px-4 py-3 text-white">
+            <div id="shopping-bot-title" class="hidden">
                 <p class="text-sm font-semibold">Nora</p>
-                <p class="text-xs text-gray-200">Ask about products, sharing, or delivery</p>
+                <p class="text-xs text-blue-50">Ask about products, sharing, or delivery</p>
             </div>
-            <button id="shopping-bot-toggle" class="text-gray-200 hover:text-white">Chat</button>
+            <div class="flex items-center gap-3">
+                <button id="shopping-bot-close" class="hidden text-white hover:text-blue-100 transition-colors" aria-label="Close chat">✕</button>
+                <button id="shopping-bot-toggle" class="text-white hover:text-blue-100 flex items-center justify-center transition-colors" aria-label="Open chat">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+                        <path d="M20 2H4a2 2 0 0 0-2 2v14l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm0 10H6.83L4 16.83V4h16v8Z" />
+                    </svg>
+                </button>
+            </div>
         </div>
-        <div id="shopping-bot-body" class="hidden p-4">
+        <div id="shopping-bot-body" class="hidden p-4 bg-gradient-to-b from-white to-blue-50">
             <div id="shopping-bot-messages" class="mb-4 max-h-60 space-y-3 overflow-y-auto text-sm"></div>
             <div class="flex flex-col gap-2 sm:flex-row">
-                <input id="shopping-bot-input" type="text" placeholder="Ask me anything..." class="flex-1 min-w-0 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
-                <button id="shopping-bot-send" class="w-full rounded-full bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 sm:w-auto">Send</button>
+                <input id="shopping-bot-input" type="text" placeholder="Ask me anything..." class="flex-1 min-w-0 rounded-full border-2 border-blue-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent" />
+                <button id="shopping-bot-send" class="w-full rounded-full bg-gradient-to-r from-blue-600 to-sky-600 px-4 py-2 text-sm font-semibold text-white hover:from-blue-700 hover:to-sky-700 transition-all shadow-md hover:shadow-lg sm:w-auto">Send</button>
             </div>
         </div>
     </div>
@@ -445,6 +457,8 @@
             const botToggle = document.getElementById('shopping-bot-toggle');
             const botBody = document.getElementById('shopping-bot-body');
             const botWidget = document.getElementById('shopping-bot-widget');
+            const botTitle = document.getElementById('shopping-bot-title');
+            const botClose = document.getElementById('shopping-bot-close');
             const botMessages = document.getElementById('shopping-bot-messages');
             const botInput = document.getElementById('shopping-bot-input');
             const botSend = document.getElementById('shopping-bot-send');
@@ -452,7 +466,7 @@
 
             function appendBotMessage(text, isUser = false) {
                 const message = document.createElement('div');
-                message.className = 'rounded-2xl px-4 py-3 text-sm break-words ' + (isUser ? 'bg-black text-white self-end' : 'bg-gray-100 text-gray-900');
+                message.className = 'rounded-2xl px-4 py-3 text-sm break-words ' + (isUser ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white ml-auto max-w-xs shadow-md' : 'bg-white text-gray-900 border-l-4 border-blue-500 shadow-sm');
                 message.innerText = text;
                 botMessages.appendChild(message);
                 botMessages.scrollTop = botMessages.scrollHeight;
@@ -462,7 +476,39 @@
                 return window.innerWidth <= 640;
             }
 
+            function collapseBot() {
+                botWidget.classList.add('w-12', 'h-12', 'rounded-full');
+                botWidget.classList.remove('w-[calc(100%-2rem)]', 'w-80', 'max-w-none', 'rounded-3xl');
+                botWidget.style.width = '3rem';
+                botWidget.style.height = '3rem';
+                botWidget.style.maxWidth = '3rem';
+                botWidget.style.minWidth = '3rem';
+                botWidget.style.overflow = 'hidden';
+                botTitle?.classList.add('hidden');
+                botClose?.classList.add('hidden');
+                botToggle?.setAttribute('aria-label', 'Open chat');
+            }
+
+            function expandBot() {
+                botWidget.classList.remove('w-12', 'h-12', 'rounded-full');
+                botWidget.classList.add('rounded-3xl');
+                if (isMobileView()) {
+                    botWidget.classList.add('w-[calc(100%-2rem)]', 'max-w-none');
+                } else {
+                    botWidget.classList.add('w-80');
+                }
+                botWidget.style.width = '';
+                botWidget.style.height = '';
+                botWidget.style.maxWidth = '';
+                botWidget.style.minWidth = '';
+                botWidget.style.overflow = '';
+                botTitle?.classList.remove('hidden');
+                botClose?.classList.remove('hidden');
+                botToggle?.setAttribute('aria-label', 'Close chat');
+            }
+
             function openBot() {
+                expandBot();
                 botBody.classList.remove('hidden');
                 if (isMobileView()) {
                     botWidget.classList.add('h-[85vh]', 'max-h-[85vh]', 'bottom-0', 'left-1/2', '-translate-x-1/2', 'w-[calc(100%-1rem)]', 'max-w-none', 'rounded-t-[28px]');
@@ -484,7 +530,10 @@
                     }
                     document.documentElement.style.overflow = '';
                 }
+                collapseBot();
             }
+
+            collapseBot();
 
             if (botToggle && botBody) {
                 botToggle.addEventListener('click', () => {
@@ -493,6 +542,44 @@
                     } else {
                         closeBot();
                     }
+                });
+            }
+
+            if (botClose) {
+                botClose.addEventListener('click', closeBot);
+            }
+
+            // Two-handle price range live update (min & max)
+            const minInput = document.getElementById('price-min-input');
+            const maxInput = document.getElementById('price-max-input');
+            const minValue = document.getElementById('price-min-value');
+            const maxValue = document.getElementById('price-max-value');
+            if (minInput && maxInput && minValue && maxValue) {
+                // ensure numeric sync and enforce min <= max
+                minInput.addEventListener('input', function() {
+                    let min = parseInt(this.value, 10);
+                    let max = parseInt(maxInput.value, 10);
+                    if (isNaN(min)) min = parseInt(minInput.min || 0, 10);
+                    if (isNaN(max)) max = parseInt(maxInput.max || 0, 10);
+                    if (min > max) {
+                        maxInput.value = min;
+                        max = min;
+                    }
+                    minValue.innerText = Math.round(min) + ' ZMW';
+                    maxValue.innerText = Math.round(max) + ' ZMW';
+                });
+
+                maxInput.addEventListener('input', function() {
+                    let max = parseInt(this.value, 10);
+                    let min = parseInt(minInput.value, 10);
+                    if (isNaN(max)) max = parseInt(maxInput.max || 0, 10);
+                    if (isNaN(min)) min = parseInt(minInput.min || 0, 10);
+                    if (max < min) {
+                        minInput.value = max;
+                        min = max;
+                    }
+                    minValue.innerText = Math.round(min) + ' ZMW';
+                    maxValue.innerText = Math.round(max) + ' ZMW';
                 });
             }
 
@@ -540,6 +627,59 @@
                     }
                 });
             }
+
+            // Wishlist toggle (delegated)
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest && e.target.closest('.wishlist-toggle');
+                if (!btn) return;
+                const productId = btn.dataset.productId;
+                if (!productId) return;
+                const isActive = btn.classList.contains('wish-active');
+                const url = isActive ? '{% url "remove_from_wishlist" %}' : '{% url "add_to_wishlist" %}';
+                const csrftoken = getCookie('csrftoken');
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify({product_id: productId})
+                }).then(r => r.json()).then(data => {
+                    if (data && data.success) {
+                        if (data.added || (data.added === undefined && !data.removed)) {
+                            btn.classList.add('wish-active');
+                            const svg = btn.querySelector('svg');
+                            if (svg) {
+                                svg.classList.remove('text-gray-400');
+                                svg.classList.add('text-pink-500');
+                            }
+                        } else if (data.removed) {
+                            btn.classList.remove('wish-active');
+                            const svg = btn.querySelector('svg');
+                            if (svg) {
+                                svg.classList.add('text-gray-400');
+                                svg.classList.remove('text-pink-500');
+                            }
+                        }
+                    }
+                }).catch(err => console.error('Wishlist error', err));
+            });
         })();
     </script>
 </body>
