@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Verification Complete - Marketplace{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-10">
+    <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+        <span class="inline-flex items-center justify-center rounded-full bg-green-100 text-green-700 w-16 h-16 mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+            </svg>
+        </span>
+        <h1 class="text-3xl font-bold mb-4">Verification successful</h1>
+        <p class="text-gray-600 mb-6">Your account has been activated and you are now logged in.</p>
+        <a href="{% url 'home' %}" class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-full font-medium hover:bg-indigo-700">Continue to Home</a>
+    </div>
+</div>
+{% endblock %}

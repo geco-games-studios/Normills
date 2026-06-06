@@ -756,8 +756,7 @@ def verify_otp(request):
             # login
             login(request, user)
             del request.session['pending_user_id']
-            messages.success(request, 'Your phone has been verified and account activated.')
-            return redirect('home')
+            return render(request, 'registration/verification_success.html', {'user': user})
         except Exception as e:
             logger.exception('OTP verification error: %s', e)
             messages.error(request, 'An error occurred while verifying OTP.')
