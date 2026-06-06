@@ -5,6 +5,7 @@ class User(AbstractUser):
     # Add custom fields if needed
     is_store_owner = models.BooleanField(default=False)
     is_client = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=False)
 
     # Add unique related_name to avoid clashes
     groups = models.ManyToManyField(
