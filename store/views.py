@@ -755,7 +755,9 @@ def verify_otp(request):
             user.is_verified = True
             user.save()
             # login
-            login(request, user)
+            backend_path = 'users.backends.EmailOrPhoneBackend'
+            user.backend = backend_path
+            login(request, user, backend=backend_path)
             del request.session['pending_user_id']
             return render(request, 'registration/verification_success.html', {'user': user})
         except Exception as e:
@@ -904,7 +906,9 @@ def password_reset_form(request):
         form = SetPasswordForm(user, request.POST)
         if form.is_valid():
             form.save()
-            login(request, user)
+            backend_path = 'users.backends.EmailOrPhoneBackend'
+            user.backend = backend_path
+            login(request, user, backend=backend_path)
             if 'password_reset_verified_user_id' in request.session:
                 del request.session['password_reset_verified_user_id']
             messages.success(request, 'Your password has been reset successfully.')

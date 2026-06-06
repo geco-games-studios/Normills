@@ -17,7 +17,9 @@ def login_view(request):
         form = EmailOrPhoneAuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            login(request, user)
+            backend_path = 'users.backends.EmailOrPhoneBackend'
+            user.backend = backend_path
+            login(request, user, backend=backend_path)
             messages.success(request, f'Welcome back, {user.first_name or user.username}!')
             
             # Redirect to next page or home
