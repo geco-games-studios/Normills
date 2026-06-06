@@ -752,6 +752,7 @@ def verify_otp(request):
             from users.models import User
             user = User.objects.get(id=pending_user_id)
             user.is_active = True
+            user.is_verified = True
             user.save()
             # login
             login(request, user)
