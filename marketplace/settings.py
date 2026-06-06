@@ -4,6 +4,21 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env if present
+env_path = BASE_DIR / '.env'
+if env_path.exists():
+    with env_path.open() as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -40,6 +55,12 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 AUTH_USER_MODEL = 'users.User'
+
+# Custom authentication backends
+AUTHENTICATION_BACKENDS = [
+    'users.backends.EmailOrPhoneBackend',
+    'django.contrib.auth.backends.ModelBackend',  # Keep default for admin
+]
 
 TAILWIND_APP_NAME = 'theme'
 
@@ -156,10 +177,10 @@ EXCITESMS_API_TOKEN = os.getenv('EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJ
 EXCITESMS_SENDER_ID = os.getenv('EXCITESMS_SENDER_ID', 'Gecogames')
 
 # Email (SMTP) settings for Outlook
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp-mail.outlook.com'
-EMAIL_PORT = 587
-EMAIL_HOST_USER = 'hello@gecogames.com'
-EMAIL_HOST_PASSWORD = 'Worldwar@2026?'
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'Geco Marketplace <hello@gecogames.com>'
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('SMTP_HOST', 'smtp-mail.outlook.com')
+EMAIL_PORT = int(os.getenv('SMTP_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('SMTP_USER', 'hello@gecogames.com')
+EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASS', 'Worldwar@2026?')
+EMAIL_USE_TLS = os.getenv('SMTP_SECURE', 'TRUE').strip().upper() in ('TRUE', '1', 'YES', 'ON')
+DEFAULT_FROM_EMAIL = os.getenv('SMTP_FROM', 'Geco Marketplace <hello@gecogames.com>')
