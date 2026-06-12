@@ -193,8 +193,8 @@
           <span class="absolute top-3 left-3 bg-cyan-100 text-cyan-700 text-xs font-semibold px-2 py-1 rounded">New Arrival</span>
         {% endif %}
         <!-- Wishlist Icon -->
-        <button data-product-id="{{ product.id }}" class="wishlist-toggle absolute top-3 right-3 z-20 bg-white/80 rounded-full p-2 shadow hover:bg-pink-100 transition group/wishlist" title="Add to wishlist">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-400 group-hover/wishlist:text-pink-500 transition">
+        <button data-product-id="{{ product.id }}" class="wishlist-toggle {% if product.id|stringformat:'s' in wishlist_ids %}wish-active{% endif %} absolute top-3 right-3 z-20 bg-white/80 rounded-full p-2 shadow hover:bg-pink-100 transition group/wishlist" title="{% if product.id|stringformat:'s' in wishlist_ids %}Remove from wishlist{% else %}Add to wishlist{% endif %}" aria-pressed="{% if product.id|stringformat:'s' in wishlist_ids %}true{% else %}false{% endif %}">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="{% if product.id|stringformat:'s' in wishlist_ids %}currentColor{% else %}none{% endif %}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 {% if product.id|stringformat:'s' in wishlist_ids %}text-pink-500 fill-pink-500{% else %}text-gray-400 fill-none{% endif %} group-hover/wishlist:text-pink-500 transition">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.623 0-3.06.936-3.812 2.25-.752-1.314-2.189-2.25-3.812-2.25C5.099 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
           </svg>
         </button>

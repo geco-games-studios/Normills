@@ -110,18 +110,35 @@ class OrderAdmin(admin.ModelAdmin):
         'first_name',
         'last_name',
         'email',
-        'status',
+        'order_status',
         'payment_method',
-        'payment_status',
+        'admin_payment_status',
+        'payment_confirmed',
+        'lenco_status',
         'payment_reference',
         'created',
         'total',
     ]
-    list_filter = ['status', 'payment_method', 'payment_status', 'created']
+    list_filter = ['status', 'payment_method', 'payment_status', 'payment_confirmed', 'created']
     search_fields = ['id', 'email', 'phone', 'payment_reference', 'transaction_id']
     readonly_fields = ['created', 'updated', 'payment_reference', 'payment_details']
     actions = ['refresh_lenco_payment_status']
     inlines = [OrderItemInline]
+
+    @admin.display(description='Order Status', ordering='status')
+    def order_status(self, obj):
+        return obj.get_status_display()
+
+    @admin.display(description='Payment Status', ordering='payment_status')
+    def admin_payment_status(self, obj):
+        if obj.payment_status == 'completed':
+            return 'Paid'
+        return obj.get_payment_status_display()
+
+    @admin.display(description='Lenco Status')
+    def lenco_status(self, obj):
+        data = _lenco_data_from_response(_best_stored_lenco_response(obj))
+        return data.get('status') or '-'
 
     @admin.action(description='Refresh selected orders from Lenco')
     def refresh_lenco_payment_status(self, request, queryset):

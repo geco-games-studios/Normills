@@ -92,23 +92,28 @@
                 </svg>
                 <span id="desktop-cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold hidden">0</span>
             </a>
-            <a href="{% url 'wishlist' %}" class="ml-4 bg-gray-100 rounded-full p-2 hover:bg-gray-200 transition">
+            <a href="{% url 'wishlist' %}" class="ml-4 bg-gray-100 rounded-full p-2 hover:bg-gray-200 transition relative" aria-label="Wishlist">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21.682l-7.682-7.682a4.5 4.5 0 010-6.364z" />
                 </svg>
+                <span id="desktop-wishlist-badge" class="absolute -top-1 -right-1 bg-pink-500 text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center text-[10px] font-bold {% if wishlist_count|default:0 == 0 %}hidden{% endif %}">{{ wishlist_count|default:0 }}</span>
             </a>
 
             <!-- Desktop User -->
             {% if user.is_authenticated %}
             <div class="relative group">
-                <button class="flex items-center space-x-1 bg-gray-100 rounded-full px-3 py-1.5">
+                <button class="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition" aria-label="Account menu">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span class="font-medium text-sm">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="font-medium text-sm">Account</span>
                 </button>
                 <div class="absolute right-0 top-full w-44 pt-2 hidden group-hover:block group-focus-within:block">
                     <div class="bg-white rounded-xl shadow-lg py-2">
+                        <div class="px-4 py-2 border-b border-gray-100">
+                            <p class="text-xs text-gray-500">Signed in as</p>
+                            <p class="text-sm font-semibold text-gray-900 truncate">{{ user.get_full_name|default:user.username }}</p>
+                        </div>
                         <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
                         {% if user.is_superuser %}
                         <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
@@ -175,7 +180,18 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     <span>Cart <span id="mobile-cart-count" class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span></span>
                 </a>
+                <a href="{% url 'wishlist' %}" class="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
+                    <span class="flex items-center space-x-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21.682l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>
+                        <span>Wishlist</span>
+                    </span>
+                    <span id="mobile-wishlist-count" class="bg-pink-500 text-white text-xs rounded-full px-2 py-0.5 {% if wishlist_count|default:0 == 0 %}hidden{% endif %}">{{ wishlist_count|default:0 }}</span>
+                </a>
                 {% if user.is_authenticated %}
+                <a href="{% url 'order_history' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span>Account</span>
+                </a>
                 <a href="{% url 'order_history' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                     <span>My Orders</span>
@@ -186,6 +202,11 @@
                     <span>Admin Dashboard</span>
                 </a>
                 {% endif %}
+                {% else %}
+                <a href="{% url 'login' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span>Account</span>
+                </a>
                 {% endif %}
             </nav>
 
@@ -658,6 +679,31 @@
                 return cookieValue;
             }
 
+            function setWishlistButtonState(button, active) {
+                button.classList.toggle('wish-active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                button.title = active ? 'Remove from wishlist' : 'Add to wishlist';
+                const svg = button.querySelector('svg');
+                if (svg) {
+                    svg.classList.toggle('text-gray-400', !active);
+                    svg.classList.toggle('text-pink-500', active);
+                    svg.classList.toggle('fill-pink-500', active);
+                    svg.classList.toggle('fill-none', !active);
+                }
+            }
+
+            function updateWishlistBadges(count) {
+                const badges = [
+                    document.getElementById('desktop-wishlist-badge'),
+                    document.getElementById('mobile-wishlist-count'),
+                ];
+                badges.forEach((badge) => {
+                    if (!badge) return;
+                    badge.textContent = count;
+                    badge.classList.toggle('hidden', Number(count) === 0);
+                });
+            }
+
             document.addEventListener('click', function(e) {
                 const btn = e.target.closest && e.target.closest('.wishlist-toggle');
                 if (!btn) return;
@@ -676,19 +722,23 @@
                     body: JSON.stringify({product_id: productId})
                 }).then(r => r.json()).then(data => {
                     if (data && data.success) {
-                        if (data.added || (data.added === undefined && !data.removed)) {
-                            btn.classList.add('wish-active');
-                            const svg = btn.querySelector('svg');
-                            if (svg) {
-                                svg.classList.remove('text-gray-400');
-                                svg.classList.add('text-pink-500');
+                        const shouldBeActive = Boolean(data.added || (data.added === undefined && !data.removed));
+                        document.querySelectorAll(`.wishlist-toggle[data-product-id="${productId}"]`).forEach((button) => {
+                            setWishlistButtonState(button, shouldBeActive);
+                        });
+                        if (typeof data.count !== 'undefined') {
+                            updateWishlistBadges(data.count);
+                        }
+                        if (data.removed) {
+                            const wishlistCard = btn.closest('[data-wishlist-card]');
+                            if (wishlistCard) {
+                                wishlistCard.remove();
                             }
-                        } else if (data.removed) {
-                            btn.classList.remove('wish-active');
-                            const svg = btn.querySelector('svg');
-                            if (svg) {
-                                svg.classList.add('text-gray-400');
-                                svg.classList.remove('text-pink-500');
+                            const wishlistGrid = document.getElementById('wishlist-grid');
+                            const emptyState = document.getElementById('wishlist-empty-state');
+                            if (wishlistGrid && emptyState && !wishlistGrid.querySelector('[data-wishlist-card]')) {
+                                wishlistGrid.classList.add('hidden');
+                                emptyState.classList.remove('hidden');
                             }
                         }
                     }
