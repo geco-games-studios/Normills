@@ -513,14 +513,20 @@ def home(request):
     
     
 def search_products(request):
-    query = request.GET.get('q')
+    query = (request.GET.get('q') or '').strip()
     if query:
         products = Product.objects.filter(
-            Q(name__icontains=query) | Q(description__icontains=query)
-        )
+            Q(name__icontains=query) |
+            Q(description__icontains=query) |
+            Q(category__name__icontains=query) |
+            Q(brand__name__icontains=query)
+        ).distinct()
     else:
-        products = Product.objects.all()
-    return render(request, 'search_results.html', {'products': products})
+        products = Product.objects.none()
+    return render(request, 'search_results.html', {
+        'products': products,
+        'query': query,
+    })
 
 def category_detail(request, slug):
     category = get_object_or_404(Category, slug=slug)
