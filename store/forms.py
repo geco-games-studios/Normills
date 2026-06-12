@@ -112,7 +112,7 @@ class CheckoutForm(forms.Form):
         return cleaned_data
     PAYMENT_CHOICES = [
         ('mobile_money', 'Mobile Money'),
-        ('cash', 'Cash on Delivery'),
+        # ('cash', 'Cash on Delivery'),
     ]
     
     payment_method = forms.ChoiceField(

@@ -169,8 +169,12 @@ CSRF_COOKIE_SECURE = False  # Set to True if using HTTPS
 
 
 # Lenco Payment Gateway Settings
-LENCO_API_BASE_URL = "https://api.lenco.co/access/v2"
-LENCO_API_KEY = "ebbdf8030d34cd5d25052ed44fd757adcd96b93cd47d02bf72dc063bda8ae5b9"
+LENCO_API_BASE_URL = os.getenv('LENCO_API_BASE_URL', 'https://api.lenco.co/access/v2')
+LENCO_API_KEY = os.getenv('LENCO_API_KEY', 'ebbdf8030d34cd5d25052ed44fd757adcd96b93cd47d02bf72dc063bda8ae5b9')
+LENCO_MOBILE_MONEY_FIXED_FEE = os.getenv('LENCO_MOBILE_MONEY_FIXED_FEE', '8.50')
+LENCO_MOBILE_MONEY_PERCENT_FEE = os.getenv('LENCO_MOBILE_MONEY_PERCENT_FEE', '0.01')
+# CHECKOUT_TAX_RATE = os.getenv('CHECKOUT_TAX_RATE', '0.02')
+# CHECKOUT_SHIPPING_FEE = os.getenv('CHECKOUT_SHIPPING_FEE', '5.00')
 
 # ExciteSMS SMS Gateway Settings
 EXCITESMS_API_TOKEN = os.getenv('EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJfEVzyD2e44Vo8I0jpWZw65ec96a2')

@@ -76,11 +76,23 @@
                     const cashRadio = document.getElementById('payment_method_cash');
                     const mobileRadio = document.getElementById('payment_method_mobile_money');
                     const mobileOptions = document.getElementById('mobile-money-options');
+                    const taxAmount = document.getElementById('summary-tax');
+                    const paymentChargeRow = document.getElementById('payment-charge-row');
+                    const paymentChargeAmount = document.getElementById('summary-payment-charge');
+                    const totalAmount = document.getElementById('summary-total');
                     if (cashRadio && mobileRadio && mobileOptions) {
                         if (mobileRadio.checked) {
                             mobileOptions.style.display = 'block';
+                            if (paymentChargeRow) paymentChargeRow.style.display = '';
+                            if (taxAmount) taxAmount.textContent = taxAmount.dataset.mobile;
+                            if (paymentChargeAmount) paymentChargeAmount.textContent = paymentChargeAmount.dataset.mobile;
+                            if (totalAmount) totalAmount.textContent = totalAmount.dataset.mobile;
                         } else {
                             mobileOptions.style.display = 'none';
+                            if (paymentChargeRow) paymentChargeRow.style.display = 'none';
+                            if (taxAmount) taxAmount.textContent = taxAmount.dataset.cash;
+                            if (paymentChargeAmount) paymentChargeAmount.textContent = paymentChargeAmount.dataset.cash;
+                            if (totalAmount) totalAmount.textContent = totalAmount.dataset.cash;
                         }
                     }
                 }
@@ -107,14 +119,14 @@
             <div class="space-y-4">
                 <!-- Add explicit payment method radio buttons -->
                 <div class="flex items-center">
-                    <input id="payment_method_mobile_money" name="payment_method" value="mobile_money" type="radio" form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                    <input id="payment_method_mobile_money" name="payment_method" value="mobile_money" type="radio" checked form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
                     <label for="payment_method_mobile_money" class="ml-3 block text-sm font-medium text-gray-700">
                         Mobile Money
                     </label>
                 </div>
-                <div class="flex items-center">
-                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" checked form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                    <label for="payment_method_cash" class="ml-3 block text-sm font-medium text-gray-700">
+                <div class="flex items-center opacity-50 cursor-not-allowed">
+                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" disabled form="checkout-form" class="h-4 w-4 text-gray-400 border-gray-300 cursor-not-allowed">
+                    <label for="payment_method_cash" class="ml-3 block text-sm font-medium text-gray-500 cursor-not-allowed">
                         Cash on Delivery
                     </label>
                 </div>
@@ -173,17 +185,27 @@
             <div class="border-t border-gray-200 pt-4">
                 <div class="flex justify-between py-2">
                     <span class="text-gray-600">Subtotal</span>
-                    <span class="text-gray-900 font-medium">K{{ cart.total }}</span>
+                    <span class="text-gray-900 font-medium">K{{ checkout_amounts.subtotal|floatformat:2 }}</span>
+                </div>
+
+                <div class="flex justify-between py-2">
+                    <span class="text-gray-600">Shipping</span>
+                    <span class="text-gray-900 font-medium">K{{ checkout_amounts.shipping|floatformat:2 }}</span>
                 </div>
 
                 <div class="flex justify-between py-2">
                     <span class="text-gray-600">Tax</span>
-                    <span class="text-gray-900 font-medium">K{{ cart.total|multiply:0.015|floatformat:2 }}</span>
+                    <span id="summary-tax" class="text-gray-900 font-medium" data-cash="K{{ checkout_amounts.tax|floatformat:2 }}" data-mobile="K{{ mobile_money_amounts.tax|floatformat:2 }}">K{{ checkout_amounts.tax|floatformat:2 }}</span>
+                </div>
+
+                <div id="payment-charge-row" class="flex justify-between py-2" style="display: none;">
+                    <span class="text-gray-600">Mobile money charge included in tax</span>
+                    <span id="summary-payment-charge" class="text-gray-900 font-medium" data-cash="K0.00" data-mobile="K{{ mobile_money_amounts.mobile_money_fee|floatformat:2 }}">K0.00</span>
                 </div>
                 
                 <div class="flex justify-between py-2 border-t border-gray-200 mt-2">
                     <span class="text-lg font-medium text-gray-900">Total</span>
-                    <span class="text-lg font-medium text-gray-900">K{{ cart.total|multiply:0.015|add:cart.total }}</span>
+                    <span id="summary-total" class="text-lg font-medium text-gray-900" data-cash="K{{ checkout_amounts.total|floatformat:2 }}" data-mobile="K{{ mobile_money_amounts.total|floatformat:2 }}">K{{ checkout_amounts.total|floatformat:2 }}</span>
                 </div>
             </div>
             

@@ -7,7 +7,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Min, Max, Sum
 from django.utils.crypto import get_random_string
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import re
 import uuid
 import json
@@ -22,12 +22,51 @@ from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
-from .payment import process_lenco_payment, logger
+from .payment import process_lenco_payment, submit_lenco_otp, get_collection_status
 from .sms_service import send_order_sms, send_order_receipt_sms
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+MONEY_PLACES = Decimal('0.01')
+
+
+def _money(value):
+    return Decimal(value).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+
+
+def _checkout_amounts(subtotal, payment_method='cash'):
+    subtotal = _money(subtotal)
+    shipping = _money(getattr(settings, 'CHECKOUT_SHIPPING_FEE', '0.00'))
+    base_tax = _money(subtotal * Decimal(str(getattr(settings, 'CHECKOUT_TAX_RATE', '0.00'))))
+    mobile_money_fee = Decimal('0.00')
+
+    if payment_method == 'mobile_money':
+        fee_base = subtotal + shipping + base_tax
+        fixed_fee = Decimal(str(getattr(settings, 'LENCO_MOBILE_MONEY_FIXED_FEE', '8.50')))
+        percent_fee = Decimal(str(getattr(settings, 'LENCO_MOBILE_MONEY_PERCENT_FEE', '0.01')))
+        mobile_money_fee = _money(fixed_fee + (fee_base * percent_fee))
+
+    tax = _money(base_tax + mobile_money_fee)
+    total = _money(subtotal + shipping + tax)
+
+    return {
+        'subtotal': subtotal,
+        'shipping': shipping,
+        'base_tax': base_tax,
+        'mobile_money_fee': mobile_money_fee,
+        'tax': tax,
+        'total': total,
+    }
+
+
+def _order_payment_status(lenco_status):
+    if lenco_status == 'successful':
+        return 'completed'
+    if lenco_status in ('otp-required', 'pay-offline', 'pending', 'processing'):
+        return 'processing'
+    return 'failed'
 
 
 def _get_wishlist_count(request):
@@ -1003,10 +1042,11 @@ def checkout(request):
         
         form = CheckoutForm(request.POST)
         if form.is_valid():
-            subtotal = cart.total
-            shipping = Decimal('5.00')
-            tax = subtotal * Decimal('0.02')
-            total = subtotal + shipping + tax
+            amounts = _checkout_amounts(cart.total, form.cleaned_data['payment_method'])
+            subtotal = amounts['subtotal']
+            shipping = amounts['shipping']
+            tax = amounts['tax']
+            total = amounts['total']
             
             # Determine the store for this order from the first cart item
             order_store = None
@@ -1032,7 +1072,14 @@ def checkout(request):
                 tax=tax,
                 total=total,
                 payment_method=form.cleaned_data['payment_method'],
-                payment_status='pending'
+                payment_status='pending',
+                payment_details={
+                    'checkout': {
+                        'base_tax': str(amounts['base_tax']),
+                        'mobile_money_fee': str(amounts['mobile_money_fee']),
+                        'tax_total': str(amounts['tax']),
+                    }
+                }
             )
             
             # Add order items
@@ -1077,7 +1124,14 @@ def checkout(request):
                     if mobile_operator not in ['airtel', 'mtn']:
                         mobile_operator = 'airtel'  # Default to airtel if invalid
                     
-                    logger.info(f"Payment request - Order ID: {order.id}, Amount: {total}, Phone: {phone}, Operator: {mobile_operator}")
+                    logger.info(
+                        "Payment request - Order ID: %s, Amount: %s, Phone: %s, Operator: %s, Mobile money fee: %s",
+                        order.id,
+                        total,
+                        phone,
+                        mobile_operator,
+                        amounts['mobile_money_fee'],
+                    )
                     
                     # Generate a unique reference
                     reference = f"ORDER-{order.id}-{uuid.uuid4().hex[:6]}"
@@ -1096,7 +1150,10 @@ def checkout(request):
                         logger.error(f"Payment error - Order ID: {order.id}, Error: {error_message}")
                         
                         order.payment_status = 'failed'
-                        order.payment_details = payment_response
+                        order.payment_details = {
+                            **(order.payment_details or {}),
+                            'lenco_response': payment_response,
+                        }
                         order.save()
                         
                         return JsonResponse({
@@ -1107,10 +1164,13 @@ def checkout(request):
 
                     payment_data = payment_response.get('data', {})
                     order.payment_reference = payment_data.get('lencoReference') or payment_data.get('reference', '')
-                    order.payment_details = payment_response
+                    order.payment_details = {
+                        **(order.payment_details or {}),
+                        'lenco_response': payment_response,
+                    }
 
                     payment_status = payment_data.get('status', 'pending')
-                    order.payment_status = payment_status
+                    order.payment_status = _order_payment_status(payment_status)
                     order.save()
 
                     logger.info(f"Order updated - ID: {order.id}, Status: {payment_status}, Reference: {order.payment_reference}")
@@ -1214,9 +1274,14 @@ def checkout(request):
         
         form = CheckoutForm(initial=initial_data)
     
+    cash_amounts = _checkout_amounts(cart.total, 'cash')
+    mobile_money_amounts = _checkout_amounts(cart.total, 'mobile_money')
+
     return render(request, 'checkout.html', {
         'cart': cart,
-        'form': form
+        'form': form,
+        'checkout_amounts': cash_amounts,
+        'mobile_money_amounts': mobile_money_amounts,
     })
 
 def send_order_confirmation_email(order):
@@ -1274,7 +1339,7 @@ def submit_otp(request, order_id):
             
             order.payment_status = 'failed'
             order.payment_details = {
-                **order.payment_details,
+                **(order.payment_details or {}),
                 'otp_response': otp_response
             }
             order.save()
@@ -1293,9 +1358,9 @@ def submit_otp(request, order_id):
         payment_data = otp_response.get('data', {})
         payment_status = payment_data.get('status', 'pending')
         
-        order.payment_status = payment_status
+        order.payment_status = _order_payment_status(payment_status)
         order.payment_details = {
-            **order.payment_details,
+            **(order.payment_details or {}),
             'otp_response': otp_response
         }
         order.save()
@@ -1376,7 +1441,8 @@ def verify_payment(request, order_id):
     payment_status = get_collection_status(order.payment_reference)
     
     if payment_status.get('status', False):
-        order.payment_status = payment_status['data'].get('status', 'pending')
+        lenco_status = payment_status['data'].get('status', 'pending')
+        order.payment_status = _order_payment_status(lenco_status)
         order.save()
         
         return JsonResponse({

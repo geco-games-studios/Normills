@@ -4,87 +4,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
-    """
-    Process a payment using the Lenco API.
-
-    Args:
-        amount (float): The amount to be paid.
-        phone_number (str): The customer's phone number.
-        reference (str): A unique reference for the transaction.
-        operator (str): The mobile money operator (default: "airtel").
-
-    Returns:
-        dict: The API response or an error dictionary.
-    """
-    # Ensure the URL points to the correct endpoint
-    url = f"{settings.LENCO_API_BASE_URL}/collections/mobile-money"
-    
-    # Format the phone number (remove non-digits and ensure country code)
+def _format_zambian_phone(phone_number):
     phone = ''.join(filter(str.isdigit, phone_number))
-    if not phone.startswith('234'):  # Adjust for your country code
-        phone = f"234{phone}" if phone.startswith('0') else f"234{phone}"
-    
-    # Prepare payload and headers
-    payload = {
-        "operator": operator,
-        "bearer": "merchant",
-        "amount": f"{float(amount):.2f}",  # Format as string with 2 decimal places
-        "phone": phone,
-        "reference": reference
-    }
-    
-    headers = {
+    if phone.startswith('00'):
+        phone = phone[2:]
+    if phone.startswith('0'):
+        phone = f"260{phone[1:]}"
+    elif len(phone) == 9:
+        phone = f"260{phone}"
+    elif not phone.startswith('260'):
+        phone = f"260{phone}"
+    return phone
+
+
+def _lenco_headers():
+    return {
         "accept": "application/json",
         "content-type": "application/json",
         "Authorization": f"Bearer {settings.LENCO_API_KEY}",
         "User-Agent": "Mozilla/5.0 (compatible; GecoMarketplaceBot/1.0; +https://marketplace.gecogames.com)"
     }
-    
-    # Log the request for debugging
-    logger.info(f"Lenco payment request: URL={url}, Payload={payload}")
-    
-    try:
-        # Make the API request
-        response = requests.post(url, json=payload, headers=headers)
-        
-        # Try to parse the JSON response
-        try:
-            response_data = response.json()
-            logger.info(f"Lenco API response: Status={response.status_code}, Data={response_data}")
-        except ValueError:
-            logger.error(f"Non-JSON response: {response.text}")
-            response_data = {"error": "Invalid JSON response", "raw_response": response.text}
-        
-        # Check for error status codes
-        if response.status_code >= 400:
-            logger.error(f"Lenco API error: Status={response.status_code}, Response={response_data}")
-            return {
-                "error": response_data.get("message", "API error"),
-                "status": "failed",
-                "status_code": response.status_code,
-                "response": response_data
-            }
-        
-        return response_data
-    
-    except requests.exceptions.RequestException as e:
-        # Log the error and return a meaningful response
-        logger.error(f"Payment processing error: {str(e)}. Payload={payload}")
-        error_response = {
-            "error": str(e),
-            "status": "failed",
-            "status_code": getattr(e.response, "status_code", None)
-        }
-        
-        # Try to get more details from the response if available
-        if hasattr(e, 'response') and e.response is not None:
-            try:
-                error_response["response"] = e.response.json()
-            except ValueError:
-                error_response["response_text"] = e.response.text
-        
-        return error_response
 
 def submit_lenco_otp(otp, transaction_reference):
     """
@@ -104,11 +43,7 @@ def submit_lenco_otp(otp, transaction_reference):
         "transaction_reference": transaction_reference
     }
     
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "Authorization": f"Bearer {settings.LENCO_API_KEY}"
-    }
+    headers = _lenco_headers()
     
     logger.info(f"Submitting OTP for transaction: {transaction_reference}")
     
@@ -156,30 +91,19 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
     # Ensure the URL points to the correct endpoint
     url = f"{settings.LENCO_API_BASE_URL}/collections/mobile-money"
     
-    # Format the phone number (remove non-digits and ensure country code)
-    phone = ''.join(filter(str.isdigit, phone_number))
-    # Adjust country code as needed for your region
-    if not phone.startswith('260'):  # Zambia country code
-        phone = f"260{phone}" if phone.startswith('0') else f"260{phone}"
-    
-    # Ensure operator is exactly "airtel" or "mtn" (no validation here, it should be done before calling this function)
-    # Do not modify the operator value - pass it as is
+    phone = _format_zambian_phone(phone_number)
     
     # Prepare payload and headers
     payload = {
-        "operator": operator,  # Use the operator value as provided
+        "operator": operator,
         "bearer": "merchant",
-        "amount": f"{float(amount):.2f}",  # Format as string with 2 decimal places
+        "amount": f"{float(amount):.2f}",
         "phone": phone,
         "reference": reference,
-        "currency": "ZMW"  # Add currency for Zambia
+        "currency": "ZMW"
     }
     
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "Authorization": f"Bearer {settings.LENCO_API_KEY}"
-    }
+    headers = _lenco_headers()
     
     # Log the request for debugging
     logger.info(f"Lenco payment request: URL={url}, Payload={payload}")
@@ -217,3 +141,31 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
             "data": None
         }
 
+
+def get_collection_status(transaction_reference):
+    url = f"{settings.LENCO_API_BASE_URL}/collections/status/{transaction_reference}"
+
+    try:
+        response = requests.get(url, headers=_lenco_headers())
+        try:
+            response_data = response.json()
+            logger.info(f"Lenco status response: Status={response.status_code}, Data={response_data}")
+        except ValueError:
+            logger.error(f"Non-JSON response from status check: {response.text}")
+            response_data = {"status": False, "message": "Invalid JSON response", "data": None}
+
+        if response.status_code >= 400:
+            return {
+                "status": False,
+                "message": response_data.get("message", "API error"),
+                "data": None
+            }
+
+        return response_data
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Collection status error: {str(e)}")
+        return {
+            "status": False,
+            "message": str(e),
+            "data": None
+        }
