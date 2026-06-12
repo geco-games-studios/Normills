@@ -6,13 +6,33 @@
 {% block content %}
 <div class="max-w-3xl mx-auto">
     <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="inline-flex items-center justify-center w-16 h-16 {% if order.payment_status == 'completed' %}bg-green-100{% elif order.payment_status == 'failed' %}bg-red-100{% else %}bg-yellow-100{% endif %} rounded-full mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 {% if order.payment_status == 'completed' %}text-green-600{% elif order.payment_status == 'failed' %}text-red-600{% else %}text-yellow-600{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {% if order.payment_status == 'failed' %}
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                {% else %}
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                {% endif %}
             </svg>
         </div>
-        <h1 class="text-3xl font-bold text-gray-900">Thank you for shopping at Normils!</h1>
-        <p class="text-gray-600 mt-2">Your order has been placed successfully.</p>
+        <h1 class="text-3xl font-bold text-gray-900">
+            {% if order.payment_status == 'completed' %}
+                Payment complete
+            {% elif order.payment_status == 'failed' %}
+                Payment failed
+            {% else %}
+                Waiting for payment
+            {% endif %}
+        </h1>
+        <p class="text-gray-600 mt-2">
+            {% if order.payment_status == 'completed' %}
+                Your order has been paid and is now being processed.
+            {% elif order.payment_status == 'failed' %}
+                Your order was created, but the mobile money payment did not complete.
+            {% else %}
+                Your order was created. Please complete the mobile money payment to continue.
+            {% endif %}
+        </p>
     </div>
     
     <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -79,7 +99,7 @@
                 <p class="text-gray-600">Payment Method:</p>
                 <p class="font-medium">{{ order.get_payment_method_display }}</p>
             </div>
-            <span class="px-3 py-1 
+            <span id="payment-status-badge" class="px-3 py-1 
                 {% if order.payment_status == 'completed' %}
                     bg-green-100 text-green-800
                 {% elif order.payment_status == 'failed' %}
@@ -88,9 +108,12 @@
                     bg-yellow-100 text-yellow-800
                 {% endif %} 
                 rounded-full text-sm font-medium">
-                {{ order.get_payment_status_display }}
+                {% if order.payment_status == 'completed' %}Paid{% else %}{{ order.get_payment_status_display }}{% endif %}
             </span>
         </div>
+        {% if order.payment_reference %}
+        <p class="text-xs text-gray-500 mb-4">Payment reference: {{ order.payment_reference }}</p>
+        {% endif %}
         
         {% if order.payment_method == 'mobile_money' and order.payment_status == 'processing' %}
         <div class="bg-yellow-50 p-4 rounded-md mt-4">
@@ -110,7 +133,7 @@
                             <button type="button" id="check-payment-status" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                                 Check Payment Status
                             </button>
-                            <span id="payment-status-message" class="ml-3 text-sm text-yellow-700"></span>
+                            <span id="payment-status-message" class="ml-3 text-sm text-yellow-700">Checking automatically...</span>
                         </div>
                     </div>
                 </div>
@@ -167,23 +190,45 @@
         const errorModal = document.getElementById('error-modal');
         const errorMessage = document.getElementById('error-message');
         const closeErrorModal = document.getElementById('close-error-modal');
+        let statusInterval = null;
 
-        checkStatusBtn.addEventListener('click', function() {
+        function setPaymentBadge(status) {
+            const badge = document.getElementById('payment-status-badge');
+            if (!badge) return;
+            badge.className = 'px-3 py-1 rounded-full text-sm font-medium';
+            if (status === 'completed') {
+                badge.className += ' bg-green-100 text-green-800';
+                badge.textContent = 'Paid';
+            } else if (status === 'failed') {
+                badge.className += ' bg-red-100 text-red-800';
+                badge.textContent = 'Failed';
+            } else {
+                badge.className += ' bg-yellow-100 text-yellow-800';
+                badge.textContent = 'Processing';
+            }
+        }
+
+        function checkPaymentStatus() {
             statusMessage.textContent = 'Checking payment status...';
             
             fetch('{% url "verify_payment" order.id %}')
                 .then(response => response.json())
                 .then(data => {
                     if (data.payment_status === 'completed') {
+                        if (statusInterval) clearInterval(statusInterval);
+                        setPaymentBadge('completed');
                         statusMessage.textContent = 'Payment completed successfully!';
                         statusMessage.className = 'ml-3 text-sm text-green-700';
                         setTimeout(() => {
                             window.location.reload();
                         }, 2000);
                     } else if (data.payment_status === 'failed') {
+                        if (statusInterval) clearInterval(statusInterval);
+                        setPaymentBadge('failed');
                         statusMessage.textContent = 'Payment failed. Please try again.';
                         statusMessage.className = 'ml-3 text-sm text-red-700';
                     } else {
+                        setPaymentBadge('processing');
                         statusMessage.textContent = 'Payment is still processing. Please check your phone.';
                         statusMessage.className = 'ml-3 text-sm text-yellow-700';
                     }
@@ -194,7 +239,11 @@
                     errorModal.classList.remove('hidden');
                     console.error('Error:', error);
                 });
-        });
+        }
+
+        checkStatusBtn.addEventListener('click', checkPaymentStatus);
+        checkPaymentStatus();
+        statusInterval = setInterval(checkPaymentStatus, 10000);
 
         // Close modal when clicking the button
         closeErrorModal.addEventListener('click', function() {
@@ -205,4 +254,3 @@
 
 {% endif %}
 {% endblock %}
-

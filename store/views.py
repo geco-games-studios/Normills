@@ -64,7 +64,7 @@ def _checkout_amounts(subtotal, payment_method='cash'):
 def _order_payment_status(lenco_status):
     if lenco_status == 'successful':
         return 'completed'
-    if lenco_status in ('otp-required', 'pay-offline', 'pending', 'processing'):
+    if lenco_status in ('pay-offline', 'pending'):
         return 'processing'
     return 'failed'
 
@@ -1177,24 +1177,14 @@ def checkout(request):
 
                     json_response = None
 
-                    if payment_status == 'otp-required':
+                    if payment_status in ('pending', 'pay-offline'):
                         json_response = {
                             'status': True,
-                            'message': 'Please enter your mobile money PIN to authorize the payment.',
+                            'message': 'Please authorize the mobile money payment on your phone.',
                             'data': {
                                 'order_id': order.id,
                                 'payment_reference': order.payment_reference,
-                                'status': 'otp-required'
-                            }
-                        }
-                    elif payment_status == 'pay-offline':
-                        json_response = {
-                            'status': True,
-                            'message': 'Please authorize the payment on your mobile money app.',
-                            'data': {
-                                'order_id': order.id,
-                                'payment_reference': order.payment_reference,
-                                'status': 'pay-offline'
+                                'status': payment_status
                             }
                         }
                     elif payment_status == 'successful':
@@ -1442,12 +1432,24 @@ def verify_payment(request, order_id):
     
     if payment_status.get('status', False):
         lenco_status = payment_status['data'].get('status', 'pending')
+        was_paid = order.payment_status == 'completed' or order.payment_confirmed
         order.payment_status = _order_payment_status(lenco_status)
+        if order.payment_status == 'completed':
+            order.status = 'processing'
         order.save()
+
+        if order.payment_status == 'completed' and not was_paid:
+            try:
+                send_order_confirmation_email(order)
+            except Exception:
+                logger.exception('Payment confirmation email failed for Order ID %s', order.id)
+            order.notify_payment_confirmed()
         
         return JsonResponse({
+            'status': True,
             'order_id': order.id,
             'payment_status': order.payment_status,
+            'lenco_status': lenco_status,
             'payment_reference': order.payment_reference
         })
     else:

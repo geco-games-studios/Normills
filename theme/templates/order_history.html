@@ -10,15 +10,23 @@
     {% for order in orders %}
     <div class="bg-white rounded-lg shadow-sm overflow-hidden">
         <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-4">
                 <div>
                     <h2 class="text-lg font-medium text-gray-900">Order #{{ order.id }}</h2>
                     <p class="text-sm text-gray-500">Placed on {{ order.created|date:"F j, Y" }}</p>
                 </div>
-                <span class="px-3 py-1 {% if order.status == 'delivered' %}bg-green-100 text-green-800{% elif order.status == 'cancelled' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-full text-sm font-medium">
-                    {{ order.get_status_display }}
-                </span>
+                <div class="flex flex-wrap gap-2">
+                    <span class="px-3 py-1 {% if order.status == 'delivered' %}bg-green-100 text-green-800{% elif order.status == 'cancelled' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %} rounded-full text-sm font-medium">
+                        Order: {{ order.get_status_display }}
+                    </span>
+                    <span class="px-3 py-1 {% if order.payment_status == 'completed' %}bg-green-100 text-green-800{% elif order.payment_status == 'failed' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %} rounded-full text-sm font-medium">
+                        Payment: {% if order.payment_status == 'completed' %}Paid{% else %}{{ order.get_payment_status_display }}{% endif %}
+                    </span>
+                </div>
             </div>
+            {% if order.payment_reference %}
+            <p class="mb-4 text-xs text-gray-500">Payment reference: {{ order.payment_reference }}</p>
+            {% endif %}
             
             <div class="border-t border-gray-200 pt-4">
                 <div class="space-y-4">
@@ -53,7 +61,9 @@
                     <span class="ml-2 text-lg font-medium text-gray-900">K{{ order.total }}</span>
                 </div>
                 
-                <a href="{% url 'order_confirmation' order.id %}" class="text-indigo-600 hover:text-indigo-800 font-medium">View Details</a>
+                <a href="{% url 'order_confirmation' order.id %}" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                    {% if order.payment_status == 'processing' %}Check Payment{% else %}View Details{% endif %}
+                </a>
             </div>
         </div>
     </div>
@@ -72,4 +82,3 @@
 </div>
 {% endif %}
 {% endblock %}
-

@@ -107,15 +107,17 @@
                     </svg>
                     <span class="font-medium text-sm">{{ user.get_full_name|default:user.username }}</span>
                 </button>
-                <div class="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg py-2 hidden group-hover:block">
-                    <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
-                    {% if user.is_superuser %}
-                    <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
-                    {% endif %}
-                    <form action="{% url 'logout' %}" method="post" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
-                    </form>
+                <div class="absolute right-0 top-full w-44 pt-2 hidden group-hover:block group-focus-within:block">
+                    <div class="bg-white rounded-xl shadow-lg py-2">
+                        <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
+                        {% if user.is_superuser %}
+                        <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
+                        {% endif %}
+                        <form action="{% url 'logout' %}" method="post" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
+                        </form>
+                    </div>
                 </div>
             </div>
             {% else %}
