@@ -11,9 +11,23 @@
         <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Shipping Information</h2>
             
-            <!-- Loading Spinner -->
-            <div id="loading-spinner" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+            <div id="payment-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+                <div class="bg-white rounded-lg shadow-lg max-w-sm w-full p-6 text-center">
+                    <div id="payment-modal-spinner" class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600"></div>
+                    <div id="payment-modal-success" class="hidden mx-auto mb-4 h-12 w-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 111.414-1.414l2.543 2.543 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div id="payment-modal-error" class="hidden mx-auto mb-4 h-12 w-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <h3 id="payment-modal-title" class="text-lg font-semibold text-gray-900">Processing payment</h3>
+                    <p id="payment-modal-message" class="mt-2 text-sm text-gray-600">Please approve the mobile money prompt on your phone. Keep this page open while we confirm the payment.</p>
+                    <button id="payment-modal-close" type="button" class="hidden mt-5 w-full bg-gray-900 text-white px-4 py-2 rounded-md font-medium hover:bg-gray-800">Close</button>
+                </div>
             </div>
             
             <form method="post" id="checkout-form" onsubmit="submitForm(event)">
@@ -210,19 +224,59 @@
             </div>
             
             <div class="mt-6">
-                <button type="submit" form="checkout-form" class="w-full bg-indigo-600 text-white text-center px-4 py-3 rounded-md font-medium hover:bg-indigo-700">Place Order</button>
+                <button id="place-order-button" type="submit" form="checkout-form" class="w-full bg-indigo-600 text-white text-center px-4 py-3 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">Place Order</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    function setPaymentModalState(state, message) {
+        const modal = document.getElementById('payment-modal');
+        const spinner = document.getElementById('payment-modal-spinner');
+        const successIcon = document.getElementById('payment-modal-success');
+        const errorIcon = document.getElementById('payment-modal-error');
+        const title = document.getElementById('payment-modal-title');
+        const messageEl = document.getElementById('payment-modal-message');
+        const closeButton = document.getElementById('payment-modal-close');
+        const submitButton = document.getElementById('place-order-button');
+
+        modal.classList.remove('hidden');
+        spinner.classList.toggle('hidden', state !== 'processing');
+        successIcon.classList.toggle('hidden', state !== 'success');
+        errorIcon.classList.toggle('hidden', state !== 'error');
+        closeButton.classList.toggle('hidden', state !== 'error');
+        if (submitButton) submitButton.disabled = state === 'processing' || state === 'success';
+
+        if (state === 'processing') {
+            title.textContent = 'Processing payment';
+            messageEl.textContent = message || 'Please approve the mobile money prompt on your phone. Keep this page open while we confirm the payment.';
+        } else if (state === 'success') {
+            title.textContent = 'Payment request sent';
+            messageEl.textContent = message || 'Your payment is being confirmed. We will take you to the next step now.';
+        } else {
+            title.textContent = 'Payment failed';
+            messageEl.textContent = message || 'The payment could not be completed. Please check your balance or try again.';
+        }
+    }
+
+    function hidePaymentModal() {
+        document.getElementById('payment-modal').classList.add('hidden');
+        const submitButton = document.getElementById('place-order-button');
+        if (submitButton) submitButton.disabled = false;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const closeButton = document.getElementById('payment-modal-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', hidePaymentModal);
+        }
+    });
+
     async function submitForm(event) {
         event.preventDefault(); // Prevent the default form submission
 
-        // Show the loading spinner
-        const loadingSpinner = document.getElementById('loading-spinner');
-        loadingSpinner.classList.remove('hidden');
+        setPaymentModalState('processing');
 
         // Get form data
         const form = document.getElementById('checkout-form');
@@ -252,18 +306,16 @@
 
             // Redirect to the order confirmation page
             if (data.data && data.data.order_id) {
-                window.location.href = `{% url 'confirm_payment' order_id=0 %}`.replace('0', data.data.order_id);
+                setPaymentModalState('success', data.message || 'Payment request accepted. Redirecting now.');
+                setTimeout(() => {
+                    window.location.href = `{% url 'confirm_payment' order_id=0 %}`.replace('0', data.data.order_id);
+                }, 900);
             } else {
                 throw new Error(data.message || 'Form submission failed');
             }
         } catch (error) {
-            // Hide the loading spinner and display an error message
-            loadingSpinner.classList.add('hidden');
             console.error('Error:', error.message);
-            alert(`Error: ${error.message}`);
-        } finally {
-            // Hide the loading spinner
-            loadingSpinner.classList.add('hidden');
+            setPaymentModalState('error', error.message);
         }
     }
 </script>
