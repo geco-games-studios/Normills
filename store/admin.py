@@ -51,6 +51,20 @@ class LearnedKeywordAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user', 'first_name', 'last_name', 'email', 'status', 'created', 'total']
-    list_filter = ['status', 'created']
+    list_display = [
+        'id',
+        'user',
+        'first_name',
+        'last_name',
+        'email',
+        'status',
+        'payment_method',
+        'payment_status',
+        'payment_reference',
+        'created',
+        'total',
+    ]
+    list_filter = ['status', 'payment_method', 'payment_status', 'created']
+    search_fields = ['id', 'email', 'phone', 'payment_reference', 'transaction_id']
+    readonly_fields = ['created', 'updated', 'payment_reference', 'payment_details']
     inlines = [OrderItemInline]
