@@ -4,6 +4,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _mask_lenco_key():
+    api_key = settings.LENCO_API_KEY or ''
+    if not api_key:
+        return 'missing'
+    if len(api_key) <= 8:
+        return 'configured-short'
+    return f"{api_key[:4]}...{api_key[-4:]} ({len(api_key)} chars)"
+
+
 def _format_zambian_phone(phone_number):
     phone = ''.join(filter(str.isdigit, phone_number))
     if phone.startswith('00'):
@@ -37,6 +47,7 @@ def _missing_api_key_response():
 
 def _api_error_response(response, response_data, fallback_message="API error"):
     if response.status_code == 401:
+        logger.error("Lenco authorization failed using API key %s", _mask_lenco_key())
         return {
             "status": False,
             "message": "Mobile money authorization failed. Please contact support.",
