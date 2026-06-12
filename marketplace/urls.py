@@ -10,6 +10,7 @@ urlpatterns = [
     path('', include('store.urls')),
     path('users/', include('users.urls')),
     path('accounts/login/', user_views.login_view, name='login'),  # Custom login
+    path('accounts/profile/', user_views.profile_view, name='profile'),
     path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),  # Include other auth URLs (password reset, etc.)
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # Direct logout URL

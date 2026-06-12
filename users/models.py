@@ -6,6 +6,7 @@ class User(AbstractUser):
     is_store_owner = models.BooleanField(default=False)
     is_client = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
 
     # Add unique related_name to avoid clashes
     groups = models.ManyToManyField(

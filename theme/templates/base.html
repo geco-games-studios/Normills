@@ -102,18 +102,19 @@
             <!-- Desktop User -->
             {% if user.is_authenticated %}
             <div class="relative group">
-                <button class="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition" aria-label="Account menu">
+                <a href="{% url 'profile' %}" class="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition" aria-label="Account">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     <span class="font-medium text-sm">Account</span>
-                </button>
+                </a>
                 <div class="absolute right-0 top-full w-44 pt-2 hidden group-hover:block group-focus-within:block">
                     <div class="bg-white rounded-xl shadow-lg py-2">
                         <div class="px-4 py-2 border-b border-gray-100">
                             <p class="text-xs text-gray-500">Signed in as</p>
                             <p class="text-sm font-semibold text-gray-900 truncate">{{ user.get_full_name|default:user.username }}</p>
                         </div>
+                        <a href="{% url 'profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
                         <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
                         {% if user.is_superuser %}
                         <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
@@ -188,7 +189,7 @@
                     <span id="mobile-wishlist-count" class="bg-pink-500 text-white text-xs rounded-full px-2 py-0.5 {% if wishlist_count|default:0 == 0 %}hidden{% endif %}">{{ wishlist_count|default:0 }}</span>
                 </a>
                 {% if user.is_authenticated %}
-                <a href="{% url 'order_history' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
+                <a href="{% url 'profile' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     <span>Account</span>
                 </a>

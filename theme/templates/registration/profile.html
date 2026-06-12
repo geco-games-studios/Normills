@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile - Normils{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">My Profile</h1>
+        <p class="text-gray-600 mt-2">Update your account details and password.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+            <div class="mx-auto h-28 w-28 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                {% if user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" alt="{{ user.get_full_name|default:user.username }}" class="h-full w-full object-cover">
+                {% else %}
+                <span class="text-4xl font-bold text-gray-400">{{ user.first_name|default:user.username|slice:":1"|upper }}</span>
+                {% endif %}
+            </div>
+            <h2 class="mt-4 text-lg font-semibold text-gray-900">{{ user.get_full_name|default:user.username }}</h2>
+            <p class="text-sm text-gray-500">{{ user.email }}</p>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Profile Details</h2>
+                <form method="post" enctype="multipart/form-data" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="profile">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="{{ profile_form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                            {{ profile_form.first_name }}
+                            {% for error in profile_form.first_name.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <div>
+                            <label for="{{ profile_form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                            {{ profile_form.last_name }}
+                            {% for error in profile_form.last_name.errors %}
+                            <p class="text-sm text-red-600 mt-1">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="{{ profile_form.profile_picture.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Profile Picture</label>
+                        {{ profile_form.profile_picture }}
+                        {% for error in profile_form.profile_picture.errors %}
+                        <p class="text-sm text-red-600 mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" class="bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800">Save Profile</button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Change Password</h2>
+                <form method="post" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="password">
+
+                    {% for field in password_form %}
+                    <div>
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ field.label }}</label>
+                        <input type="{{ field.field.widget.input_type }}" name="{{ field.html_name }}" id="{{ field.id_for_label }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black" autocomplete="{{ field.field.widget.attrs.autocomplete|default:'' }}">
+                        {% if field.help_text %}
+                        <p class="text-xs text-gray-500 mt-1">{{ field.help_text|striptags }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                        <p class="text-sm text-red-600 mt-1">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+
+                    <button type="submit" class="bg-gray-900 text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800">Update Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
