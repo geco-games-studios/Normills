@@ -7,11 +7,21 @@ logger = logging.getLogger(__name__)
 
 def _mask_lenco_key():
     api_key = settings.LENCO_API_KEY or ''
+    api_key = api_key.strip()
+    if api_key.lower().startswith('bearer '):
+        api_key = api_key[7:].strip()
     if not api_key:
         return 'missing'
     if len(api_key) <= 8:
         return 'configured-short'
     return f"{api_key[:4]}...{api_key[-4:]} ({len(api_key)} chars)"
+
+
+def _lenco_authorization_header():
+    api_key = (settings.LENCO_API_KEY or '').strip()
+    if api_key.lower().startswith('bearer '):
+        return api_key
+    return f"Bearer {api_key}"
 
 
 def _format_zambian_phone(phone_number):
@@ -31,7 +41,7 @@ def _lenco_headers():
     return {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": f"Bearer {settings.LENCO_API_KEY}",
+        "Authorization": _lenco_authorization_header(),
         "User-Agent": "Mozilla/5.0 (compatible; GecoMarketplaceBot/1.0; +https://marketplace.gecogames.com)"
     }
 
