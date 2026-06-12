@@ -1,5 +1,16 @@
 from django.contrib import admin
 from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword
+from .payment import get_collection_status
+
+
+def _order_payment_status(lenco_status):
+    if lenco_status == 'successful':
+        return 'completed'
+    if lenco_status in ('pay-offline', 'pending'):
+        return 'processing'
+    return 'failed'
+
+
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
     list_display = ['name', 'slug']
@@ -67,4 +78,43 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ['status', 'payment_method', 'payment_status', 'created']
     search_fields = ['id', 'email', 'phone', 'payment_reference', 'transaction_id']
     readonly_fields = ['created', 'updated', 'payment_reference', 'payment_details']
+    actions = ['refresh_lenco_payment_status']
     inlines = [OrderItemInline]
+
+    @admin.action(description='Refresh selected orders from Lenco')
+    def refresh_lenco_payment_status(self, request, queryset):
+        updated = 0
+        failed = 0
+
+        for order in queryset:
+            if not order.payment_reference:
+                failed += 1
+                continue
+
+            response = get_collection_status(order.payment_reference)
+            if not response.get('status'):
+                failed += 1
+                order.payment_details = {
+                    **(order.payment_details or {}),
+                    'lenco_status_refresh': response,
+                }
+                order.save(update_fields=['payment_details'])
+                continue
+
+            payment_data = response.get('data') or {}
+            lenco_status = payment_data.get('status', 'pending')
+            order.payment_status = _order_payment_status(lenco_status)
+            if order.payment_status == 'completed':
+                order.status = 'processing'
+                order.payment_confirmed = True
+            order.payment_details = {
+                **(order.payment_details or {}),
+                'lenco_status_refresh': response,
+            }
+            order.save(update_fields=['payment_status', 'status', 'payment_confirmed', 'payment_details'])
+            updated += 1
+
+        self.message_user(
+            request,
+            f'Refreshed {updated} order(s) from Lenco. {failed} order(s) could not be refreshed.'
+        )
