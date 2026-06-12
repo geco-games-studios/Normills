@@ -34,7 +34,7 @@ urlpatterns = [
     path('add-to-cart/<int:product_id>/', views.add_to_cart, name='add_to_cart'),
     path('update-cart-item/<int:item_id>/', views.update_cart_item, name='update_cart_item'),
     path('checkout/', views.checkout, name='checkout'),
-    # path('verify-payment/<int:order_id>/', views.verify_payment, name='verify_payment'),
+    path('verify-payment/<int:order_id>/', views.verify_payment, name='verify_payment'),
     
     # Order related urls
     path('order/<int:order_id>/submit-otp/', views.submit_otp, name='submit_otp'),
@@ -44,4 +44,3 @@ urlpatterns = [
     path('order/<int:order_id>/confirm-payment/', views.confirm_payment, name='confirm_payment'),
     path('order-history/', views.order_history, name='order_history'),
 ]
-
