@@ -25,6 +25,30 @@ def _lenco_headers():
         "User-Agent": "Mozilla/5.0 (compatible; GecoMarketplaceBot/1.0; +https://marketplace.gecogames.com)"
     }
 
+
+def _missing_api_key_response():
+    logger.error("Lenco API key is not configured. Set LENCO_API_KEY in the server environment or .env file.")
+    return {
+        "status": False,
+        "message": "Mobile money payments are not configured yet. Please contact support.",
+        "data": None
+    }
+
+
+def _api_error_response(response, response_data, fallback_message="API error"):
+    if response.status_code == 401:
+        return {
+            "status": False,
+            "message": "Mobile money authorization failed. Please contact support.",
+            "data": None
+        }
+
+    return {
+        "status": False,
+        "message": response_data.get("message", fallback_message),
+        "data": None
+    }
+
 def submit_lenco_otp(otp, transaction_reference):
     """
     Submit OTP for a Lenco mobile money transaction.
@@ -37,6 +61,9 @@ def submit_lenco_otp(otp, transaction_reference):
         dict: The API response or an error dictionary.
     """
     url = f"{settings.LENCO_API_BASE_URL}/collections/mobile-money/submit-otp"
+    if not settings.LENCO_API_KEY:
+        return _missing_api_key_response()
+
     
     payload = {
         "otp": otp,
@@ -59,11 +86,7 @@ def submit_lenco_otp(otp, transaction_reference):
         
         if response.status_code >= 400:
             logger.error(f"OTP submission error: Status={response.status_code}, Response={response_data}")
-            return {
-                "status": False,
-                "message": response_data.get("message", "API error"),
-                "data": None
-            }
+            return _api_error_response(response, response_data)
         
         return response_data
     
@@ -90,6 +113,8 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
     """
     # Ensure the URL points to the correct endpoint
     url = f"{settings.LENCO_API_BASE_URL}/collections/mobile-money"
+    if not settings.LENCO_API_KEY:
+        return _missing_api_key_response()
     
     phone = _format_zambian_phone(phone_number)
     
@@ -123,11 +148,7 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
         # Check for error status codes
         if response.status_code >= 400:
             logger.error(f"Lenco API error: Status={response.status_code}, Response={response_data}")
-            return {
-                "status": False,
-                "message": response_data.get("message", "API error"),
-                "data": None
-            }
+            return _api_error_response(response, response_data)
         
         # Return the response in the expected format
         return response_data
@@ -144,6 +165,8 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
 
 def get_collection_status(transaction_reference):
     url = f"{settings.LENCO_API_BASE_URL}/collections/status/{transaction_reference}"
+    if not settings.LENCO_API_KEY:
+        return _missing_api_key_response()
 
     try:
         response = requests.get(url, headers=_lenco_headers())
@@ -155,11 +178,7 @@ def get_collection_status(transaction_reference):
             response_data = {"status": False, "message": "Invalid JSON response", "data": None}
 
         if response.status_code >= 400:
-            return {
-                "status": False,
-                "message": response_data.get("message", "API error"),
-                "data": None
-            }
+            return _api_error_response(response, response_data)
 
         return response_data
     except requests.exceptions.RequestException as e:

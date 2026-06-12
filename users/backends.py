@@ -25,22 +25,22 @@ class EmailOrPhoneBackend(ModelBackend):
         """
         Authenticate with email, phone number, or username.
         """
+        if username is None or password is None:
+            return None
+
         normalized_phone = self._normalize_phone(username)
-        try:
-            # Try to find user by email or phone number only
-            if normalized_phone:
-                user = User.objects.get(
-                    Q(email__iexact=username) |
-                    Q(client_profile__phone_number__iexact=normalized_phone)
-                )
-            else:
-                user = User.objects.get(Q(email__iexact=username))
-        except User.DoesNotExist:
+        lookup = Q(email__iexact=username) | Q(username__iexact=username)
+        if normalized_phone:
+            lookup |= Q(client_profile__phone_number__iexact=normalized_phone)
+
+        users = User.objects.filter(lookup).select_related('client_profile').distinct().order_by('id')
+        if not users.exists():
             User().set_password(password)
             return None
-        
-        if user.check_password(password) and self.user_can_authenticate(user):
-            return user
+
+        for user in users:
+            if user.check_password(password) and self.user_can_authenticate(user):
+                return user
         
         return None
     

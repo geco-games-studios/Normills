@@ -170,7 +170,7 @@ CSRF_COOKIE_SECURE = False  # Set to True if using HTTPS
 
 # Lenco Payment Gateway Settings
 LENCO_API_BASE_URL = os.getenv('LENCO_API_BASE_URL', 'https://api.lenco.co/access/v2')
-LENCO_API_KEY = os.getenv('LENCO_API_KEY', 'ebbdf8030d34cd5d25052ed44fd757adcd96b93cd47d02bf72dc063bda8ae5b9')
+LENCO_API_KEY = os.getenv('LENCO_API_KEY', '')
 LENCO_MOBILE_MONEY_FIXED_FEE = os.getenv('LENCO_MOBILE_MONEY_FIXED_FEE', '8.50')
 LENCO_MOBILE_MONEY_PERCENT_FEE = os.getenv('LENCO_MOBILE_MONEY_PERCENT_FEE', '0.01')
 # CHECKOUT_TAX_RATE = os.getenv('CHECKOUT_TAX_RATE', '0.02')
