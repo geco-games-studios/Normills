@@ -1,14 +1,56 @@
 from django.contrib import admin
 from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword
-from .payment import get_collection_status
+from .payment import best_lenco_data, get_collection_status, lenco_data_items
+
+
+FINAL_LENCO_STATUSES = ('successful', 'failed')
 
 
 def _order_payment_status(lenco_status):
     if lenco_status == 'successful':
         return 'completed'
-    if lenco_status in ('pay-offline', 'pending'):
+    if lenco_status in ('pay-offline', 'pending', '3ds-auth-required'):
         return 'processing'
     return 'failed'
+
+
+def _lenco_data_from_response(response):
+    if not response:
+        return {}
+    return best_lenco_data(response)
+
+
+def _stored_lenco_responses(order):
+    details = order.payment_details or {}
+    for key in ('lenco_status_refresh', 'lenco_response', 'otp_response'):
+        response = details.get(key)
+        if response:
+            yield response
+
+
+def _stored_lenco_references(order):
+    references = []
+    if order.payment_reference:
+        references.append(order.payment_reference)
+
+    for response in _stored_lenco_responses(order):
+        for data in lenco_data_items(response):
+            for key in ('lencoReference', 'reference', 'id'):
+                value = data.get(key)
+                if value and value not in references:
+                    references.append(value)
+
+    return references
+
+
+def _best_stored_lenco_response(order):
+    fallback = None
+    for response in _stored_lenco_responses(order):
+        data = _lenco_data_from_response(response)
+        if data.get('status') in FINAL_LENCO_STATUSES:
+            return response
+        fallback = fallback or response
+    return fallback
 
 
 @admin.register(Brand)
@@ -87,12 +129,22 @@ class OrderAdmin(admin.ModelAdmin):
         failed = 0
 
         for order in queryset:
-            if not order.payment_reference:
+            references = _stored_lenco_references(order)
+            if not references:
                 failed += 1
                 continue
 
-            response = get_collection_status(order.payment_reference)
-            if not response.get('status'):
+            response = _best_stored_lenco_response(order)
+            for reference in references:
+                fresh_response = get_collection_status(reference)
+                fresh_status = _lenco_data_from_response(fresh_response).get('status')
+                if fresh_response.get('status') and fresh_status in FINAL_LENCO_STATUSES:
+                    response = fresh_response
+                    break
+                if not response and fresh_response.get('status'):
+                    response = fresh_response
+
+            if not response or not response.get('status'):
                 failed += 1
                 order.payment_details = {
                     **(order.payment_details or {}),

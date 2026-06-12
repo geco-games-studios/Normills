@@ -22,7 +22,7 @@ from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
-from .payment import process_lenco_payment, submit_lenco_otp, get_collection_status
+from .payment import best_lenco_data, get_collection_status, lenco_data_items, process_lenco_payment, submit_lenco_otp
 from .sms_service import send_order_sms, send_order_receipt_sms
 
 import logging
@@ -64,9 +64,45 @@ def _checkout_amounts(subtotal, payment_method='cash'):
 def _order_payment_status(lenco_status):
     if lenco_status == 'successful':
         return 'completed'
-    if lenco_status in ('pay-offline', 'pending'):
+    if lenco_status in ('pay-offline', 'pending', '3ds-auth-required'):
         return 'processing'
     return 'failed'
+
+
+def _order_lenco_references(order):
+    references = []
+    if order.payment_reference:
+        references.append(order.payment_reference)
+
+    details = order.payment_details or {}
+    for key in ('lenco_status_refresh', 'lenco_response', 'otp_response'):
+        for data in lenco_data_items(details.get(key)):
+            for ref_key in ('lencoReference', 'reference', 'id'):
+                value = data.get(ref_key)
+                if value and value not in references:
+                    references.append(value)
+
+    return references
+
+
+def _get_order_collection_status(order):
+    fallback_response = None
+    for reference in _order_lenco_references(order):
+        response = get_collection_status(reference)
+        if not response.get('status'):
+            fallback_response = fallback_response or response
+            continue
+
+        lenco_status = best_lenco_data(response).get('status')
+        if lenco_status in ('successful', 'failed'):
+            return response
+        fallback_response = response
+
+    return fallback_response or {
+        'status': False,
+        'message': 'No payment reference found',
+        'data': None,
+    }
 
 
 def _get_wishlist_count(request):
@@ -1428,7 +1464,7 @@ def verify_payment(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     
     # Check payment status with Lenco API
-    payment_status = get_collection_status(order.payment_reference)
+    payment_status = _get_order_collection_status(order)
     
     if payment_status.get('status', False):
         lenco_status = payment_status['data'].get('status', 'pending')

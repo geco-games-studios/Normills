@@ -4,6 +4,36 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+FINAL_LENCO_STATUSES = ("successful", "failed")
+
+
+def lenco_data_items(response_data):
+    data = (response_data or {}).get("data")
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    return []
+
+
+def best_lenco_data(response_data):
+    items = lenco_data_items(response_data)
+    for item in items:
+        if item.get("status") in FINAL_LENCO_STATUSES:
+            return item
+    return items[0] if items else {}
+
+
+def normalize_lenco_response(response_data):
+    if not isinstance(response_data, dict):
+        return {"status": False, "message": "Invalid response", "data": None}
+
+    normalized = {**response_data}
+    data = response_data.get("data")
+    if isinstance(data, list):
+        normalized["data"] = best_lenco_data(response_data) or None
+    return normalized
+
 
 def _mask_lenco_key():
     api_key = settings.LENCO_API_KEY or ''
@@ -185,23 +215,45 @@ def process_lenco_payment(amount, phone_number, reference, operator="airtel"):
 
 
 def get_collection_status(transaction_reference):
-    url = f"{settings.LENCO_API_BASE_URL}/collections/status/{transaction_reference}"
     if not settings.LENCO_API_KEY:
         return _missing_api_key_response()
 
+    urls = [
+        f"{settings.LENCO_API_BASE_URL}/collections/status/{transaction_reference}",
+        f"{settings.LENCO_API_BASE_URL}/collections/{transaction_reference}",
+        f"{settings.LENCO_API_BASE_URL}/collections/mobile-money/{transaction_reference}",
+    ]
+    last_response = None
+
     try:
-        response = requests.get(url, headers=_lenco_headers())
-        try:
-            response_data = response.json()
-            logger.info(f"Lenco status response: Status={response.status_code}, Data={response_data}")
-        except ValueError:
-            logger.error(f"Non-JSON response from status check: {response.text}")
-            response_data = {"status": False, "message": "Invalid JSON response", "data": None}
+        for url in urls:
+            response = requests.get(url, headers=_lenco_headers())
+            try:
+                response_data = response.json()
+                logger.info(f"Lenco status response: URL={url}, Status={response.status_code}, Data={response_data}")
+            except ValueError:
+                logger.error(f"Non-JSON response from status check: URL={url}, Response={response.text}")
+                response_data = {"status": False, "message": "Invalid JSON response", "data": None}
 
-        if response.status_code >= 400:
-            return _api_error_response(response, response_data)
+            if response.status_code >= 400:
+                last_response = _api_error_response(response, response_data)
+                continue
 
-        return response_data
+            normalized_response = normalize_lenco_response(response_data)
+            if normalized_response.get("status"):
+                status = best_lenco_data(response_data).get("status")
+                if status in FINAL_LENCO_STATUSES:
+                    return normalized_response
+                last_response = normalized_response
+                continue
+
+            last_response = normalized_response
+
+        return last_response or {
+            "status": False,
+            "message": "Failed to verify payment",
+            "data": None
+        }
     except requests.exceptions.RequestException as e:
         logger.error(f"Collection status error: {str(e)}")
         return {
