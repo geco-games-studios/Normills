@@ -198,7 +198,7 @@ class Order(models.Model):
         ('pickup', 'Pickup'),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)

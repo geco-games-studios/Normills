@@ -188,3 +188,9 @@ EMAIL_HOST_USER = os.getenv('SMTP_USER', 'hello@gecogames.com')
 EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASS', 'Worldwar@2026?')
 EMAIL_USE_TLS = os.getenv('SMTP_SECURE', 'TRUE').strip().upper() in ('TRUE', '1', 'YES', 'ON')
 DEFAULT_FROM_EMAIL = os.getenv('SMTP_FROM', 'Geco Marketplace <hello@gecogames.com>')
+
+# WhatsApp Business Cloud API settings for automatic admin order receipts.
+# If these are not set, the dashboard still shows one-click WhatsApp close links.
+ADMIN_WHATSAPP_NUMBER = os.getenv('ADMIN_WHATSAPP_NUMBER', '')
+WHATSAPP_PHONE_NUMBER_ID = os.getenv('WHATSAPP_PHONE_NUMBER_ID', '')
+WHATSAPP_ACCESS_TOKEN = os.getenv('WHATSAPP_ACCESS_TOKEN', '')

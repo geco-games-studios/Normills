@@ -25,6 +25,7 @@ from django.utils import timezone
 from datetime import timedelta
 from .payment import best_lenco_data, get_collection_status, lenco_data_items, process_lenco_payment, submit_lenco_otp
 from .sms_service import send_order_sms, send_order_receipt_sms
+from .whatsapp_service import send_admin_whatsapp_order_receipt
 
 import logging
 
@@ -185,6 +186,21 @@ def _set_order_paid(order):
     if not was_confirmed:
         order.notify_payment_confirmed()
     return order
+
+
+def _remember_order_for_session(request, order):
+    order_ids = request.session.get('guest_order_ids', [])
+    if not isinstance(order_ids, list):
+        order_ids = []
+    if order.id not in order_ids:
+        order_ids.append(order.id)
+    request.session['guest_order_ids'] = order_ids[-20:]
+
+
+def _can_access_order(request, order):
+    if request.user.is_authenticated:
+        return request.user.is_superuser or order.user_id == request.user.id
+    return order.id in request.session.get('guest_order_ids', [])
 
 
 @csrf_exempt
@@ -1258,8 +1274,6 @@ def cart(request):
         'checkout_amounts': _checkout_amounts(cart.total, 'cash'),
     })
 
-@login_required
-@login_required
 def checkout(request):
     cart = get_or_create_cart(request)
     
@@ -1302,7 +1316,7 @@ def checkout(request):
 
             # Create the order
             order = Order.objects.create(
-                user=request.user,
+                user=request.user if request.user.is_authenticated else None,
                 store=order_store,
                 first_name=form.cleaned_data['first_name'],
                 last_name=form.cleaned_data['last_name'],
@@ -1328,6 +1342,7 @@ def checkout(request):
                     }
                 }
             )
+            _remember_order_for_session(request, order)
             
             # Add order items
             for cart_item in cart.items.all():
@@ -1360,6 +1375,8 @@ def checkout(request):
                     send_order_sms(order)
             except Exception as sms_exc:
                 logger.exception('Immediate order SMS failed for Order ID %s', order.id)
+
+            send_admin_whatsapp_order_receipt(order)
 
             # Process payment based on selected method
             payment_method = form.cleaned_data['payment_method']
@@ -1515,11 +1532,11 @@ def checkout(request):
             return JsonResponse(error_response, status=400)
     else:
         initial_data = {}
-        if request.user.first_name:
+        if request.user.is_authenticated and request.user.first_name:
             initial_data['first_name'] = request.user.first_name
-        if request.user.last_name:
+        if request.user.is_authenticated and request.user.last_name:
             initial_data['last_name'] = request.user.last_name
-        if request.user.email:
+        if request.user.is_authenticated and request.user.email:
             initial_data['email'] = request.user.email
         
         form = CheckoutForm(initial=initial_data)
@@ -1535,6 +1552,9 @@ def checkout(request):
     })
 
 def send_order_confirmation_email(order):
+    if not order.email:
+        logger.info('Order confirmation email skipped for order %s: no customer email.', order.id)
+        return
     subject = f"Order Confirmation - #{order.id}"
     html_message = render_to_string('emails/order_confirmation.html', {'order': order})
     plain_message = strip_tags(html_message)
@@ -1674,9 +1694,10 @@ def submit_otp(request, order_id):
         
         return JsonResponse(error_response, status=500)
 
-@login_required
 def order_confirmation(request, order_id):
-    order = get_object_or_404(Order, id=order_id, user=request.user)
+    order = get_object_or_404(Order, id=order_id)
+    if not _can_access_order(request, order):
+        return HttpResponseForbidden('You do not have access to this order.')
     return render(request, 'order_confirmation.html', {'order': order})
 
 @login_required
@@ -1684,11 +1705,11 @@ def order_history(request):
     orders = Order.objects.filter(user=request.user)
     return render(request, 'order_history.html', {'orders': orders})
 
-@login_required
-@login_required
 def verify_payment(request, order_id):
     """Endpoint to verify payment status"""
-    order = get_object_or_404(Order, id=order_id, user=request.user)
+    order = get_object_or_404(Order, id=order_id)
+    if not _can_access_order(request, order):
+        return JsonResponse({'status': False, 'message': 'Forbidden', 'data': None}, status=403)
     
     # Check payment status with Lenco API
     payment_status = _get_order_collection_status(order)
@@ -1744,9 +1765,10 @@ def received_parcel(request, order_id):
     messages.success(request, 'Order marked as delivered and notifications sent.')
     return redirect('order_confirmation', order_id=order.id)
 
-@login_required
 def confirm_payment(request, order_id):
-    order = get_object_or_404(Order, id=order_id, user=request.user)
+    order = get_object_or_404(Order, id=order_id)
+    if not _can_access_order(request, order):
+        return HttpResponseForbidden('You do not have access to this order.')
 
     # For cash on delivery, skip the timer and go directly to confirmation
     if order.payment_method == 'cash':

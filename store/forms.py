@@ -93,7 +93,7 @@ class EmailOrPhoneAuthenticationForm(AuthenticationForm):
 
 class CheckoutForm(forms.Form):
     first_name = forms.CharField(max_length=100, required=True)
-    last_name = forms.CharField(max_length=100, required=True)
+    last_name = forms.CharField(max_length=100, required=False)
     email = forms.EmailField(required=False)
     address = forms.CharField(max_length=255, required=False)
     city = forms.CharField(max_length=100, required=False)
