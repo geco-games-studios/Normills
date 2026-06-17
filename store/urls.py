@@ -43,4 +43,12 @@ urlpatterns = [
     path('order/<int:order_id>/received-parcel/', views.received_parcel, name='received_parcel'),
     path('order/<int:order_id>/confirm-payment/', views.confirm_payment, name='confirm_payment'),
     path('order-history/', views.order_history, name='order_history'),
+
+    # Review URLs
+    path('product/<int:product_id>/reviews/', views.product_reviews, name='product_reviews'),
+    path('product/<int:product_id>/review/submit/', views.submit_review, name='submit_review'),
+
+    # Affiliate URLs
+    path('ref/<str:code>/', views.affiliate_landing, name='affiliate_landing'),
+    path('affiliate/dashboard/', views.affiliate_dashboard, name='affiliate_dashboard'),
 ]

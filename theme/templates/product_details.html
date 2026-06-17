@@ -87,6 +87,106 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- Reviews Section -->
+<!-- ============================================================ -->
+<div class="mt-12 border-t pt-8">
+    <h2 class="text-2xl font-semibold mb-6">Customer Reviews</h2>
+
+    <!-- Review Stats Summary -->
+    <div class="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div class="text-center">
+            <span class="text-4xl font-bold text-gray-900">{{ review_stats.avg_rating }}</span>
+            <div class="flex items-center justify-center mt-1">
+                {% for i in "12345" %}
+                    {% if forloop.counter <= review_stats.avg_rating|floatformat:0 %}
+                        <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <p class="text-sm text-gray-500 mt-1">{{ review_stats.total_reviews }} review{{ review_stats.total_reviews|pluralize }}</p>
+        </div>
+        <div class="text-sm text-gray-600 ml-4">
+            <p>{{ review_stats.avg_rating }} out of 5 stars</p>
+            <p class="mt-1">{% if review_stats.total_reviews > 0 %}{{ review_stats.total_reviews }} customer rating{{ review_stats.total_reviews|pluralize }}{% else %}No reviews yet{% endif %}</p>
+        </div>
+    </div>
+
+    <!-- Submit Review Form (only if logged in and haven't reviewed) -->
+    {% if user.is_authenticated %}
+        {% if user_review %}
+            <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p class="text-green-700 font-medium">You reviewed this product ({{ user_review.rating }}★)</p>
+                {% if user_review.title %}<p class="text-sm font-semibold mt-1">{{ user_review.title }}</p>{% endif %}
+                {% if user_review.comment %}<p class="text-sm text-gray-600 mt-1">{{ user_review.comment }}</p>{% endif %}
+            </div>
+        {% else %}
+            <div class="mb-8 p-6 border border-gray-200 rounded-lg">
+                <h3 class="text-lg font-semibold mb-4">Write a Review</h3>
+                <form id="review-form" data-product-id="{{ product.id }}">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Your Rating</label>
+                        <div class="flex gap-1" id="star-rating">
+                            {% for i in "12345" %}
+                            <button type="button" data-value="{{ forloop.counter }}" class="star-btn text-3xl text-gray-300 hover:text-yellow-400 focus:text-yellow-400 transition">★</button>
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" name="rating" id="rating-input" value="0">
+                    </div>
+                    <div class="mb-4">
+                        <label for="review-title" class="block text-sm font-medium text-gray-700 mb-2">Review Title (optional)</label>
+                        <input type="text" id="review-title" name="title" maxlength="200" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900">
+                    </div>
+                    <div class="mb-4">
+                        <label for="review-comment" class="block text-sm font-medium text-gray-700 mb-2">Your Review (optional)</label>
+                        <textarea id="review-comment" name="comment" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900"></textarea>
+                    </div>
+                    <button type="submit" class="bg-gray-900 text-white px-6 py-2 rounded-md hover:bg-gray-800 disabled:opacity-50" id="review-submit-btn">Submit Review</button>
+                    <p id="review-success" class="mt-2 text-green-600 hidden">Review submitted! Thank you.</p>
+                    <p id="review-error" class="mt-2 text-red-600 hidden"></p>
+                </form>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
+            <p class="text-gray-600"><a href="{% url 'login' %}?next={{ request.path }}" class="text-gray-900 underline font-medium">Log in</a> to leave a review.</p>
+        </div>
+    {% endif %}
+
+    <!-- Existing Reviews List -->
+    <div id="reviews-list" class="space-y-4">
+        {% for review in reviews %}
+        <div class="p-4 border border-gray-200 rounded-lg">
+            <div class="flex items-center gap-2 mb-1">
+                <div class="flex text-yellow-400">
+                    {% for i in "12345" %}
+                        {% if forloop.counter <= review.rating %}
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        {% else %}
+                        <svg class="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <span class="font-medium text-sm">{{ review.user.username }}</span>
+                {% if review.verified_purchase %}
+                <span class="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-medium">Verified Purchase</span>
+                {% endif %}
+            </div>
+            {% if review.title %}
+            <p class="font-semibold text-sm mt-1">{{ review.title }}</p>
+            {% endif %}
+            {% if review.comment %}
+            <p class="text-sm text-gray-600 mt-1">{{ review.comment }}</p>
+            {% endif %}
+            <p class="text-xs text-gray-400 mt-2">{{ review.created_at|date:"M d, Y" }}</p>
+        </div>
+        {% empty %}
+        <p class="text-gray-500 text-center py-8">No reviews yet. Be the first to review this product!</p>
+        {% endfor %}
+    </div>
+</div>
+
 {% if recommended_products %}
 <div class="mt-12">
     <h2 class="text-2xl font-semibold mb-4">Recommended for you</h2>
@@ -141,6 +241,84 @@
                     }
                 } catch (error) {
                     console.error('Copy failed', error);
+                }
+            });
+        }
+
+        // --------------------------------------------------------
+        // Star Rating Interaction
+        // --------------------------------------------------------
+        const starBtns = document.querySelectorAll('.star-btn');
+        const ratingInput = document.getElementById('rating-input');
+        starBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const value = parseInt(this.dataset.value);
+                ratingInput.value = value;
+                starBtns.forEach((s, i) => {
+                    if (i < value) {
+                        s.classList.remove('text-gray-300');
+                        s.classList.add('text-yellow-400');
+                    } else {
+                        s.classList.remove('text-yellow-400');
+                        s.classList.add('text-gray-300');
+                    }
+                });
+            });
+        });
+
+        // --------------------------------------------------------
+        // Review Form Submission (AJAX)
+        // --------------------------------------------------------
+        const reviewForm = document.getElementById('review-form');
+        if (reviewForm) {
+            const productId = reviewForm.dataset.productId;
+            const submitBtn = document.getElementById('review-submit-btn');
+            const successMsg = document.getElementById('review-success');
+            const errorMsg = document.getElementById('review-error');
+
+            reviewForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Submitting...';
+                successMsg.classList.add('hidden');
+                errorMsg.classList.add('hidden');
+
+                const rating = document.getElementById('rating-input').value;
+                const title = document.getElementById('review-title').value;
+                const comment = document.getElementById('review-comment').value;
+
+                if (rating === '0') {
+                    errorMsg.textContent = 'Please select a star rating.';
+                    errorMsg.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Review';
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/product/' + productId + '/review/submit/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        },
+                        body: JSON.stringify({ rating, title, comment })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        successMsg.classList.remove('hidden');
+                        reviewForm.innerHTML = '<p class="text-green-700 font-medium">Thank you! Your review has been submitted.</p>';
+                    } else {
+                        errorMsg.textContent = data.error || 'Failed to submit review. Please try again.';
+                        errorMsg.classList.remove('hidden');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit Review';
+                    }
+                } catch (err) {
+                    errorMsg.textContent = 'Network error. Please try again.';
+                    errorMsg.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Review';
                 }
             });
         }

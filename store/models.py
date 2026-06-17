@@ -310,10 +310,51 @@ class Order(models.Model):
     def notify_payment_confirmed(self):
         """
         Notify the user and store owner that the payment has been confirmed.
+        Also award Loyalty Stars and mark any abandoned cart as recovered.
         """
         if not self.payment_confirmed:
             self.payment_confirmed = True
             self.save()
+            
+            # --- Award Loyalty Stars ---
+            try:
+                from .loyalty import award_stars
+                award_stars(self.user, self)
+            except Exception as exc:
+                logger.exception('Failed to award Stars for Order %s: %s', self.id, exc)
+            
+            # --- Mark abandoned cart as recovered ---
+            try:
+                from .abandoned_cart import AbandonedCartRecord, mark_recovered
+                cart = Cart.objects.filter(user=self.user).order_by('-updated_at').first()
+                if cart and hasattr(cart, 'abandoned_record'):
+                    mark_recovered(cart.abandoned_record, self)
+            except Exception as exc:
+                logger.exception('Failed to mark abandoned cart recovered for Order %s: %s', self.id, exc)
+            
+            # --- Record affiliate commission if applicable ---
+            try:
+                from .affiliate import get_or_create_affiliate, record_referral_sale, Referral
+                # Check if this user was referred by an affiliate
+                referral = Referral.objects.filter(
+                    referred_user=self.user,
+                    order__isnull=True
+                ).first()
+                if referral:
+                    record_referral_sale(referral.affiliate, self)
+            except Exception as exc:
+                logger.exception('Failed to record affiliate commission for Order %s: %s', self.id, exc)
+            
+            # --- Verify purchases for reviews ---
+            try:
+                from .reviews import Review
+                # Any existing reviews by this user for products in this order become verified
+                for item in self.items.all():
+                    Review.objects.filter(
+                        user=self.user, product=item.product
+                    ).update(verified_purchase=True)
+            except Exception as exc:
+                logger.exception('Failed to mark verified purchases for Order %s: %s', self.id, exc)
 
             # Prepare receipt message
             store_owner_name = None

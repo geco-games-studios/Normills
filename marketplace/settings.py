@@ -173,8 +173,17 @@ LENCO_API_BASE_URL = os.getenv('LENCO_API_BASE_URL', 'https://api.lenco.co/acces
 LENCO_API_KEY = os.getenv('LENCO_API_KEY', '')
 LENCO_MOBILE_MONEY_FIXED_FEE = os.getenv('LENCO_MOBILE_MONEY_FIXED_FEE', '8.50')
 LENCO_MOBILE_MONEY_PERCENT_FEE = os.getenv('LENCO_MOBILE_MONEY_PERCENT_FEE', '0.01')
-# CHECKOUT_TAX_RATE = os.getenv('CHECKOUT_TAX_RATE', '0.02')
-# CHECKOUT_SHIPPING_FEE = os.getenv('CHECKOUT_SHIPPING_FEE', '5.00')
+
+# Loyalty Stars Settings
+KWACHA_PER_STAR = os.getenv('KWACHA_PER_STAR', '10')          # 1 Star per K10 spent
+STARS_PER_DISCOUNT = os.getenv('STARS_PER_DISCOUNT', '10')     # 10 Stars per discount unit
+DISCOUNT_VALUE_PER_REDEMPTION = os.getenv('DISCOUNT_VALUE_PER_REDEMPTION', '5')  # K5 per 10 Stars
+
+# Abandoned Cart Recovery Settings
+ABANDON_TIMEOUT_MINUTES = os.getenv('ABANDON_TIMEOUT_MINUTES', '60')   # 1 hour = abandoned
+FIRST_REMINDER_HOURS = os.getenv('FIRST_REMINDER_HOURS', '2')          # 2 hours after abandonment
+SECOND_REMINDER_HOURS = os.getenv('SECOND_REMINDER_HOURS', '24')       # 24 hours
+FINAL_REMINDER_HOURS = os.getenv('FINAL_REMINDER_HOURS', '72')         # 72 hours
 
 # ExciteSMS SMS Gateway Settings
 EXCITESMS_API_TOKEN = os.getenv('EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJfEVzyD2e44Vo8I0jpWZw65ec96a2')

@@ -24,6 +24,10 @@ from django.utils import timezone
 from datetime import timedelta
 from .payment import best_lenco_data, get_collection_status, lenco_data_items, process_lenco_payment, submit_lenco_otp
 from .sms_service import send_order_sms, send_order_receipt_sms
+from .loyalty import award_stars, get_star_balance, get_earn_rate_description
+from .affiliate import get_referral_code_from_session, apply_referral_to_user, record_referral_sale
+from .abandoned_cart import mark_recovered, AbandonedCartRecord
+from .reviews import get_product_review_stats, has_user_reviewed_product, Review
 
 import logging
 
@@ -556,11 +560,21 @@ def product_detail(request, slug):
     recommended_products = get_personalized_products(request, exclude_product=product)
     product_url = request.build_absolute_uri()
 
+    # --- Review data ---
+    review_stats = get_product_review_stats(product)
+    user_review = None
+    if request.user.is_authenticated:
+        user_review = Review.objects.filter(product=product, user=request.user).first()
+    reviews_list = Review.objects.filter(product=product).select_related('user').order_by('-created_at')[:20]
+
     return render(request, 'product_details.html', {
         'product': product,
         'variants': variants,
         'recommended_products': recommended_products,
         'product_url': product_url,
+        'review_stats': review_stats,
+        'user_review': user_review,
+        'reviews': reviews_list,
     })
 
 
@@ -791,6 +805,17 @@ def signup(request):
                 user.delete()
                 messages.error(request, 'We were unable to send the verification SMS. Please check your phone number and try again.')
                 return render(request, 'registration/signup.html', {'form': form})
+
+            # ---- Affiliate: link referral if code exists in session ----
+            try:
+                ref_code = get_referral_code_from_session(request)
+                if ref_code:
+                    apply_referral_to_user(user, ref_code)
+                    # Clear the code after use
+                    if 'affiliate_ref_code' in request.session:
+                        del request.session['affiliate_ref_code']
+            except Exception as exc:
+                logger.exception('Failed to apply referral for new user %s: %s', user.id, exc)
 
             request.session['pending_user_id'] = user.id
             messages.success(request, 'A verification code has been sent to your phone number.')
@@ -1561,6 +1586,146 @@ def confirm_payment(request, order_id):
         return redirect('order_confirmation', order_id=order.id)
 
     return render(request, 'confirm_payment.html', {'order': order})
+
+# ============================================================================
+# Review Views
+# ============================================================================
+@login_required
+@csrf_exempt
+def submit_review(request, product_id):
+    """AJAX endpoint to submit a product review."""
+    product = get_object_or_404(Product, id=product_id, available=True)
+
+    if has_user_reviewed_product(request.user, product):
+        return JsonResponse({'success': False, 'error': 'You have already reviewed this product.'}, status=400)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body.decode('utf-8')) if request.body else request.POST
+        except Exception:
+            data = request.POST
+
+        rating = data.get('rating')
+        title = data.get('title', '')
+        comment = data.get('comment', '')
+
+        if not rating:
+            return JsonResponse({'success': False, 'error': 'Rating is required.'}, status=400)
+
+        try:
+            rating = int(rating)
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'error': 'Invalid rating value.'}, status=400)
+
+        if rating < 1 or rating > 5:
+            return JsonResponse({'success': False, 'error': 'Rating must be between 1 and 5.'}, status=400)
+
+        review = Review.objects.create(
+            product=product,
+            user=request.user,
+            rating=rating,
+            title=title,
+            comment=comment,
+        )
+
+        return JsonResponse({
+            'success': True,
+            'review': {
+                'id': review.id,
+                'rating': review.rating,
+                'title': review.title,
+                'comment': review.comment,
+                'user': review.user.username,
+                'created_at': review.created_at.isoformat(),
+            }
+        })
+
+    return JsonResponse({'success': False, 'error': 'POST required.'}, status=405)
+
+
+def product_reviews(request, product_id):
+    """Return reviews for a product as JSON."""
+    product = get_object_or_404(Product, id=product_id, available=True)
+    stats = get_product_review_stats(product)
+    reviews = Review.objects.filter(product=product).select_related('user').order_by('-created_at')
+
+    reviews_data = []
+    for r in reviews:
+        reviews_data.append({
+            'id': r.id,
+            'rating': r.rating,
+            'title': r.title,
+            'comment': r.comment,
+            'user': r.user.username,
+            'verified_purchase': r.verified_purchase,
+            'created_at': r.created_at.isoformat(),
+        })
+
+    return JsonResponse({
+        'success': True,
+        'stats': stats,
+        'reviews': reviews_data,
+    })
+
+
+# ============================================================================
+# Affiliate Views
+# ============================================================================
+def affiliate_landing(request, code):
+    """
+    Landing page for affiliate referral links.
+    Tracks the click and stores the referral code in the session.
+    """
+    from .affiliate import Affiliate, ReferralClick, set_referral_code_in_session
+
+    try:
+        affiliate = Affiliate.objects.get(referral_code=code, is_active=True)
+    except Affiliate.DoesNotExist:
+        messages.error(request, 'Invalid or inactive referral link.')
+        return redirect('home')
+
+    # Track the click
+    ReferralClick.objects.create(
+        affiliate=affiliate,
+        ip_address=request.META.get('REMOTE_ADDR'),
+        session_id=request.session.session_key or '',
+        referrer_url=request.META.get('HTTP_REFERER', ''),
+    )
+
+    # Store code in session so signup/order can link it
+    set_referral_code_in_session(request, code)
+
+    # Redirect to home page (user will sign up or browse and purchase)
+    messages.info(request, f'Welcome! You were referred by {affiliate.user.username}.')
+    return redirect('home')
+
+
+@login_required
+def affiliate_dashboard(request):
+    """Dashboard showing an affiliate their stats."""
+    from .affiliate import Affiliate, Referral, ReferralClick
+
+    try:
+        affiliate = Affiliate.objects.get(user=request.user)
+    except Affiliate.DoesNotExist:
+        # If user doesn't have an affiliate profile, let them create one
+        affiliate = Affiliate.objects.create(user=request.user)
+
+    referrals = Referral.objects.filter(affiliate=affiliate).select_related('order', 'referred_user')
+    clicks = ReferralClick.objects.filter(affiliate=affiliate).count()
+    total_commission = affiliate.total_earned
+    balance = affiliate.balance
+    referral_link = request.build_absolute_uri(f'/ref/{affiliate.referral_code}/')
+
+    return render(request, 'affiliate_dashboard.html', {
+        'affiliate': affiliate,
+        'referrals': referrals,
+        'clicks': clicks,
+        'total_commission': total_commission,
+        'balance': balance,
+        'referral_link': referral_link,
+    })
+
 
 def buy_now(request, slug):
     product = get_object_or_404(Product, slug=slug)
