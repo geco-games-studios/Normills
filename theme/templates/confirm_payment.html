@@ -1,75 +1,59 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1 class="text-3xl font-bold mb-8">Confirm Mobile Money Payment</h1>
+<div class="max-w-2xl mx-auto rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    <h1 class="text-2xl font-bold text-gray-900">Payment Status</h1>
+    <p class="mt-2 text-gray-600">Order #{{ order.id }} / K{{ order.total }}</p>
 
-<div class="bg-white rounded-lg shadow-sm p-6">
-    <h2 class="text-lg font-medium text-gray-900">Order #{{ order.id }}</h2>
-    <p class="text-sm text-gray-500">Total Amount: K{{ order.total }}</p>
-    <p class="text-sm text-gray-600 mt-2">Payment Method: Mobile Money</p>
-    
-    <!-- Countdown Timer -->
-    <div class="mt-6 text-center">
-        <p class="text-gray-700">Please complete the mobile money payment on your phone. Transaction will be cancelled in:</p>
-        <div class="mt-4">
-            <div id="countdown-timer" class="w-16 h-16 mx-auto rounded-full border-4 border-indigo-600 flex items-center justify-center text-xl font-bold text-indigo-600">
-                60
-            </div>
-        </div>
+    {% if order.payment_method == 'mobile_money' and order.payment_status == 'processing' %}
+    <div class="mt-6 rounded-lg bg-yellow-50 p-4 text-yellow-800">
+        <p class="font-semibold">Waiting for mobile money confirmation</p>
+        <p class="mt-1 text-sm">Approve the official prompt on your phone. This page will check the payment status automatically.</p>
     </div>
-
-    <!-- Proceed Button (Hidden by default) -->
-    <div id="proceed-button" class="mt-6 hidden">
-        <a href="{% url 'order_confirmation' order.id %}" class="w-full bg-green-600 text-white px-6 py-3 rounded-md font-medium hover:bg-green-700 text-center block">
-            Proceed to Confirmation
-        </a>
+    <div class="mt-4 flex items-center gap-3">
+        <button id="check-payment-status" class="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white">Check Now</button>
+        <span id="payment-status-message" class="text-sm text-gray-600">Checking...</span>
     </div>
-
-    <!-- Cancel Message (Hidden by default) -->
-    <div id="cancel-message" class="mt-6 text-center text-red-600 hidden">
-        <p>Transaction cancelled. Redirecting to order confirmation...</p>
+    {% else %}
+    <div class="mt-6 rounded-lg bg-gray-50 p-4">
+        <p class="text-gray-700">Current payment status: <strong>{{ order.get_payment_status_display }}</strong></p>
     </div>
+    <a href="{% url 'order_confirmation' order.id %}" class="mt-5 inline-flex rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white">View Order</a>
+    {% endif %}
 </div>
 
+{% if order.payment_method == 'mobile_money' and order.payment_status == 'processing' %}
 <script>
-    // Countdown Timer Logic
-    let timeLeft = 60; // 1 minute
-    const countdownTimer = document.getElementById('countdown-timer');
-    const proceedButton = document.getElementById('proceed-button');
-    const cancelMessage = document.getElementById('cancel-message');
+document.addEventListener('DOMContentLoaded', function() {
+    const checkButton = document.getElementById('check-payment-status');
+    const message = document.getElementById('payment-status-message');
+    let interval = null;
 
-    const countdownInterval = setInterval(() => {
-        timeLeft--;
-        countdownTimer.textContent = timeLeft;
-
-        if (timeLeft <= 0) {
-            clearInterval(countdownInterval);
-            countdownTimer.textContent = '0';
-            cancelMessage.classList.remove('hidden');
-            setTimeout(() => {
-                window.location.href = "{% url 'order_confirmation' order.id %}";
-            }, 2000); // Redirect after 2 seconds
-        }
-    }, 1000);
-
-    // Simulate payment status check (replace with actual API call)
     function checkPaymentStatus() {
-        // Replace this with an actual API call to check payment status
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({ status: 'success' }); // Simulate success after 5 seconds
-            }, 5000);
-        });
+        message.textContent = 'Checking payment status...';
+        fetch('{% url "verify_payment" order.id %}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.payment_status === 'completed') {
+                    message.textContent = 'Payment confirmed. Opening order now...';
+                    if (interval) clearInterval(interval);
+                    window.location.href = '{% url "order_confirmation" order.id %}';
+                } else if (data.payment_status === 'failed') {
+                    message.textContent = 'Payment failed. Please contact support or try again.';
+                    if (interval) clearInterval(interval);
+                } else {
+                    message.textContent = 'Still waiting for confirmation.';
+                }
+            })
+            .catch(() => {
+                message.textContent = 'Could not check payment right now. Try again.';
+            });
     }
 
-    // Check payment status periodically
-    const paymentCheckInterval = setInterval(async () => {
-        const paymentStatus = await checkPaymentStatus();
-        if (paymentStatus.status === 'success') {
-            clearInterval(countdownInterval); // Stop the countdown
-            clearInterval(paymentCheckInterval); // Stop checking payment status
-            proceedButton.classList.remove('hidden'); // Show the proceed button
-        }
-    }, 2000); // Check every 2 seconds
+    checkButton.addEventListener('click', checkPaymentStatus);
+    checkPaymentStatus();
+    interval = setInterval(checkPaymentStatus, 10000);
+});
 </script>
+{% endif %}
 {% endblock %}

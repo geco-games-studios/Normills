@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -70,9 +70,9 @@ class ProductVariantInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'brand', 'price', 'stock', 'available', 'created', 'updated']
+    list_display = ['name', 'category', 'brand', 'price', 'stock', 'offline_stock', 'low_stock_threshold', 'available', 'created', 'updated']
     list_filter = ['available', 'created', 'updated', 'category', 'brand']
-    list_editable = ['price', 'stock', 'available']
+    list_editable = ['price', 'stock', 'offline_stock', 'low_stock_threshold', 'available']
     prepopulated_fields = {'slug': ('name',)}
     inlines = [ProductVariantInline]
 
@@ -114,14 +114,15 @@ class OrderAdmin(admin.ModelAdmin):
         'payment_method',
         'admin_payment_status',
         'payment_confirmed',
+        'delivery_method',
         'lenco_status',
         'payment_reference',
         'created',
         'total',
     ]
-    list_filter = ['status', 'payment_method', 'payment_status', 'payment_confirmed', 'created']
+    list_filter = ['status', 'payment_method', 'payment_status', 'payment_confirmed', 'delivery_method', 'created']
     search_fields = ['id', 'email', 'phone', 'payment_reference', 'transaction_id']
-    readonly_fields = ['created', 'updated', 'payment_reference', 'payment_details']
+    readonly_fields = ['created', 'updated', 'payment_reference', 'payment_details', 'stock_deducted_at']
     actions = ['refresh_lenco_payment_status']
     inlines = [OrderItemInline]
 
@@ -174,7 +175,7 @@ class OrderAdmin(admin.ModelAdmin):
             lenco_status = payment_data.get('status', 'pending')
             order.payment_status = _order_payment_status(lenco_status)
             if order.payment_status == 'completed':
-                order.status = 'processing'
+                order.status = 'paid'
                 order.payment_confirmed = True
             order.payment_details = {
                 **(order.payment_details or {}),
@@ -187,3 +188,29 @@ class OrderAdmin(admin.ModelAdmin):
             request,
             f'Refreshed {updated} order(s) from Lenco. {failed} order(s) could not be refreshed.'
         )
+
+
+@admin.register(StockAdjustment)
+class StockAdjustmentAdmin(admin.ModelAdmin):
+    list_display = [
+        'created_at',
+        'product',
+        'previous_online_stock',
+        'new_online_stock',
+        'previous_offline_stock',
+        'new_offline_stock',
+        'user',
+        'reason',
+    ]
+    list_filter = ['created_at', 'product']
+    search_fields = ['product__name', 'reason', 'user__username']
+    readonly_fields = [
+        'created_at',
+        'product',
+        'user',
+        'previous_online_stock',
+        'new_online_stock',
+        'previous_offline_stock',
+        'new_offline_stock',
+        'reason',
+    ]

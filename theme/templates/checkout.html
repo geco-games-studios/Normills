@@ -70,14 +70,32 @@
                     <input type="text" name="phone" id="id_phone" value="{{ form.phone.value|default:'' }}" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <p class="mt-1 text-xs text-gray-500">This number will be used for mobile money payments and delivery notifications.</p>
                 </div>
+                <div class="mb-4">
+                    <span class="block text-sm font-medium text-gray-700 mb-2">Delivery Option</span>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="flex items-center rounded-lg border border-gray-200 p-3">
+                            <input id="delivery_method_delivery" name="delivery_method" value="delivery" type="radio" checked class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                            <span class="ml-3 text-sm font-medium text-gray-700">Delivery</span>
+                        </label>
+                        <label class="flex items-center rounded-lg border border-gray-200 p-3">
+                            <input id="delivery_method_pickup" name="delivery_method" value="pickup" type="radio" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                            <span class="ml-3 text-sm font-medium text-gray-700">Pickup</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label for="id_notes" class="block text-sm font-medium text-gray-700 mb-1">Order Notes</label>
+                    <textarea name="notes" id="id_notes" rows="3" placeholder="Delivery landmark, preferred time, size note, or pickup instruction" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ form.notes.value|default:'' }}</textarea>
+                </div>
             <script>
                 // Hide extra fields if cash is selected
                 function toggleExtraFields() {
                     const cashRadio = document.getElementById('payment_method_cash');
                     const mobileRadio = document.getElementById('payment_method_mobile_money');
+                    const pickupRadio = document.getElementById('delivery_method_pickup');
                     const extraFields = document.getElementById('extra-fields');
                     if (cashRadio && extraFields && mobileRadio) {
-                        if (cashRadio.checked) {
+                        if (cashRadio.checked || (pickupRadio && pickupRadio.checked)) {
                             extraFields.style.display = 'none';
                         } else {
                             extraFields.style.display = '';
@@ -114,11 +132,15 @@
                 document.addEventListener('DOMContentLoaded', function() {
                     const cashRadio = document.getElementById('payment_method_cash');
                     const mobileRadio = document.getElementById('payment_method_mobile_money');
+                    const deliveryRadio = document.getElementById('delivery_method_delivery');
+                    const pickupRadio = document.getElementById('delivery_method_pickup');
                     if (cashRadio && mobileRadio) {
                         cashRadio.addEventListener('change', toggleExtraFields);
                         mobileRadio.addEventListener('change', toggleExtraFields);
                         cashRadio.addEventListener('change', toggleMobileMoneyOptions);
                         mobileRadio.addEventListener('change', toggleMobileMoneyOptions);
+                        if (deliveryRadio) deliveryRadio.addEventListener('change', toggleExtraFields);
+                        if (pickupRadio) pickupRadio.addEventListener('change', toggleExtraFields);
                         toggleExtraFields();
                         toggleMobileMoneyOptions();
                     }
@@ -138,10 +160,10 @@
                         Mobile Money
                     </label>
                 </div>
-                <div class="flex items-center opacity-50 cursor-not-allowed">
-                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" disabled form="checkout-form" class="h-4 w-4 text-gray-400 border-gray-300 cursor-not-allowed">
-                    <label for="payment_method_cash" class="ml-3 block text-sm font-medium text-gray-500 cursor-not-allowed">
-                        Cash on Delivery
+                <div class="flex items-center">
+                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
+                    <label for="payment_method_cash" class="ml-3 block text-sm font-medium text-gray-700">
+                        Pay on delivery/pickup
                     </label>
                 </div>
                 
@@ -158,7 +180,7 @@
                             <label for="operator-mtn" class="ml-3 block text-sm text-gray-700">MTN Mobile Money</label>
                         </div>
                     </div>
-                    <p class="mt-2 text-xs text-gray-500">You will receive a prompt on your phone to complete the payment.</p>
+                    <p class="mt-2 text-xs text-gray-500">You will receive an official mobile money prompt on your phone to complete payment.</p>
                 </div>
             </div>
         </div>
@@ -308,7 +330,7 @@
             if (data.data && data.data.order_id) {
                 setPaymentModalState('success', data.message || 'Payment request accepted. Redirecting now.');
                 setTimeout(() => {
-                    window.location.href = `{% url 'confirm_payment' order_id=0 %}`.replace('0', data.data.order_id);
+                    window.location.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', data.data.order_id);
                 }, 900);
             } else {
                 throw new Error(data.message || 'Form submission failed');

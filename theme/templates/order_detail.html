@@ -3,11 +3,11 @@
 <p>Status: {{ order.status }}</p>
 <p>Payment Status: {{ order.payment_status }}</p>
 
-{% if order.status == 'processing' %}
-    <a href="{% url 'add_on_delivery' order.id %}" class="btn btn-primary">Add on Delivery</a>
+{% if order.status == 'packing' %}
+    <a href="{% url 'add_on_delivery' order.id %}" class="btn btn-primary">Mark Dispatched</a>
 {% endif %}
 
-{% if order.status == 'shipped' %}
+{% if order.status == 'dispatched' %}
     <a href="{% url 'received_parcel' order.id %}" class="btn btn-success">Received Parcel</a>
 {% endif %}
 

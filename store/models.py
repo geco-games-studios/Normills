@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import quote
 
 from django.db import models
 from django.utils import timezone
@@ -76,6 +77,8 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     image = models.ImageField(upload_to='products/')
     stock = models.PositiveIntegerField(default=1)
+    offline_stock = models.PositiveIntegerField(default=0)
+    low_stock_threshold = models.PositiveIntegerField(default=5)
     available = models.BooleanField(default=True)
     season = models.CharField(max_length=20, choices=SEASON_CHOICES, blank=True, null=True)
     fabric = models.CharField(max_length=20, choices=FABRIC_CHOICES, blank=True, null=True)
@@ -89,6 +92,14 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def total_stock(self):
+        return self.stock + self.offline_stock
+
+    @property
+    def is_low_stock(self):
+        return self.stock <= self.low_stock_threshold
     
 
 class LearnedKeyword(models.Model):
@@ -159,10 +170,13 @@ class CartItem(models.Model):
 class Order(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('shipped', 'Shipped'),
+        ('payment_awaiting', 'Payment awaiting confirmation'),
+        ('paid', 'Paid'),
+        ('packing', 'Packing'),
+        ('dispatched', 'Dispatched'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
+        ('refunded', 'Refunded'),
     )
 
     PAYMENT_STATUS_CHOICES = (
@@ -176,7 +190,12 @@ class Order(models.Model):
     PAYMENT_METHOD_CHOICES = (
         ('mobile_money', 'Mobile Money'),
         ('card', 'Credit/Debit Card'),
-        ('cash', 'Cash on Delivery'),
+        ('cash', 'Pay on delivery/pickup'),
+    )
+
+    DELIVERY_METHOD_CHOICES = (
+        ('delivery', 'Delivery'),
+        ('pickup', 'Pickup'),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
@@ -195,6 +214,8 @@ class Order(models.Model):
     shipping = models.DecimalField(max_digits=10, decimal_places=2)
     tax = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
+    delivery_method = models.CharField(max_length=20, choices=DELIVERY_METHOD_CHOICES, default='delivery')
+    notes = models.TextField(blank=True)
     
 
     # Payment fields
@@ -207,6 +228,7 @@ class Order(models.Model):
     delivered_at = models.DateTimeField(null=True, blank=True)  # Timestamp when the order is delivered
     payment_confirmed = models.BooleanField(default=False)  # Whether payment is confirmed
     transaction_id = models.CharField(max_length=100, unique=True, blank=True, null=True)  # Unique transaction ID
+    stock_deducted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created']
@@ -266,8 +288,8 @@ class Order(models.Model):
         """
         Notify the user and store owner that the order has been shipped.
         """
-        if self.status != 'shipped':
-            self.status = 'shipped'
+        if self.status != 'dispatched':
+            self.status = 'dispatched'
             self.save()
 
             # Prepare messages
@@ -343,6 +365,33 @@ class Order(models.Model):
         """
         return ", ".join([f"{item.product.name} (x{item.quantity})" for item in self.items.all()])
 
+    @property
+    def whatsapp_phone(self):
+        digits = ''.join(ch for ch in (self.phone or '') if ch.isdigit())
+        if digits.startswith('00'):
+            digits = digits[2:]
+        if digits.startswith('0') and len(digits) == 10:
+            digits = '260' + digits[1:]
+        elif len(digits) == 9:
+            digits = '260' + digits
+        return digits
+
+    @property
+    def whatsapp_message(self):
+        return (
+            f"Hello {self.first_name}, this is Normils Boutique about Order #{self.id}. "
+            f"Status: {self.get_status_display()}. "
+            f"Items: {self.product_details()}. "
+            f"Total: K{self.total}. "
+            "Please reply here if you have any delivery questions."
+        )
+
+    @property
+    def whatsapp_url(self):
+        if not self.whatsapp_phone:
+            return ''
+        return f"https://wa.me/{self.whatsapp_phone}?text={quote(self.whatsapp_message)}"
+
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
@@ -356,6 +405,23 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.price * self.quantity
+
+
+class StockAdjustment(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_adjustments')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    previous_online_stock = models.PositiveIntegerField(default=0)
+    new_online_stock = models.PositiveIntegerField(default=0)
+    previous_offline_stock = models.PositiveIntegerField(default=0)
+    new_offline_stock = models.PositiveIntegerField(default=0)
+    reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.product.name}: {self.previous_online_stock} -> {self.new_online_stock}"
 
 
 class OutboundSMSLog(models.Model):

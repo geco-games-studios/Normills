@@ -99,21 +99,40 @@ class CheckoutForm(forms.Form):
     city = forms.CharField(max_length=100, required=False)
     postal_code = forms.CharField(max_length=20, required=False)
     phone = forms.CharField(max_length=20, required=True)
+    notes = forms.CharField(required=False, widget=forms.Textarea)
 
     def clean(self):
         cleaned_data = super().clean()
         payment_method = cleaned_data.get('payment_method')
+        delivery_method = cleaned_data.get('delivery_method')
         if payment_method == 'mobile_money':
-            # Require all fields for mobile money
-            required_fields = ['email', 'address', 'city', 'postal_code']
+            required_fields = ['email']
+            if delivery_method == 'delivery':
+                required_fields.extend(['address', 'city'])
             for field in required_fields:
                 if not cleaned_data.get(field):
                     self.add_error(field, 'This field is required for Mobile Money payment.')
+        if delivery_method == 'delivery':
+            for field in ['address', 'city']:
+                if not cleaned_data.get(field):
+                    self.add_error(field, 'This field is required for delivery.')
         return cleaned_data
+
+    DELIVERY_CHOICES = [
+        ('delivery', 'Delivery'),
+        ('pickup', 'Pickup'),
+    ]
+
     PAYMENT_CHOICES = [
         ('mobile_money', 'Mobile Money'),
-        # ('cash', 'Cash on Delivery'),
+        ('cash', 'Pay on delivery/pickup'),
     ]
+
+    delivery_method = forms.ChoiceField(
+        choices=DELIVERY_CHOICES,
+        widget=forms.RadioSelect,
+        required=True
+    )
     
     payment_method = forms.ChoiceField(
         choices=PAYMENT_CHOICES,

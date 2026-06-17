@@ -5,6 +5,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
 from django.db.models import Q, Min, Max, Sum
 from django.utils.crypto import get_random_string
 from decimal import Decimal, ROUND_HALF_UP
@@ -16,7 +17,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -110,6 +111,80 @@ def _get_wishlist_count(request):
         return WishlistItem.objects.filter(user=request.user).count()
     session_wishlist = request.session.get('wishlist', [])
     return len(session_wishlist)
+
+
+def _wants_json(request):
+    return (
+        request.headers.get('x-requested-with') == 'XMLHttpRequest' or
+        'application/json' in request.META.get('HTTP_ACCEPT', '')
+    )
+
+
+def _parse_positive_int(value, default=1, minimum=1):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(value, minimum)
+
+
+def _cart_stock_issues(cart):
+    issues = []
+    for item in cart.items.select_related('product').all():
+        if not item.product.available or item.product.stock <= 0:
+            issues.append(f"{item.product.name} is out of stock.")
+        elif item.quantity > item.product.stock:
+            issues.append(
+                f"Only {item.product.stock} of {item.product.name} available. "
+                f"Your cart has {item.quantity}."
+            )
+    return issues
+
+
+def _deduct_stock_for_order(order):
+    with transaction.atomic():
+        locked_order = Order.objects.select_for_update().get(pk=order.pk)
+        if locked_order.stock_deducted_at:
+            return locked_order
+
+        items = list(locked_order.items.select_related('product').all())
+        product_ids = [item.product_id for item in items]
+        products = {
+            product.id: product
+            for product in Product.objects.select_for_update().filter(id__in=product_ids)
+        }
+
+        shortages = []
+        for item in items:
+            product = products[item.product_id]
+            if not product.available or product.stock < item.quantity:
+                shortages.append(f"{product.name}: {product.stock} available, {item.quantity} ordered")
+
+        if shortages:
+            raise ValueError("Stock shortage: " + "; ".join(shortages))
+
+        for item in items:
+            product = products[item.product_id]
+            product.stock -= item.quantity
+            if product.stock == 0:
+                product.available = False
+            product.save(update_fields=['stock', 'available', 'updated'])
+
+        locked_order.stock_deducted_at = timezone.now()
+        locked_order.save(update_fields=['stock_deducted_at'])
+        return locked_order
+
+
+def _set_order_paid(order):
+    was_confirmed = order.payment_confirmed
+    order.payment_status = 'completed'
+    if order.status in ('pending', 'payment_awaiting'):
+        order.status = 'paid'
+    order.save(update_fields=['payment_status', 'status'])
+    order = _deduct_stock_for_order(order)
+    if not was_confirmed:
+        order.notify_payment_confirmed()
+    return order
 
 
 @csrf_exempt
@@ -515,7 +590,7 @@ def home(request):
 def search_products(request):
     query = (request.GET.get('q') or '').strip()
     if query:
-        products = Product.objects.filter(
+        products = Product.objects.filter(available=True, stock__gt=0).filter(
             Q(name__icontains=query) |
             Q(description__icontains=query) |
             Q(category__name__icontains=query) |
@@ -530,7 +605,7 @@ def search_products(request):
 
 def category_detail(request, slug):
     category = get_object_or_404(Category, slug=slug)
-    products = category.products.filter(available=True)
+    products = category.products.filter(available=True, stock__gt=0)
     return render(request, 'category_detail.html', {
         'category': category,
         'products': products
@@ -569,6 +644,56 @@ def admin_dashboard(request):
     if not request.user.is_superuser:
         return HttpResponseForbidden('Superuser access only.')
 
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_stock':
+            product = get_object_or_404(Product, id=request.POST.get('product_id'))
+            previous_online = product.stock
+            previous_offline = product.offline_stock
+            product.stock = _parse_positive_int(request.POST.get('stock'), 0, minimum=0)
+            product.offline_stock = _parse_positive_int(request.POST.get('offline_stock'), 0, minimum=0)
+            product.low_stock_threshold = _parse_positive_int(request.POST.get('low_stock_threshold'), 0, minimum=0)
+            product.available = request.POST.get('available') == 'on' and product.stock > 0
+            product.save(update_fields=['stock', 'offline_stock', 'low_stock_threshold', 'available', 'updated'])
+            StockAdjustment.objects.create(
+                product=product,
+                user=request.user,
+                previous_online_stock=previous_online,
+                new_online_stock=product.stock,
+                previous_offline_stock=previous_offline,
+                new_offline_stock=product.offline_stock,
+                reason=(request.POST.get('reason') or 'Dashboard update').strip(),
+            )
+            messages.success(request, f"Updated stock for {product.name}.")
+            return redirect('admin_dashboard')
+
+        if action == 'update_order':
+            order = get_object_or_404(Order, id=request.POST.get('order_id'))
+            old_status = order.status
+            old_payment_status = order.payment_status
+            order.status = request.POST.get('status') or order.status
+            order.payment_status = request.POST.get('payment_status') or order.payment_status
+            order.notes = (request.POST.get('notes') or '').strip()
+            if order.status == 'delivered' and not order.delivered_at:
+                order.delivered_at = timezone.now()
+            order.save()
+
+            if order.payment_status == 'completed' and old_payment_status != 'completed':
+                try:
+                    _set_order_paid(order)
+                except ValueError as exc:
+                    messages.error(request, str(exc))
+                    return redirect('admin_dashboard')
+
+            if order.status == 'dispatched' and old_status != 'dispatched':
+                order.notify_shipped()
+            elif order.status == 'delivered' and old_status != 'delivered':
+                order.notify_delivered()
+
+            messages.success(request, f"Updated Order #{order.id}.")
+            return redirect('admin_dashboard')
+
     total_conversations = BotConversation.objects.count()
     total_learned_keywords = LearnedKeyword.objects.count()
     total_products = Product.objects.count()
@@ -603,6 +728,43 @@ def admin_dashboard(request):
     if total_conversations:
         average_tokens = token_summary.get('total_tokens', 0) / total_conversations
 
+    stock_query = (request.GET.get('stock_q') or '').strip()
+    stock_filter = request.GET.get('stock_filter') or 'all'
+    products = Product.objects.select_related('category', 'brand').order_by('name')
+    if stock_query:
+        products = products.filter(
+            Q(name__icontains=stock_query) |
+            Q(category__name__icontains=stock_query) |
+            Q(brand__name__icontains=stock_query)
+        )
+    if stock_filter == 'low':
+        low_ids = [product.id for product in products if product.is_low_stock]
+        products = Product.objects.filter(id__in=low_ids).select_related('category', 'brand').order_by('name')
+    elif stock_filter == 'out':
+        products = products.filter(stock=0)
+
+    order_query = (request.GET.get('order_q') or '').strip()
+    order_status = request.GET.get('order_status') or ''
+    payment_status = request.GET.get('payment_status') or ''
+    orders = Order.objects.prefetch_related('items__product').select_related('user').order_by('-created')
+    if order_query:
+        order_filters = (
+            Q(first_name__icontains=order_query) |
+            Q(last_name__icontains=order_query) |
+            Q(phone__icontains=order_query) |
+            Q(email__icontains=order_query) |
+            Q(payment_reference__icontains=order_query)
+        )
+        if order_query.isdigit():
+            order_filters |= Q(id=int(order_query))
+        orders = orders.filter(order_filters)
+    if order_status:
+        orders = orders.filter(status=order_status)
+    if payment_status:
+        orders = orders.filter(payment_status=payment_status)
+
+    recent_stock_adjustments = StockAdjustment.objects.select_related('product', 'user')[:12]
+
     return render(request, 'admin_dashboard.html', {
         'total_conversations': total_conversations,
         'total_learned_keywords': total_learned_keywords,
@@ -621,6 +783,19 @@ def admin_dashboard(request):
         'top_keywords': top_keywords,
         'token_summary': token_summary,
         'average_tokens': average_tokens,
+        'products': products[:80],
+        'orders': orders[:80],
+        'recent_stock_adjustments': recent_stock_adjustments,
+        'stock_query': stock_query,
+        'stock_filter': stock_filter,
+        'order_query': order_query,
+        'order_status': order_status,
+        'payment_status': payment_status,
+        'order_status_choices': Order.STATUS_CHOICES,
+        'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
+        'out_of_stock_count': Product.objects.filter(stock=0).count(),
+        'low_stock_count': sum(1 for product in Product.objects.all() if product.is_low_stock),
+        'pending_order_count': Order.objects.exclude(status__in=['delivered', 'cancelled', 'refunded']).count(),
     })
 
 
@@ -1008,7 +1183,11 @@ def password_reset_form(request):
 def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id, available=True)
     variant_id = request.POST.get('variant_id')
-    quantity = int(request.POST.get('quantity', 1))
+    quantity = _parse_positive_int(request.POST.get('quantity'), 1)
+
+    if product.stock <= 0:
+        messages.error(request, f"{product.name} is out of stock.")
+        return redirect('product_detail', slug=product.slug)
     
     cart = get_or_create_cart(request)
     
@@ -1017,9 +1196,16 @@ def add_to_cart(request, product_id):
         variant = get_object_or_404(ProductVariant, id=variant_id, product=product)
     
     cart_item = CartItem.objects.filter(cart=cart, product=product, variant=variant).first()
+    existing_quantity = cart_item.quantity if cart_item else 0
+    requested_quantity = existing_quantity + quantity
+    if requested_quantity > product.stock:
+        messages.error(request, f"Only {product.stock} of {product.name} available.")
+        if existing_quantity:
+            return redirect('cart')
+        return redirect('product_detail', slug=product.slug)
     
     if cart_item:
-        cart_item.quantity += quantity
+        cart_item.quantity = requested_quantity
         cart_item.save()
     else:
         CartItem.objects.create(
@@ -1048,8 +1234,14 @@ def update_cart_item(request, item_id):
     action = request.POST.get('action')
     
     if action == 'update':
-        quantity = int(request.POST.get('quantity', 1))
+        quantity = _parse_positive_int(request.POST.get('quantity'), 1)
         if quantity > 0:
+            if quantity > cart_item.product.stock:
+                quantity = cart_item.product.stock
+                messages.warning(request, f"Quantity adjusted to available stock for {cart_item.product.name}.")
+            if quantity <= 0:
+                cart_item.delete()
+                return redirect('cart')
             cart_item.quantity = quantity
             cart_item.save()
         else:
@@ -1061,7 +1253,10 @@ def update_cart_item(request, item_id):
 
 def cart(request):
     cart = get_or_create_cart(request)
-    return render(request, 'cart.html', {'cart': cart})
+    return render(request, 'cart.html', {
+        'cart': cart,
+        'checkout_amounts': _checkout_amounts(cart.total, 'cash'),
+    })
 
 @login_required
 @login_required
@@ -1081,6 +1276,13 @@ def checkout(request):
     
     if request.method == 'POST':
         logger.info(f"Checkout POST data: {request.POST}")
+        stock_issues = _cart_stock_issues(cart)
+        if stock_issues:
+            return JsonResponse({
+                'status': False,
+                'message': ' '.join(stock_issues),
+                'data': None
+            }, status=400)
         
         form = CheckoutForm(request.POST)
         if form.is_valid():
@@ -1113,8 +1315,11 @@ def checkout(request):
                 shipping=shipping,
                 tax=tax,
                 total=total,
+                delivery_method=form.cleaned_data['delivery_method'],
+                notes=form.cleaned_data.get('notes', ''),
                 payment_method=form.cleaned_data['payment_method'],
-                payment_status='pending',
+                payment_status='processing' if form.cleaned_data['payment_method'] == 'mobile_money' else 'pending',
+                status='payment_awaiting',
                 payment_details={
                     'checkout': {
                         'base_tax': str(amounts['base_tax']),
@@ -1220,6 +1425,8 @@ def checkout(request):
                     json_response = None
 
                     if payment_status in ('pending', 'pay-offline'):
+                        order.status = 'payment_awaiting'
+                        order.save(update_fields=['status'])
                         json_response = {
                             'status': True,
                             'message': 'Please authorize the mobile money payment on your phone.',
@@ -1230,9 +1437,9 @@ def checkout(request):
                             }
                         }
                     elif payment_status == 'successful':
+                        _set_order_paid(order)
                         cart.items.all().delete()
                         send_order_confirmation_email(order)
-                        order.notify_payment_confirmed()
                         json_response = {
                             'status': True,
                             'message': 'Order placed successfully! Your payment was successful.',
@@ -1272,7 +1479,18 @@ def checkout(request):
 
             elif payment_method == 'cash':
                 order.payment_status = 'pending'
-                order.save()
+                order.status = 'packing'
+                order.save(update_fields=['payment_status', 'status'])
+                try:
+                    _deduct_stock_for_order(order)
+                except ValueError as exc:
+                    order.status = 'cancelled'
+                    order.save(update_fields=['status'])
+                    return JsonResponse({
+                        'status': False,
+                        'message': str(exc),
+                        'data': None
+                    }, status=400)
                 cart.items.all().delete()
                 send_order_confirmation_email(order)
                 json_response = {
@@ -1403,12 +1621,15 @@ def submit_otp(request, order_id):
         
         if payment_status == 'successful':
             # Clear the cart
+            try:
+                _set_order_paid(order)
+            except ValueError as exc:
+                return JsonResponse({"status": False, "message": str(exc), "data": None}, status=400)
             cart = get_or_create_cart(request)
             cart.items.all().delete()
             
             # Send order confirmation email
             send_order_confirmation_email(order)
-            order.notify_payment_confirmed()
             
             json_response = {
                 "status": True,
@@ -1477,10 +1698,18 @@ def verify_payment(request, order_id):
         was_paid = order.payment_status == 'completed' or order.payment_confirmed
         order.payment_status = _order_payment_status(lenco_status)
         if order.payment_status == 'completed':
-            order.status = 'processing'
+            order.status = 'paid'
         order.save()
 
         if order.payment_status == 'completed' and not was_paid:
+            try:
+                _deduct_stock_for_order(order)
+            except ValueError as exc:
+                return JsonResponse({
+                    'status': False,
+                    'message': str(exc),
+                    'data': None
+                }, status=400)
             try:
                 send_order_confirmation_email(order)
             except Exception:
@@ -1506,14 +1735,14 @@ def add_on_delivery(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     order.notify_shipped()
     messages.success(request, 'Order marked as shipped and notifications sent.')
-    return redirect('order_detail', order_id=order.id)
+    return redirect('order_confirmation', order_id=order.id)
 
 @login_required
 def received_parcel(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     order.notify_delivered()
     messages.success(request, 'Order marked as delivered and notifications sent.')
-    return redirect('order_detail', order_id=order.id)
+    return redirect('order_confirmation', order_id=order.id)
 
 @login_required
 def confirm_payment(request, order_id):
@@ -1523,8 +1752,13 @@ def confirm_payment(request, order_id):
     if order.payment_method == 'cash':
         # Mark payment as completed for cash on delivery
         order.payment_status = 'completed'
-        order.status = 'processing'
+        order.status = 'paid'
         order.save()
+        try:
+            _deduct_stock_for_order(order)
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect('order_confirmation', order_id=order.id)
 
         messages.success(request, 'Order placed successfully! Your order is being processed.')
         return redirect('order_confirmation', order_id=order.id)
@@ -1543,8 +1777,13 @@ def confirm_payment(request, order_id):
         # Update the order status based on the payment response
         if payment_response['status'] == 'success':
             order.payment_status = 'completed'
-            order.status = 'processing'
+            order.status = 'paid'
             order.save()
+            try:
+                _deduct_stock_for_order(order)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect('order_confirmation', order_id=order.id)
             order.notify_payment_confirmed()
             messages.success(request, 'Payment successful! Your order is being processed.')
         elif payment_response['status'] == 'insufficient_balance':
