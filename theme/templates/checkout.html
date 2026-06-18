@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load custom_filters %}
 
-{% block title %}Chat Checkout - Normils{% endblock %}
+{% block title %}Checkout - Normils{% endblock %}
 
 {% block content %}
 <section class="mx-auto max-w-5xl px-4 py-6 md:py-10">
@@ -9,11 +9,11 @@
         <section class="overflow-hidden border border-gray-200 bg-white">
             <div class="border-b border-gray-200 bg-[#2b2b2b] px-5 py-5 text-white">
                 <p class="text-xs font-black uppercase tracking-[.24em] text-white/70">Normils checkout</p>
-                <h1 class="mt-2 text-2xl font-black tracking-[.08em]">Chat with checkout</h1>
+                <h1 id="checkout-title" class="mt-2 text-2xl font-black tracking-[.08em]">{% if user.is_authenticated %}Chat with checkout{% else %}Tell Us about yourself :){% endif %}</h1>
             </div>
 
+            {% if user.is_authenticated %}
             <div id="checkout-chat" class="min-h-[480px] space-y-4 bg-[#f7f7f7] px-4 py-5 md:px-6"></div>
-
             <div id="chat-input-row" class="border-t border-gray-200 bg-white p-4">
                 <div class="flex gap-3">
                     <input id="chat-input" type="text" autocomplete="off" class="min-w-0 flex-1 border border-gray-300 px-4 py-3 text-base outline-none focus:border-black" />
@@ -21,6 +21,41 @@
                 </div>
                 <p id="chat-helper" class="mt-2 text-sm text-gray-500"></p>
             </div>
+            {% else %}
+            <div id="guest-checkout" class="min-h-[480px] bg-[#f7f7f7] px-4 py-6 md:px-6">
+                <div id="guest-step-one" class="mx-auto max-w-xl space-y-5">
+                    <div>
+                        <label class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Name</label>
+                        <input id="guest-name" type="text" autocomplete="name" class="mt-2 w-full border border-gray-300 bg-white px-4 py-4 text-base outline-none focus:border-black" placeholder="Your full name">
+                    </div>
+                    <div>
+                        <label class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Phone number</label>
+                        <input id="guest-phone" type="tel" autocomplete="tel" class="mt-2 w-full border border-gray-300 bg-white px-4 py-4 text-base outline-none focus:border-black" placeholder="0977123456">
+                    </div>
+                    <button id="guest-done" type="button" class="w-full bg-black px-5 py-4 text-sm font-black uppercase tracking-[.16em] text-white">Done</button>
+                    <p id="guest-step-one-error" class="hidden text-sm font-bold text-red-700"></p>
+                </div>
+
+                <div id="guest-step-two" class="mx-auto hidden max-w-xl space-y-5">
+                    <div>
+                        <label class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Email optional</label>
+                        <input id="guest-email" type="email" autocomplete="email" class="mt-2 w-full border border-gray-300 bg-white px-4 py-4 text-base outline-none focus:border-black" placeholder="you@example.com">
+                    </div>
+                    <div>
+                        <label class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Password</label>
+                        <input id="guest-password" type="password" autocomplete="new-password" class="mt-2 w-full border border-gray-300 bg-white px-4 py-4 text-base outline-none focus:border-black" placeholder="At least 8 characters">
+                    </div>
+                    <div>
+                        <label class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Confirm password</label>
+                        <input id="guest-password2" type="password" autocomplete="new-password" class="mt-2 w-full border border-gray-300 bg-white px-4 py-4 text-base outline-none focus:border-black">
+                    </div>
+                    <button id="guest-submit" type="button" class="w-full bg-black px-5 py-4 text-sm font-black uppercase tracking-[.16em] text-white">Lets Go!</button>
+                    <p id="guest-step-two-error" class="hidden text-sm font-bold text-red-700"></p>
+                </div>
+
+                <div id="guest-result-chat" class="mx-auto hidden max-w-xl space-y-4"></div>
+            </div>
+            {% endif %}
         </section>
 
         <aside class="border border-gray-200 bg-white p-5">
@@ -86,6 +121,8 @@
         <input type="hidden" name="delivery_method" value="delivery">
         <input type="hidden" name="payment_method" value="cash">
         <input type="hidden" name="checkout_mode" value="chat">
+        <input type="hidden" name="checkout_password" id="id_checkout_password" value="">
+        <input type="hidden" name="checkout_password2" id="id_checkout_password2" value="">
     </form>
 </section>
 
@@ -96,54 +133,17 @@
         const userEmail = "{{ user.email|default:''|escapejs }}";
         const profilePhone = "{{ user.client_profile.phone_number|default:''|escapejs }}";
         const profileAddress = "{{ user.client_profile.address|default:''|escapejs }}";
-        const chat = document.getElementById('checkout-chat');
-        const input = document.getElementById('chat-input');
-        const send = document.getElementById('chat-send');
-        const helper = document.getElementById('chat-helper');
-        const inputRow = document.getElementById('chat-input-row');
         const form = document.getElementById('checkout-form');
         const state = {
-            step: 'start',
-            name: '',
-            phone: '',
-            city: '',
-            area: '',
+            name: userName || '',
+            phone: profilePhone || '',
+            email: userEmail || '',
+            city: 'Customer city',
+            area: profileAddress || 'Saved customer address',
+            password: '',
+            password2: '',
             submitting: false,
         };
-
-        function scrollChat() {
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function addMessage(text, fromCustomer) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex ' + (fromCustomer ? 'justify-end' : 'justify-start');
-            const bubble = document.createElement('div');
-            bubble.className = (fromCustomer ? 'bg-black text-white' : 'bg-white text-gray-900 border border-gray-200') + ' max-w-[82%] px-4 py-3 text-[15px] leading-relaxed shadow-sm';
-            bubble.textContent = text;
-            wrapper.appendChild(bubble);
-            chat.appendChild(wrapper);
-            scrollChat();
-        }
-
-        function addAction(label, action) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'flex justify-start';
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'border-2 border-black bg-white px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-black';
-            button.textContent = label;
-            button.addEventListener('click', action, { once: true });
-            wrapper.appendChild(button);
-            chat.appendChild(wrapper);
-            scrollChat();
-        }
-
-        function setPrompt(placeholder, text) {
-            input.placeholder = placeholder;
-            helper.textContent = text || '';
-            input.focus();
-        }
 
         function splitName(fullName) {
             const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -157,20 +157,46 @@
             document.getElementById(id).value = value || '';
         }
 
-        async function submitOrder() {
-            if (state.submitting) return;
-            state.submitting = true;
-            inputRow.classList.add('hidden');
-            addMessage('Placing your order now...', false);
-
+        function prepareHiddenFields() {
             const names = splitName(state.name || userName || 'Customer');
             setField('id_first_name', names.first);
             setField('id_last_name', names.last);
-            setField('id_email', userEmail);
+            setField('id_email', state.email || userEmail);
             setField('id_phone', state.phone || profilePhone || 'signed-in');
             setField('id_city', state.city || 'Customer city');
             setField('id_address', state.area || profileAddress || 'Saved customer address');
-            setField('id_notes', state.area ? `Checkout chat delivery area: ${state.area}` : 'Signed-in chat checkout');
+            setField('id_notes', state.area ? `Checkout delivery area: ${state.area}. Primary contact: ${state.phone || profilePhone || 'phone not provided'}` : 'Signed-in chat checkout');
+            setField('id_checkout_password', state.password);
+            setField('id_checkout_password2', state.password2);
+        }
+
+        function addBubble(container, text, fromCustomer) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex ' + (fromCustomer ? 'justify-end' : 'justify-start');
+            const bubble = document.createElement('div');
+            bubble.className = (fromCustomer ? 'bg-black text-white' : 'bg-white text-gray-900 border border-gray-200') + ' max-w-[82%] px-4 py-3 text-[15px] leading-relaxed shadow-sm';
+            bubble.textContent = text;
+            wrapper.appendChild(bubble);
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addViewOrder(container, orderId) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex justify-start';
+            const link = document.createElement('a');
+            link.className = 'border-2 border-black bg-white px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-black';
+            link.textContent = 'View order';
+            link.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', orderId);
+            wrapper.appendChild(link);
+            container.appendChild(wrapper);
+        }
+
+        async function submitOrder(resultContainer) {
+            if (state.submitting) return;
+            state.submitting = true;
+            prepareHiddenFields();
+            addBubble(resultContainer, 'Placing your order now...', false);
 
             const formData = new FormData(form);
             try {
@@ -185,102 +211,85 @@
                 if (!response.ok || !data.status) {
                     throw new Error(data.message || 'We could not place the order right now.');
                 }
-
-                addMessage(data.message || (isSignedIn
-                    ? 'Your order will arrive in 3 - 4 business days, message me for questions. Thanks.'
-                    : 'Great, your order will arrive in 3 - 4 business days, a cashier will call you for payment confirmation, Thanks.'), false);
-
+                addBubble(resultContainer, data.message || 'Great, your order will arrive in 3 - 4 business days, a cashier will call you for payment confirmation, Thanks.', false);
                 if (data.data && data.data.order_id) {
-                    addAction('View order', function() {
-                        window.location.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', data.data.order_id);
-                    });
+                    addViewOrder(resultContainer, data.data.order_id);
                 }
             } catch (error) {
                 state.submitting = false;
-                inputRow.classList.remove('hidden');
-                addMessage(error.message || 'Something went wrong. Please try again.', false);
-                if (isSignedIn) {
-                    addAction('Try again', submitOrder);
-                } else {
-                    state.step = 'area';
-                    setPrompt('Enter your area', 'Please confirm the area again.');
-                }
+                addBubble(resultContainer, error.message || 'Something went wrong. Please try again.', false);
             }
         }
-
-        function handleGuestAnswer(value) {
-            if (state.step === 'name_phone') {
-                const phoneMatch = value.match(/(?:\+?\d[\d\s-]{6,}\d)/);
-                if (!phoneMatch) {
-                    addMessage('Please send your name and phone number together, for example: Luyando, 0977123456.', false);
-                    return;
-                }
-                state.phone = phoneMatch[0].replace(/[^\d+]/g, '');
-                state.name = value.replace(phoneMatch[0], '').replace(/[,|-]/g, ' ').trim();
-                if (!state.name) {
-                    addMessage('I have your phone number. What name should we put on the order?', false);
-                    state.step = 'name_only';
-                    setPrompt('Enter your name', '');
-                    return;
-                }
-                state.step = 'city';
-                addMessage('Thanks. What is your home town or city?', false);
-                setPrompt('Enter home town or city', '');
-                return;
-            }
-
-            if (state.step === 'name_only') {
-                state.name = value;
-                state.step = 'city';
-                addMessage('Thanks. What is your home town or city?', false);
-                setPrompt('Enter home town or city', '');
-                return;
-            }
-
-            if (state.step === 'city') {
-                state.city = value;
-                state.step = 'area';
-                addMessage('Which area should we deliver to?', false);
-                setPrompt('Enter area', 'Example: Kabulonga, Chilenje, Matero, Roma');
-                return;
-            }
-
-            if (state.step === 'area') {
-                state.area = value;
-                submitOrder();
-            }
-        }
-
-        function handleSend() {
-            const value = input.value.trim();
-            if (!value || state.submitting) return;
-            input.value = '';
-            addMessage(value, true);
-            handleGuestAnswer(value);
-        }
-
-        send.addEventListener('click', handleSend);
-        input.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                handleSend();
-            }
-        });
 
         if (isSignedIn) {
-            state.name = userName || 'Customer';
-            state.phone = profilePhone;
-            state.city = 'Customer city';
-            state.area = profileAddress || 'Saved customer address';
+            const chat = document.getElementById('checkout-chat');
+            const inputRow = document.getElementById('chat-input-row');
             inputRow.classList.add('hidden');
-            addMessage(`Hi ${state.name}. I can see you are signed up.`, false);
-            addAction('Place my order', submitOrder);
-        } else {
-            state.step = 'name_phone';
-            addMessage('Hi, I will help you check out here.', false);
-            addMessage('What is your name and phone number?', false);
-            setPrompt('Enter name and phone number', 'Example: Luyando, 0977123456');
+            addBubble(chat, `Hi ${state.name || 'there'}. I can see you are signed up.`, false);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex justify-start';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'border-2 border-black bg-white px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-black';
+            button.textContent = 'Place my order';
+            button.addEventListener('click', function() {
+                button.disabled = true;
+                submitOrder(chat);
+            }, { once: true });
+            wrapper.appendChild(button);
+            chat.appendChild(wrapper);
+            return;
         }
+
+        const title = document.getElementById('checkout-title');
+        const stepOne = document.getElementById('guest-step-one');
+        const stepTwo = document.getElementById('guest-step-two');
+        const resultChat = document.getElementById('guest-result-chat');
+        const nameInput = document.getElementById('guest-name');
+        const phoneInput = document.getElementById('guest-phone');
+        const emailInput = document.getElementById('guest-email');
+        const passwordInput = document.getElementById('guest-password');
+        const password2Input = document.getElementById('guest-password2');
+        const stepOneError = document.getElementById('guest-step-one-error');
+        const stepTwoError = document.getElementById('guest-step-two-error');
+
+        function showError(element, text) {
+            element.textContent = text;
+            element.classList.remove('hidden');
+        }
+
+        document.getElementById('guest-done').addEventListener('click', function() {
+            stepOneError.classList.add('hidden');
+            state.name = nameInput.value.trim();
+            state.phone = phoneInput.value.trim();
+            if (!state.name || !state.phone) {
+                showError(stepOneError, 'Please enter your name and phone number.');
+                return;
+            }
+            stepOne.classList.add('hidden');
+            stepTwo.classList.remove('hidden');
+            emailInput.focus();
+        });
+
+        document.getElementById('guest-submit').addEventListener('click', function() {
+            stepTwoError.classList.add('hidden');
+            state.email = emailInput.value.trim();
+            state.password = passwordInput.value;
+            state.password2 = password2Input.value;
+            if (state.password.length < 8) {
+                showError(stepTwoError, 'Please use a password with at least 8 characters.');
+                return;
+            }
+            if (state.password !== state.password2) {
+                showError(stepTwoError, 'Password and confirm password must match.');
+                return;
+            }
+            title.textContent = 'Chat with checkout';
+            stepTwo.classList.add('hidden');
+            resultChat.classList.remove('hidden');
+            addBubble(resultChat, 'Thanks. We have your phone as the primary contact for this order.', false);
+            submitOrder(resultChat);
+        });
     });
 </script>
 {% endblock %}

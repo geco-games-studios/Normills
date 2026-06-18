@@ -127,6 +127,21 @@ class ProductSubcategory(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class CashierContact(models.Model):
+    name = models.CharField(max_length=120)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
     
 
 class LearnedKeyword(models.Model):

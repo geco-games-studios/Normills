@@ -20,7 +20,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -30,6 +30,7 @@ from .payment import best_lenco_data, get_collection_status, lenco_data_items, p
 from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
+from users.models import ClientProfile
 
 import logging
 
@@ -198,6 +199,44 @@ def _send_cashier_order_message(order, message):
         order._notify_store_owner(message)
     except Exception:
         logger.exception('Cashier order message failed for Order ID %s', order.id)
+
+
+def _order_cashier_message(order):
+    return (
+        f"New Normils order #{order.id}\n"
+        f"Customer: {order.first_name} {order.last_name}\n"
+        f"Phone: {order.phone}\n"
+        f"Email: {order.email or 'Not provided'}\n"
+        f"Items: {order.product_details()}\n"
+        f"Total: K{order.total}"
+    )
+
+
+def _notify_cashiers_order_created(order):
+    contacts = CashierContact.objects.filter(active=True)
+    if not contacts.exists():
+        logger.warning('Order %s has no active cashier contacts configured', order.id)
+        return
+
+    message = _order_cashier_message(order)
+    sms_client = SMSClient()
+    for contact in contacts:
+        if contact.phone:
+            try:
+                sms_client.send_sms(contact.phone, message)
+            except Exception:
+                logger.exception('Cashier SMS failed for order %s to %s', order.id, contact.phone)
+        if contact.email:
+            try:
+                send_mail(
+                    f"New Normils Order #{order.id}",
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [contact.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception('Cashier email failed for order %s to %s', order.id, contact.email)
 
 
 def _remember_order_for_session(request, order):
@@ -972,6 +1011,34 @@ def admin_dashboard(request):
             messages.success(request, f"Removed {subcategory_name} from filter types and cleared it from matching products.")
             return dashboard_redirect('editor')
 
+        if action == 'create_cashier':
+            name = (request.POST.get('cashier_name') or '').strip()
+            email = (request.POST.get('cashier_email') or '').strip().lower()
+            phone = _normalize_phone(request.POST.get('cashier_phone') or '')
+            if not name or not email or not phone:
+                messages.error(request, 'Cashier name, email, and phone are required.')
+                return dashboard_redirect('cashiers')
+            CashierContact.objects.create(name=name, email=email, phone=phone, active=True)
+            messages.success(request, f"Added cashier contact {name}.")
+            return dashboard_redirect('cashiers')
+
+        if action == 'update_cashier':
+            contact = get_object_or_404(CashierContact, id=request.POST.get('cashier_id'))
+            contact.name = (request.POST.get('cashier_name') or contact.name).strip()
+            contact.email = (request.POST.get('cashier_email') or contact.email).strip().lower()
+            contact.phone = _normalize_phone(request.POST.get('cashier_phone') or contact.phone)
+            contact.active = request.POST.get('active') == 'on'
+            contact.save()
+            messages.success(request, f"Updated cashier contact {contact.name}.")
+            return dashboard_redirect('cashiers')
+
+        if action == 'delete_cashier':
+            contact = get_object_or_404(CashierContact, id=request.POST.get('cashier_id'))
+            contact_name = contact.name
+            contact.delete()
+            messages.success(request, f"Removed cashier contact {contact_name}.")
+            return dashboard_redirect('cashiers')
+
         if action == 'create_product':
             store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
             default_store = Store.objects.filter(id=store).first() if store else Store.objects.first()
@@ -1111,7 +1178,7 @@ def admin_dashboard(request):
         average_tokens = token_summary.get('total_tokens', 0) / total_conversations
 
     dashboard_mode = request.GET.get('mode') or 'editor'
-    if dashboard_mode not in {'editor', 'cashier', 'stock'}:
+    if dashboard_mode not in {'editor', 'cashier', 'stock', 'customers', 'cashiers'}:
         dashboard_mode = 'editor'
 
     stock_query = (request.GET.get('stock_q') or '').strip()
@@ -1154,6 +1221,16 @@ def admin_dashboard(request):
     recent_stock_adjustments = StockAdjustment.objects.select_related('product', 'user')[:12]
     categories = Category.objects.order_by('name')
     brands = Brand.objects.order_by('name')
+    customer_query = (request.GET.get('customer_q') or '').strip()
+    customers = ClientProfile.objects.select_related('user').order_by('-created_at')
+    if customer_query:
+        customers = customers.filter(
+            Q(user__first_name__icontains=customer_query) |
+            Q(user__last_name__icontains=customer_query) |
+            Q(user__email__icontains=customer_query) |
+            Q(phone_number__icontains=customer_query)
+        )
+    cashier_contacts = CashierContact.objects.order_by('name')
     subcategory_options = ['Tops', 'Bottoms', 'Shoes', 'Accessories']
     custom_subcategories = ProductSubcategory.objects.order_by('name')
     for subcategory in custom_subcategories:
@@ -1208,6 +1285,9 @@ def admin_dashboard(request):
         'orders': orders[:80],
         'categories': categories,
         'brands': brands,
+        'customers': customers[:120],
+        'customer_query': customer_query,
+        'cashier_contacts': cashier_contacts,
         'subcategory_options': subcategory_options,
         'custom_subcategories': custom_subcategories,
         'uploaded_product_images': uploaded_product_images,
@@ -1694,6 +1774,7 @@ def _send_order_created_notifications(order_id):
         send_order_receipt_sms(order)
         send_admin_whatsapp_order_receipt(order)
         send_order_confirmation_email(order)
+        _notify_cashiers_order_created(order)
     except Exception:
         logger.exception('Background order notification failed for Order ID %s', order_id)
     finally:
@@ -1708,6 +1789,54 @@ def _queue_order_created_notifications(order):
         daemon=True,
     )
     thread.start()
+
+
+def _unique_checkout_username(first_name, phone, email=''):
+    base_value = email.split('@')[0] if email else f"{first_name}-{phone}"
+    base = re.sub(r'[^a-zA-Z0-9._+-]', '', base_value)[:24] or get_random_string(8)
+    username = base
+    while get_user_model().objects.filter(username=username).exists():
+        username = f"{base[:24]}{get_random_string(6)}"
+    return username
+
+
+def _create_checkout_customer(request, form):
+    if request.user.is_authenticated:
+        return request.user, None
+
+    password = request.POST.get('checkout_password') or ''
+    password2 = request.POST.get('checkout_password2') or ''
+    if len(password) < 8:
+        return None, 'Please use a password with at least 8 characters.'
+    if password != password2:
+        return None, 'Password and confirm password must match.'
+
+    email = (form.cleaned_data.get('email') or '').strip().lower()
+    phone = _normalize_phone(form.cleaned_data['phone'])
+    UserModel = get_user_model()
+
+    if email and UserModel.objects.filter(email__iexact=email).exists():
+        return None, 'That email is already signed up. Please log in before checkout.'
+    if ClientProfile.objects.filter(phone_number__iexact=phone).exists():
+        return None, 'That phone number is already signed up. Please log in before checkout.'
+
+    user = UserModel(
+        username=_unique_checkout_username(form.cleaned_data['first_name'], phone, email),
+        email=email,
+        first_name=form.cleaned_data['first_name'],
+        last_name=form.cleaned_data.get('last_name', ''),
+        is_client=True,
+        is_verified=True,
+        is_active=True,
+    )
+    user.set_password(password)
+    user.save()
+    login(request, user, backend='users.backends.EmailOrPhoneBackend')
+    profile, _ = ClientProfile.objects.get_or_create(user=user)
+    profile.phone_number = phone
+    profile.address = form.cleaned_data.get('address', '')
+    profile.save(update_fields=['phone_number', 'address', 'updated_at'])
+    return user, None
 
 
 def checkout(request):
@@ -1737,6 +1866,13 @@ def checkout(request):
         
         form = CheckoutForm(request.POST)
         if form.is_valid():
+            checkout_user, customer_error = _create_checkout_customer(request, form)
+            if customer_error:
+                return JsonResponse({
+                    'status': False,
+                    'message': customer_error,
+                    'data': None
+                }, status=400)
             amounts = _checkout_amounts(cart.total, form.cleaned_data['payment_method'])
             subtotal = amounts['subtotal']
             shipping = amounts['shipping']
@@ -1753,7 +1889,7 @@ def checkout(request):
 
             # Create the order
             order = Order.objects.create(
-                user=request.user if request.user.is_authenticated else None,
+                user=checkout_user,
                 store=order_store,
                 first_name=form.cleaned_data['first_name'],
                 last_name=form.cleaned_data['last_name'],
@@ -1761,7 +1897,7 @@ def checkout(request):
                 address=form.cleaned_data.get('address', ''),
                 city=form.cleaned_data.get('city', ''),
                 postal_code=form.cleaned_data.get('postal_code', ''),
-                phone=form.cleaned_data['phone'],
+                phone=_normalize_phone(form.cleaned_data['phone']),
                 subtotal=subtotal,
                 shipping=shipping,
                 tax=tax,
@@ -1815,6 +1951,7 @@ def checkout(request):
                     logger.exception('Immediate order SMS failed for Order ID %s', order.id)
 
                 send_admin_whatsapp_order_receipt(order)
+                _notify_cashiers_order_created(order)
 
             # Process payment based on selected method
             payment_method = form.cleaned_data['payment_method']
