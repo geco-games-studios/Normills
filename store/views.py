@@ -1800,31 +1800,30 @@ def _unique_checkout_username(first_name, phone, email=''):
     return username
 
 
-def _create_checkout_customer(request, form):
-    if request.user.is_authenticated:
-        return request.user, None
-
-    password = request.POST.get('checkout_password') or ''
-    password2 = request.POST.get('checkout_password2') or ''
+def _create_customer_account(request, first_name, last_name, email, phone, password, password2, address=''):
     if len(password) < 8:
         return None, 'Please use a password with at least 8 characters.'
     if password != password2:
         return None, 'Password and confirm password must match.'
 
-    email = (form.cleaned_data.get('email') or '').strip().lower()
-    phone = _normalize_phone(form.cleaned_data['phone'])
+    first_name = (first_name or 'Customer').strip()
+    last_name = (last_name or '').strip()
+    email = (email or '').strip().lower()
+    phone = _normalize_phone(phone)
     UserModel = get_user_model()
 
+    if not phone:
+        return None, 'Please enter your phone number.'
     if email and UserModel.objects.filter(email__iexact=email).exists():
         return None, 'That email is already signed up. Please log in before checkout.'
     if ClientProfile.objects.filter(phone_number__iexact=phone).exists():
         return None, 'That phone number is already signed up. Please log in before checkout.'
 
     user = UserModel(
-        username=_unique_checkout_username(form.cleaned_data['first_name'], phone, email),
+        username=_unique_checkout_username(first_name, phone, email),
         email=email,
-        first_name=form.cleaned_data['first_name'],
-        last_name=form.cleaned_data.get('last_name', ''),
+        first_name=first_name,
+        last_name=last_name,
         is_client=True,
         is_verified=True,
         is_active=True,
@@ -1834,9 +1833,77 @@ def _create_checkout_customer(request, form):
     login(request, user, backend='users.backends.EmailOrPhoneBackend')
     profile, _ = ClientProfile.objects.get_or_create(user=user)
     profile.phone_number = phone
-    profile.address = form.cleaned_data.get('address', '')
+    profile.address = address or ''
     profile.save(update_fields=['phone_number', 'address', 'updated_at'])
     return user, None
+
+
+def _create_checkout_customer(request, form):
+    if request.user.is_authenticated:
+        return request.user, None
+
+    return _create_customer_account(
+        request,
+        form.cleaned_data['first_name'],
+        form.cleaned_data.get('last_name', ''),
+        form.cleaned_data.get('email', ''),
+        form.cleaned_data['phone'],
+        request.POST.get('checkout_password') or '',
+        request.POST.get('checkout_password2') or '',
+        form.cleaned_data.get('address', ''),
+    )
+
+
+def account_quick_create(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': False, 'message': 'POST required'}, status=405)
+    if request.user.is_authenticated:
+        return JsonResponse({'status': True, 'message': 'You are already signed in.'})
+
+    full_name = (request.POST.get('name') or '').strip()
+    if not full_name:
+        return JsonResponse({'status': False, 'message': 'Please enter your name.'}, status=400)
+    names = full_name.split()
+    first_name = names[0] if names else ''
+    last_name = ' '.join(names[1:])
+    user, error = _create_customer_account(
+        request,
+        first_name,
+        last_name,
+        request.POST.get('email') or '',
+        request.POST.get('phone') or '',
+        request.POST.get('password') or '',
+        request.POST.get('password2') or '',
+        '',
+    )
+    if error:
+        return JsonResponse({'status': False, 'message': error}, status=400)
+    profile = ClientProfile.objects.get(user=user)
+    return JsonResponse({
+        'status': True,
+        'message': 'Account Created successful',
+        'data': {
+            'name': user.get_full_name() or user.username,
+            'phone': profile.phone_number,
+            'email': user.email,
+        },
+    })
+
+
+@login_required
+def account_save_address(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': False, 'message': 'POST required'}, status=405)
+
+    city = (request.POST.get('city') or '').strip()
+    area = (request.POST.get('area') or '').strip()
+    if not city or not area:
+        return JsonResponse({'status': False, 'message': 'Town or City and Area are required.'}, status=400)
+
+    profile, _ = ClientProfile.objects.get_or_create(user=request.user)
+    profile.address = f"{area}, {city}"
+    profile.save(update_fields=['address', 'updated_at'])
+    return JsonResponse({'status': True, 'message': 'Address saved.'})
 
 
 def checkout(request):
