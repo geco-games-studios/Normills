@@ -849,6 +849,25 @@ def admin_dashboard(request):
             messages.success(request, f"Updated storefront item: {product.name}.")
             return dashboard_redirect('editor')
 
+        if action == 'delete_product':
+            product = get_object_or_404(Product, id=request.POST.get('product_id'))
+            previous_online = product.stock
+            previous_offline = product.offline_stock
+            product.stock = 0
+            product.available = False
+            product.save(update_fields=['stock', 'available', 'updated'])
+            StockAdjustment.objects.create(
+                product=product,
+                user=request.user,
+                previous_online_stock=previous_online,
+                new_online_stock=product.stock,
+                previous_offline_stock=previous_offline,
+                new_offline_stock=product.offline_stock,
+                reason='Removed from storefront editor',
+            )
+            messages.success(request, f"Removed {product.name} from the storefront.")
+            return dashboard_redirect('editor')
+
         if action == 'create_product':
             store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
             default_store = Store.objects.filter(id=store).first() if store else Store.objects.first()

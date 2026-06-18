@@ -120,6 +120,20 @@
             <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover object-center">
             {% endif %}
             <span class="absolute left-2 top-2 bg-black px-2 py-1 text-[10px] font-black uppercase tracking-[.14em] text-white">Edit</span>
+            <form method="post" class="absolute right-2 top-2 z-20" onsubmit="return confirm('Remove {{ product.name|escapejs }} from the storefront? This keeps old orders intact but hides the item from customers.');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_product">
+              <input type="hidden" name="product_id" value="{{ product.id }}">
+              <button type="submit" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-red-700 shadow" aria-label="Remove {{ product.name }} from storefront" title="Remove from storefront">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18"></path>
+                  <path d="M8 6V4h8v2"></path>
+                  <path d="M19 6l-1 14H6L5 6"></path>
+                  <path d="M10 11v5"></path>
+                  <path d="M14 11v5"></path>
+                </svg>
+              </button>
+            </form>
             {% if product.stock < 5 %}
             <span class="absolute bottom-2 left-2 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[.14em] text-gray-900">Low stock</span>
             {% endif %}
