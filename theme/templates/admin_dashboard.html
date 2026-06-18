@@ -289,6 +289,23 @@
         </div>
 
         <div class="border-t border-gray-100 p-5">
+          <div class="mb-4 grid gap-2 sm:grid-cols-2">
+            <form method="post" onsubmit="return confirm('Cancel Order #{{ order.id }}? This will mark the order as cancelled and send the customer a cancellation message.');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_order">
+              <input type="hidden" name="cashier_step" value="cancel_order">
+              <input type="hidden" name="order_id" value="{{ order.id }}">
+              <button class="w-full border border-red-700 bg-white px-4 py-3 text-sm font-black uppercase tracking-[.12em] text-red-700">Cancel order</button>
+            </form>
+
+            <form method="post" onsubmit="return confirm('Clear Order #{{ order.id }} from cashier mode? You can still find it later by filtering for cleared orders.');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_order">
+              <input type="hidden" name="cashier_step" value="clear_order">
+              <input type="hidden" name="order_id" value="{{ order.id }}">
+              <button class="w-full border border-gray-300 bg-gray-50 px-4 py-3 text-sm font-black uppercase tracking-[.12em] text-gray-700">Clear</button>
+            </form>
+          </div>
           <details>
             <summary class="cursor-pointer text-sm font-black uppercase tracking-[.14em] text-gray-700">Manual status and note</summary>
             <form method="post" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]">

@@ -176,6 +176,7 @@ class Order(models.Model):
         ('dispatched', 'Dispatched'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
+        ('cleared', 'Cleared from cashier'),
         ('refunded', 'Refunded'),
     )
 

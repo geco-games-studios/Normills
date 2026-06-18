@@ -832,6 +832,24 @@ def admin_dashboard(request):
                 messages.success(request, f"Order #{order.id} marked arrived.")
                 return dashboard_redirect('cashier')
 
+            if cashier_step == 'cancel_order':
+                order.status = 'cancelled'
+                if order.payment_status not in ('completed', 'refunded'):
+                    order.payment_status = 'failed'
+                order.save(update_fields=['status', 'payment_status'])
+                _send_cashier_order_message(
+                    order,
+                    f"Order #{order.id} has been cancelled. Please reply or call us if you need help placing a new order.",
+                )
+                messages.success(request, f"Order #{order.id} cancelled.")
+                return dashboard_redirect('cashier')
+
+            if cashier_step == 'clear_order':
+                order.status = 'cleared'
+                order.save(update_fields=['status'])
+                messages.success(request, f"Order #{order.id} cleared from cashier mode.")
+                return dashboard_redirect('cashier')
+
             order.status = request.POST.get('status') or order.status
             order.payment_status = request.POST.get('payment_status') or order.payment_status
             order.notes = (request.POST.get('notes') or '').strip()
@@ -917,6 +935,8 @@ def admin_dashboard(request):
     order_status = request.GET.get('order_status') or ''
     payment_status = request.GET.get('payment_status') or ''
     orders = Order.objects.prefetch_related('items__product').select_related('user').order_by('-created')
+    if dashboard_mode == 'cashier' and not order_status:
+        orders = orders.exclude(status__in=['cleared', 'cancelled'])
     if order_query:
         order_filters = (
             Q(first_name__icontains=order_query) |
@@ -977,7 +997,7 @@ def admin_dashboard(request):
         'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
         'out_of_stock_count': Product.objects.filter(stock=0).count(),
         'low_stock_count': sum(1 for product in Product.objects.all() if product.is_low_stock),
-        'pending_order_count': Order.objects.exclude(status__in=['delivered', 'cancelled', 'refunded']).count(),
+        'pending_order_count': Order.objects.exclude(status__in=['delivered', 'cancelled', 'cleared', 'refunded']).count(),
     })
 
 
