@@ -118,6 +118,10 @@
           </select>
         </div>
         <div>
+          <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Subcategory / filter type</label>
+          <input name="subcategory" list="subcategory-options" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Tops, Bottoms, Shoes, Accessories...">
+        </div>
+        <div>
           <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Upload image</label>
           <input name="image" type="file" accept="image/*" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
         </div>
@@ -210,6 +214,9 @@
                   <option value="{{ category.id }}" {% if product.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
                   {% endfor %}
                 </select>
+              </label>
+              <label class="block text-xs font-bold text-gray-600">Subcategory / filter type
+                <input name="subcategory" list="subcategory-options" value="{{ product.subcategory }}" class="mt-1 w-full border border-gray-300 px-2 py-2 text-sm" placeholder="Tops, Bottoms, Shoes, Accessories...">
               </label>
               <label class="block text-xs font-bold text-gray-600">Brand
                 <select name="brand" class="mt-1 w-full border border-gray-300 px-2 py-2 text-sm">
@@ -456,4 +463,10 @@
   </section>
   {% endif %}
 </section>
+
+<datalist id="subcategory-options">
+  {% for option in subcategory_options %}
+  <option value="{{ option }}">
+  {% endfor %}
+</datalist>
 {% endblock %}

@@ -553,10 +553,26 @@ BASE_STOREFRONT_FILTERS = [
 ]
 
 
+def _normalize_filter_slug(value):
+    return slugify(value or '').strip('-')
+
+
 def _storefront_filter_buttons():
     collection_slugs = {'kids-collection', 'mens-collection', 'women-collection'}
     buttons = [dict(button) for button in BASE_STOREFRONT_FILTERS]
     existing_slugs = {button['slug'] for button in buttons}
+    for subcategory in Product.objects.exclude(subcategory='').values_list('subcategory', flat=True).distinct().order_by('subcategory'):
+        subcategory = (subcategory or '').strip()
+        subcategory_slug = _normalize_filter_slug(subcategory)
+        if not subcategory_slug or subcategory_slug in existing_slugs:
+            continue
+        buttons.append({
+            'label': subcategory,
+            'slug': subcategory_slug,
+            'subcategory': subcategory,
+            'terms': [subcategory, subcategory_slug.replace('-', ' ')],
+        })
+        existing_slugs.add(subcategory_slug)
     for category in Category.objects.exclude(slug__in=collection_slugs).order_by('name'):
         if category.slug in existing_slugs:
             continue
@@ -579,10 +595,16 @@ def _apply_storefront_filter(products, selected_filter, filter_buttons):
         return products
 
     filters = Q()
+    filters |= Q(subcategory__iexact=filter_config['label'])
+    filters |= Q(subcategory__iexact=filter_config['slug'])
+    if filter_config.get('subcategory'):
+        filters |= Q(subcategory__iexact=filter_config['subcategory'])
+
     if filter_config.get('category_id'):
         filters |= Q(category_id=filter_config['category_id'])
 
     for term in filter_config.get('terms', []):
+        filters |= Q(subcategory__icontains=term)
         filters |= Q(name__icontains=term)
         filters |= Q(description__icontains=term)
         filters |= Q(category__name__icontains=term)
@@ -773,6 +795,7 @@ def admin_dashboard(request):
 
         product.name = (request.POST.get('name') or product.name).strip()
         product.description = (request.POST.get('description') or '').strip()
+        product.subcategory = (request.POST.get('subcategory') or '').strip()
         product.price = _money(request.POST.get('price') or product.price)
         product.stock = _parse_positive_int(request.POST.get('stock'), product.stock, minimum=0)
         product.offline_stock = _parse_positive_int(request.POST.get('offline_stock'), product.offline_stock, minimum=0)
@@ -1087,6 +1110,11 @@ def admin_dashboard(request):
     recent_stock_adjustments = StockAdjustment.objects.select_related('product', 'user')[:12]
     categories = Category.objects.order_by('name')
     brands = Brand.objects.order_by('name')
+    subcategory_options = ['Tops', 'Bottoms', 'Shoes', 'Accessories']
+    for subcategory in Product.objects.exclude(subcategory='').values_list('subcategory', flat=True).distinct().order_by('subcategory'):
+        subcategory = (subcategory or '').strip()
+        if subcategory and subcategory.lower() not in {option.lower() for option in subcategory_options}:
+            subcategory_options.append(subcategory)
     media_products_dir = os.path.join(settings.MEDIA_ROOT, 'products')
     uploaded_product_images = []
     if os.path.isdir(media_products_dir):
@@ -1136,6 +1164,7 @@ def admin_dashboard(request):
         'orders': orders[:80],
         'categories': categories,
         'brands': brands,
+        'subcategory_options': subcategory_options,
         'uploaded_product_images': uploaded_product_images,
         'dashboard_mode': dashboard_mode,
         'recent_stock_adjustments': recent_stock_adjustments,
