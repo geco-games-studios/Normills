@@ -519,7 +519,7 @@ def get_personalized_products(request, exclude_product=None, limit=6):
 
 def home(request):
     categories = Category.objects.all()
-    products = Product.objects.all()
+    products = Product.objects.filter(available=True, stock__gt=0)
     brands = Brand.objects.all()
 
     # price bounds for the UI slider
@@ -590,6 +590,14 @@ def home(request):
 
     personalized_products = get_personalized_products(request)
 
+    if request.user.is_authenticated:
+        wishlist_ids = list(WishlistItem.objects.filter(user=request.user).values_list('product_id', flat=True))
+    else:
+        wishlist_ids = request.session.get('wishlist', [])
+
+    total_products = Product.objects.filter(available=True, stock__gt=0).count()
+    viewed_count = products.count()
+
     return render(request, 'index.html', {
         'categories': categories,
         'products': products,
@@ -600,6 +608,9 @@ def home(request):
         'max_price': max_price,
         'selected_min_price': price_min or min_price,
         'selected_max_price': price_max or price_filter or max_price,
+        'total_products': total_products,
+        'viewed_count': viewed_count,
+        'wishlist_ids': [str(product_id) for product_id in wishlist_ids],
     })
     
     

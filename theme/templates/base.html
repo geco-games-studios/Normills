@@ -3,143 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Normils Boutique | Elegance</title>
+    <title>{% block title %}Normils{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Additional custom styles to ensure mobile menu is always on top and scrollable */
-        .mobile-nav-open {
-            overflow: hidden;
-            position: fixed;
-            width: 100%;
-            height: 100%;
+        :root {
+            color-scheme: light;
         }
-        /* ensure header has proper stacking context */
-        header {
-            z-index: 40;
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            letter-spacing: .03em;
         }
-        /* mobile nav panel - highest z-index, smooth overlay */
-        .mobile-nav-panel {
-            z-index: 1000;
-            transition: transform 0.3s ease-in-out, opacity 0.2s ease;
-            transform: translateX(100%);
-        }
-        .mobile-nav-panel.active {
-            transform: translateX(0);
-        }
-        .nav-overlay-blur {
-            z-index: 999;
-            backdrop-filter: blur(3px);
-            transition: opacity 0.25s ease;
-        }
-        /* prevent body scroll when menu open */
+
         body.menu-open {
             overflow: hidden;
             position: fixed;
             width: 100%;
             height: 100%;
         }
-        /* improved dropdown card styling for better readability */
-        .mobile-menu-card {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(12px);
-            box-shadow: 0 25px 40px -12px rgba(0, 0, 0, 0.35);
+
+        .normils-wordmark {
+            font-weight: 900;
+            letter-spacing: -.08em;
+            text-transform: lowercase;
         }
-        /* Force clickable area above content */
-        .high-z {
-            z-index: 1001;
+
+        .product-title {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+        }
+
+        .image-tile {
+            aspect-ratio: 3 / 4;
+        }
+
+        .range-track {
+            background: linear-gradient(90deg, #1686b9 0 2%, #e7e7e7 2% 100%);
+        }
+
+        .scrollbar-none {
+            scrollbar-width: none;
+        }
+
+        .scrollbar-none::-webkit-scrollbar {
+            display: none;
         }
     </style>
 </head>
-<body class="min-h-screen bg-white antialiased">
-    <!-- Header: improved for mobile stacking context -->
-    <header class="sticky top-0 bg-white/80 backdrop-blur-md shadow-md rounded-2xl mx-auto mt-4 mb-6 max-w-6xl px-4 md:px-6 py-3 flex items-center justify-between relative z-40">
-        <!-- Logo -->
-        <a href="/" class="flex items-center space-x-2 z-30">
-            <span class="inline-block bg-black rounded-full w-8 h-8 flex items-center justify-center">
-                <span class="text-white text-lg font-bold">N</span>
-            </span>
-            <span class="text-2xl font-extrabold text-gray-900 tracking-tight">Normils Boutique.</span>
-        </a>
-
-        <!-- Hamburger Button (Mobile) -->
-        <button id="nav-toggle" class="md:hidden flex items-center justify-center p-2 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 transition z-50" aria-label="Open menu">
-            <svg id="menu-icon-open" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            <svg id="menu-icon-close" class="h-6 w-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-
-        <!-- Desktop Navigation (always visible on md+) -->
-        <div class="hidden md:flex md:items-center md:gap-6 flex-1 justify-end">
-            <!-- Search Bar Desktop -->
-            <form action="/search/" method="get" class="w-80">
-                <div class="relative">
-                    <input type="text" name="q" placeholder="Search products..." class="w-full rounded-full pl-5 pr-12 py-2.5 bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-black focus:outline-none text-gray-900 shadow-sm text-sm" />
-                    <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black rounded-full p-1.5 hover:bg-gray-800 transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
-                        </svg>
-                    </button>
-                </div>
-            </form>
-
-            <!-- Desktop Cart -->
-            <a href="/cart/" class="relative bg-gray-100 rounded-full p-2 hover:bg-gray-200 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+<body class="min-h-screen bg-white text-[#2d2d33] antialiased">
+    <header class="sticky top-0 z-50 bg-[#2b2b2b] text-white">
+        <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
+            <button id="nav-toggle" class="flex h-10 w-10 items-center justify-center text-white md:hidden" aria-label="Open menu">
+                <svg id="menu-icon-open" class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" />
                 </svg>
-                <span id="desktop-cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold hidden">0</span>
-            </a>
-            <a href="{% url 'wishlist' %}" class="ml-4 bg-gray-100 rounded-full p-2 hover:bg-gray-200 transition relative" aria-label="Wishlist">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21.682l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                <svg id="menu-icon-close" class="hidden h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" />
                 </svg>
-                <span id="desktop-wishlist-badge" class="absolute -top-1 -right-1 bg-pink-500 text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center text-[10px] font-bold {% if wishlist_count|default:0 == 0 %}hidden{% endif %}">{{ wishlist_count|default:0 }}</span>
-            </a>
+            </button>
 
-            <!-- Desktop User -->
-            {% if user.is_authenticated %}
-            <div class="relative group">
-                <a href="{% url 'profile' %}" class="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition" aria-label="Account">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            <a href="/" class="normils-wordmark text-3xl leading-none">normils</a>
+
+            <nav class="hidden items-center gap-8 text-sm font-bold uppercase tracking-[.18em] md:flex">
+                <a href="/" class="hover:text-gray-200">New In</a>
+                <a href="/search/?q=dress" class="hover:text-gray-200">Women</a>
+                <a href="/search/?q=shoes" class="hover:text-gray-200">Shoes</a>
+                <a href="/search/?q=accessories" class="hover:text-gray-200">Accessories</a>
+            </nav>
+
+            <div class="flex items-center gap-5">
+                <form action="/search/" method="get" class="hidden w-64 md:block">
+                    <label class="relative block">
+                        <span class="sr-only">Search</span>
+                        <input type="text" name="q" placeholder="Search products" class="w-full border-0 bg-white px-4 py-2 pr-10 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-white" />
+                        <button type="submit" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-900" aria-label="Search">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="7"></circle>
+                                <path d="m20 20-3.5-3.5" stroke-linecap="round"></path>
+                            </svg>
+                        </button>
+                    </label>
+                </form>
+                <a href="/search/" class="md:hidden" aria-label="Search">
+                    <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <path d="m20 20-3.5-3.5" stroke-linecap="round"></path>
                     </svg>
-                    <span class="font-medium text-sm">Account</span>
                 </a>
-                <div class="absolute right-0 top-full w-44 pt-2 hidden group-hover:block group-focus-within:block">
-                    <div class="bg-white rounded-xl shadow-lg py-2">
-                        <div class="px-4 py-2 border-b border-gray-100">
-                            <p class="text-xs text-gray-500">Signed in as</p>
-                            <p class="text-sm font-semibold text-gray-900 truncate">{{ user.get_full_name|default:user.username }}</p>
-                        </div>
-                        <a href="{% url 'profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
-                        <a href="{% url 'order_history' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Orders</a>
-                        {% if user.is_superuser %}
-                        <a href="{% url 'admin_dashboard' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
-                        {% endif %}
-                        <form action="{% url 'logout' %}" method="post" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
-                        </form>
-                    </div>
-                </div>
+                <a href="{% if user.is_authenticated %}{% url 'profile' %}{% else %}{% url 'login' %}{% endif %}" aria-label="Account">
+                    <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <circle cx="12" cy="8" r="4"></circle>
+                        <path d="M4 21c1.8-4.2 5-6 8-6s6.2 1.8 8 6" stroke-linecap="round"></path>
+                    </svg>
+                </a>
+                <a href="/cart/" class="relative" aria-label="Cart">
+                    <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M6 7h12l-1 14H7L6 7Z"></path>
+                        <path d="M9 7a3 3 0 0 1 6 0" stroke-linecap="round"></path>
+                    </svg>
+                    <span id="desktop-cart-badge" class="absolute -right-2 -top-2 hidden min-w-5 rounded-full bg-white px-1 text-center text-xs font-bold text-black">0</span>
+                </a>
             </div>
-            {% else %}
-            <div class="flex items-center gap-3">
-                <a href="{% url 'login' %}" class="text-sm font-medium text-gray-700 hover:text-gray-900">Sign in</a>
-                <a href="{% url 'signup' %}" class="text-sm font-semibold text-white bg-black px-4 py-2 rounded-full hover:bg-gray-800">Sign up</a>
-            </div>
-            {% endif %}
         </div>
     </header>
 
     {% if messages %}
-    <div class="container mx-auto px-4 mt-6">
+    <div class="mx-auto max-w-7xl px-4 py-4">
         <div class="space-y-3">
             {% for message in messages %}
-            <div class="rounded-xl px-4 py-3 text-sm shadow-sm {% if message.tags %}{{ message.tags }}{% endif %} {% if message.level_tag == 'error' %}bg-red-50 text-red-800 border border-red-200{% elif message.level_tag == 'success' %}bg-green-50 text-green-800 border border-green-200{% elif message.level_tag == 'warning' %}bg-yellow-50 text-yellow-800 border border-yellow-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+            <div class="border px-4 py-3 text-sm {% if message.level_tag == 'error' %}border-red-200 bg-red-50 text-red-800{% elif message.level_tag == 'success' %}border-green-200 bg-green-50 text-green-800{% else %}border-gray-200 bg-gray-50 text-gray-800{% endif %}">
                 {{ message }}
             </div>
             {% endfor %}
@@ -147,524 +121,75 @@
     </div>
     {% endif %}
 
-    <!-- Mobile Menu Slide-out Panel + Overlay (fixed above all content) -->
-    <div id="mobile-menu-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] hidden transition-opacity duration-300"></div>
-    
-    <div id="mobile-menu-panel" class="fixed top-0 right-0 w-full max-w-sm h-full bg-white shadow-2xl z-[1001] transform translate-x-full transition-transform duration-300 ease-out overflow-y-auto mobile-menu-card">
-        <div class="flex flex-col p-6 pt-20">
-            <!-- Close button inside panel -->
-            <button id="close-mobile-menu" class="absolute top-5 right-5 p-2 rounded-full bg-gray-100 hover:bg-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-
-            <!-- Mobile Search (prominent) -->
-            <form action="/search/" method="get" class="mb-6">
-                <div class="relative">
-                    <input type="text" name="q" placeholder="Search products..." class="w-full rounded-xl pl-5 pr-12 py-3 bg-gray-100 border border-gray-200 focus:ring-2 focus:ring-black focus:outline-none text-gray-900" />
-                    <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black rounded-full p-2 hover:bg-gray-800 transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
-                        </svg>
-                    </button>
-                </div>
-            </form>
-
-            <!-- Mobile Navigation Links (clear, clickable) -->
-            <nav class="flex flex-col space-y-3 mb-8">
-                <a href="/" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                    <span>Home</span>
-                </a>
-                <a href="/cart/" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                    <span>Cart <span id="mobile-cart-count" class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span></span>
-                </a>
-                <a href="{% url 'wishlist' %}" class="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <span class="flex items-center space-x-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21.682l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>
-                        <span>Wishlist</span>
-                    </span>
-                    <span id="mobile-wishlist-count" class="bg-pink-500 text-white text-xs rounded-full px-2 py-0.5 {% if wishlist_count|default:0 == 0 %}hidden{% endif %}">{{ wishlist_count|default:0 }}</span>
-                </a>
-                {% if user.is_authenticated %}
-                <a href="{% url 'profile' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    <span>Account</span>
-                </a>
-                <a href="{% url 'order_history' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                    <span>My Orders</span>
-                </a>
-                {% if user.is_superuser %}
-                <a href="{% url 'admin_dashboard' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /></svg>
-                    <span>Admin Dashboard</span>
-                </a>
-                {% endif %}
-                {% else %}
-                <a href="{% url 'login' %}" class="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition font-medium text-gray-900">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    <span>Account</span>
-                </a>
-                {% endif %}
-            </nav>
-
-            <!-- User Info & Actions -->
-            {% if user.is_authenticated %}
-            <div class="border-t border-gray-200 pt-6 mt-2">
-                <div class="flex items-center space-x-3 mb-4">
-                    <span class="bg-gray-200 rounded-full w-12 h-12 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                    </span>
-                    <div>
-                        <p class="font-semibold text-gray-900">{{ user.get_full_name|default:user.username }}</p>
-                        <p class="text-xs text-gray-500">{{ user.email }}</p>
-                    </div>
-                </div>
-                <form action="{% url 'logout' %}" method="post" class="w-full">
-                    {% csrf_token %}
-                    <button type="submit" class="w-full bg-red-600 text-white rounded-xl py-3 font-semibold hover:bg-red-700 transition flex items-center justify-center space-x-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                        <span>Logout</span>
-                    </button>
-                </form>
-                <div class="mt-5 text-center text-xs text-gray-400">
-                    © 2026 Normils Boutique
-                </div>
-            </div>
-            {% else %}
-            <div class="border-t border-gray-200 pt-6 mt-2 space-y-3">
-                <a href="{% url 'login' %}" class="block w-full text-center bg-black text-white rounded-xl py-3 font-semibold hover:bg-gray-800 transition">Sign in</a>
-                <a href="{% url 'signup' %}" class="block w-full text-center border border-gray-200 rounded-xl py-3 font-semibold text-gray-900 hover:bg-gray-50 transition">Sign up</a>
-                <div class="mt-5 text-center text-xs text-gray-400">
-                    © 2026 Normils Boutique
-                </div>
-            </div>
-            {% endif %}
+    <div id="mobile-menu-overlay" class="fixed inset-0 z-[90] hidden bg-black/50"></div>
+    <aside id="mobile-menu-panel" class="fixed left-0 top-0 z-[100] h-full w-80 max-w-[85vw] -translate-x-full bg-white text-black shadow-2xl transition-transform duration-300">
+        <div class="flex h-16 items-center justify-between border-b border-gray-200 px-5">
+            <span class="normils-wordmark text-3xl">normils</span>
+            <button id="close-mobile-menu" class="h-10 w-10 text-3xl leading-none" aria-label="Close menu">&times;</button>
         </div>
-    </div>
+        <form action="/search/" method="get" class="border-b border-gray-200 p-5">
+            <input type="text" name="q" placeholder="Search products" class="w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black" />
+        </form>
+        <nav class="flex flex-col text-base font-bold uppercase tracking-[.14em]">
+            <a href="/" class="border-b border-gray-200 px-5 py-5">New In</a>
+            <a href="/search/?q=dress" class="border-b border-gray-200 px-5 py-5">Women</a>
+            <a href="/search/?q=shoes" class="border-b border-gray-200 px-5 py-5">Shoes</a>
+            <a href="/wishlist/" class="border-b border-gray-200 px-5 py-5">Wishlist</a>
+            <a href="/cart/" class="border-b border-gray-200 px-5 py-5">Bag</a>
+        </nav>
+    </aside>
 
-    <!-- Main Content with demo product grid to verify visibility -->
-    <main class="container mx-auto px-4 py-6 relative z-10">
-        {% block content %}
-        <!-- Sample product grid to demonstrate menu overlay doesn't hide items -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">New Arrivals</h1>
-            <p class="text-gray-600 mb-6">Discover our exclusive collection</p>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <!-- Product Card 1 -->
-                <div class="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition border border-gray-100">
-                    <div class="bg-gray-200 h-48 flex items-center justify-center">
-                        <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                    </div>
-                    <div class="p-4">
-                        <h3 class="font-semibold text-lg">Silk Wrap Dress</h3>
-                        <p class="text-gray-500 text-sm">Elegant & comfortable</p>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">ZMW 89.00</span>
-                            <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
-                        </div>
-                    </div>
-                </div>
-                <!-- Product Card 2 -->
-                <div class="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition">
-                    <div class="bg-gray-200 h-48 flex items-center justify-center">
-                        <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-                    </div>
-                    <div class="p-4">
-                        <h3 class="font-semibold text-lg">Leather Tote Bag</h3>
-                        <p class="text-gray-500 text-sm">Handcrafted leather</p>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">ZMW 129.00</span>
-                            <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
-                        </div>
-                    </div>
-                </div>
-                <!-- Product Card 3 -->
-                <div class="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition">
-                    <div class="bg-gray-200 h-48 flex items-center justify-center">
-                        <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                    </div>
-                    <div class="p-4">
-                        <h3 class="font-semibold text-lg">Cashmere Scarf</h3>
-                        <p class="text-gray-500 text-sm">Soft & warm</p>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">ZMW 59.00</span>
-                            <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
-                        </div>
-                    </div>
-                </div>
-                <!-- Product Card 4 -->
-                <div class="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition">
-                    <div class="bg-gray-200 h-48 flex items-center justify-center">
-                        <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    </div>
-                    <div class="p-4">
-                        <h3 class="font-semibold text-lg">Minimalist Watch</h3>
-                        <p class="text-gray-500 text-sm">Japanese movement</p>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xl font-bold">ZMW 199.00</span>
-                            <button class="bg-black text-white px-3 py-1 rounded-full text-sm">Add to cart</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Featured section to show content behind menu is accessible -->
-        <div class="bg-gray-50 rounded-2xl p-6 mt-8">
-            <h2 class="text-2xl font-semibold">Why Shop With Us?</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div class="flex items-center space-x-3"><span class="text-2xl">🚚</span><span>Free shipping worldwide</span></div>
-                <div class="flex items-center space-x-3"><span class="text-2xl">🔄</span><span>30-day easy returns</span></div>
-                <div class="flex items-center space-x-3"><span class="text-2xl">💎</span><span>Premium quality guarantee</span></div>
-            </div>
-        </div>
-        {% endblock %}
+    <main class="relative z-10">
+        {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-gray-100 py-8 mt-12 relative z-10">
-        <div class="container mx-auto px-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">About Us</h3>
-                    <p class="text-gray-600">Your marketplace for quality products at affordable prices.</p>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Customer Service</h3>
-                    <ul class="space-y-2">
-                                <li><a href="{% url 'contact_us' %}" class="text-gray-600 hover:text-gray-900">Contact Us</a></li>
-                        <li><a href="{% url 'shipping_policy' %}" class="text-gray-600 hover:text-gray-900">Shipping Policy</a></li>
-                        <li><a href="{% url 'returns_refunds' %}" class="text-gray-600 hover:text-gray-900">Returns & Refunds</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Follow Us</h3>
-                    <div class="flex space-x-4">
-                        <a href="#" class="text-gray-600 hover:text-gray-900"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z"/></svg></a>
-                        <a href="#" class="text-gray-600 hover:text-gray-900"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723 10.1 10.1 0 01-3.127 1.184 4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg></a>
-                        <a href="#" class="text-gray-600 hover:text-gray-900"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069z"/></svg></a>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-8 pt-8 border-t border-gray-200 text-center">
-                <p class="text-gray-600">© 2026 Normils Boutique. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
-
-    <div id="shopping-bot-overlay" class="fixed inset-0 z-[1180] hidden bg-black/60"></div>
-    <div id="shopping-bot-widget" class="fixed bottom-5 left-1/2 z-[1200] w-12 h-12 -translate-x-1/2 rounded-full border-2 border-blue-300 bg-gradient-to-br from-blue-300 via-sky-500 to-blue-900 shadow-2xl shadow-blue-500/50 overflow-hidden transition-all duration-300 sm:right-5 sm:left-auto sm:translate-x-0 sm:bottom-5 hover:shadow-lg hover:shadow-blue-600/70">
-        <div class="flex items-center justify-between bg-gradient-to-r from-blue-300 via-sky-500 to-blue-900 px-4 py-3 text-white">
-            <div id="shopping-bot-title" class="hidden">
-                <p class="text-sm font-semibold">Nora</p>
-                <p class="text-xs text-blue-50">Ask about products, sharing, or delivery</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <button id="shopping-bot-close" class="hidden text-white hover:text-blue-100 transition-colors" aria-label="Close chat">✕</button>
-                <button id="shopping-bot-toggle" class="text-white hover:text-blue-100 flex items-center justify-center transition-colors" aria-label="Open chat">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                        <path d="M20 2H4a2 2 0 0 0-2 2v14l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm0 10H6.83L4 16.83V4h16v8Z" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-        <div id="shopping-bot-body" class="hidden p-4 bg-gradient-to-b from-white to-blue-50">
-            <div id="shopping-bot-messages" class="mb-4 max-h-60 space-y-3 overflow-y-auto text-sm"></div>
-            <div class="flex flex-col gap-2 sm:flex-row">
-                <input id="shopping-bot-input" type="text" placeholder="Ask me anything..." class="flex-1 min-w-0 rounded-full border-2 border-blue-200 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent" />
-                <button id="shopping-bot-send" class="w-full rounded-full bg-gradient-to-r from-blue-600 to-sky-600 px-4 py-2 text-sm font-semibold text-white hover:from-blue-700 hover:to-sky-700 transition-all shadow-md hover:shadow-lg sm:w-auto">Send</button>
-            </div>
-        </div>
-    </div>
+    {% block footer %}{% endblock %}
 
     <script>
-        // Pure JavaScript mobile menu fix: high z-index sliding panel, ensures menu is ABOVE all content and visible.
         (function() {
             const menuToggle = document.getElementById('nav-toggle');
             const menuPanel = document.getElementById('mobile-menu-panel');
             const overlay = document.getElementById('mobile-menu-overlay');
             const closeBtn = document.getElementById('close-mobile-menu');
             const body = document.body;
-            
-            // icons toggle
             const openIcon = document.getElementById('menu-icon-open');
             const closeIcon = document.getElementById('menu-icon-close');
-            
+
             function openMenu() {
                 if (!menuPanel || !overlay) return;
-                menuPanel.classList.remove('translate-x-full');
-                menuPanel.classList.add('translate-x-0');
+                menuPanel.classList.remove('-translate-x-full');
                 overlay.classList.remove('hidden');
                 body.classList.add('menu-open');
-                // change hamburger to close icon
-                if (openIcon && closeIcon) {
-                    openIcon.classList.add('hidden');
-                    closeIcon.classList.remove('hidden');
-                }
-                // ensure no scroll behind
-                document.documentElement.style.overflow = 'hidden';
+                openIcon?.classList.add('hidden');
+                closeIcon?.classList.remove('hidden');
             }
-            
+
             function closeMenu() {
                 if (!menuPanel || !overlay) return;
-                menuPanel.classList.add('translate-x-full');
-                menuPanel.classList.remove('translate-x-0');
+                menuPanel.classList.add('-translate-x-full');
                 overlay.classList.add('hidden');
                 body.classList.remove('menu-open');
-                if (openIcon && closeIcon) {
-                    openIcon.classList.remove('hidden');
-                    closeIcon.classList.add('hidden');
-                }
-                document.documentElement.style.overflow = '';
+                openIcon?.classList.remove('hidden');
+                closeIcon?.classList.add('hidden');
             }
-            
-            if (menuToggle) {
-                menuToggle.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isOpen = !menuPanel.classList.contains('translate-x-full');
-                    if (isOpen) {
-                        closeMenu();
-                    } else {
-                        openMenu();
-                    }
-                });
-            }
-            
-            if (closeBtn) {
-                closeBtn.addEventListener('click', closeMenu);
-            }
-            
-            if (overlay) {
-                overlay.addEventListener('click', closeMenu);
-            }
-            
-            // Close on escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    if (menuPanel && !menuPanel.classList.contains('translate-x-full')) {
-                        closeMenu();
-                    }
-                }
-            });
-            
-            // For any links inside mobile panel, close menu after click (smooth behavior)
-            const panelLinks = document.querySelectorAll('#mobile-menu-panel a, #mobile-menu-panel button[type="submit"]');
-            panelLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    // allow submit/logout forms but close menu anyway 
-                    setTimeout(() => { closeMenu(); }, 150);
-                });
-            });
-            
-            // also handle any existing "Add to cart" demo buttons? just to keep consistent
-            document.querySelectorAll('.bg-black.text-white.px-3').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // demo: show toast but don't update cart count since this is just demo
-                    const toastMsg = document.createElement('div');
-                    toastMsg.innerText = '✨ Demo: Item added to cart (not actually added)';
-                    toastMsg.className = 'fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-black text-white px-4 py-2 rounded-full text-sm z-[1100] animate-pulse';
-                    document.body.appendChild(toastMsg);
-                    setTimeout(() => toastMsg.remove(), 1500);
-                });
-            });
-            
-            // Initial cart badge: use actual cart count
-            const actualCartCount = {{ cart.item_count|default:0 }};
-            const mobCartSpan = document.getElementById('mobile-cart-count');
-            const deskCartSpan = document.getElementById('desktop-cart-badge');
-            if (mobCartSpan) mobCartSpan.innerText = actualCartCount;
-            if (deskCartSpan) {
-                if (actualCartCount > 0) {
-                    deskCartSpan.innerText = actualCartCount;
-                    deskCartSpan.classList.remove('hidden');
+
+            menuToggle?.addEventListener('click', function() {
+                if (menuPanel.classList.contains('-translate-x-full')) {
+                    openMenu();
                 } else {
-                    deskCartSpan.classList.add('hidden');
+                    closeMenu();
                 }
+            });
+            closeBtn?.addEventListener('click', closeMenu);
+            overlay?.addEventListener('click', closeMenu);
+
+            const cartCount = {{ cart.item_count|default:0 }};
+            const cartBadge = document.getElementById('desktop-cart-badge');
+            if (cartBadge && cartCount > 0) {
+                cartBadge.textContent = cartCount;
+                cartBadge.classList.remove('hidden');
             }
 
-            const botOverlay = document.getElementById('shopping-bot-overlay');
-            const botToggle = document.getElementById('shopping-bot-toggle');
-            const botBody = document.getElementById('shopping-bot-body');
-            const botWidget = document.getElementById('shopping-bot-widget');
-            const botTitle = document.getElementById('shopping-bot-title');
-            const botClose = document.getElementById('shopping-bot-close');
-            const botMessages = document.getElementById('shopping-bot-messages');
-            const botInput = document.getElementById('shopping-bot-input');
-            const botSend = document.getElementById('shopping-bot-send');
-            const productContext = document.getElementById('product-context');
-
-            function appendBotMessage(text, isUser = false) {
-                const message = document.createElement('div');
-                message.className = 'rounded-2xl px-4 py-3 text-sm break-words ' + (isUser ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white ml-auto max-w-xs shadow-md' : 'bg-white text-gray-900 border-l-4 border-blue-500 shadow-sm');
-                message.innerText = text;
-                botMessages.appendChild(message);
-                botMessages.scrollTop = botMessages.scrollHeight;
-            }
-
-            function isMobileView() {
-                return window.innerWidth <= 640;
-            }
-
-            function collapseBot() {
-                botWidget.classList.add('w-12', 'h-12', 'rounded-full');
-                botWidget.classList.remove('w-[calc(100%-2rem)]', 'w-80', 'max-w-none', 'rounded-3xl');
-                botWidget.style.width = '3rem';
-                botWidget.style.height = '3rem';
-                botWidget.style.maxWidth = '3rem';
-                botWidget.style.minWidth = '3rem';
-                botWidget.style.overflow = 'hidden';
-                botTitle?.classList.add('hidden');
-                botClose?.classList.add('hidden');
-                botToggle?.setAttribute('aria-label', 'Open chat');
-            }
-
-            function expandBot() {
-                botWidget.classList.remove('w-12', 'h-12', 'rounded-full');
-                botWidget.classList.add('rounded-3xl');
-                if (isMobileView()) {
-                    botWidget.classList.add('w-[calc(100%-2rem)]', 'max-w-none');
-                } else {
-                    botWidget.classList.add('w-80');
-                }
-                botWidget.style.width = '';
-                botWidget.style.height = '';
-                botWidget.style.maxWidth = '';
-                botWidget.style.minWidth = '';
-                botWidget.style.overflow = '';
-                botTitle?.classList.remove('hidden');
-                botClose?.classList.remove('hidden');
-                botToggle?.setAttribute('aria-label', 'Close chat');
-            }
-
-            function openBot() {
-                expandBot();
-                botBody.classList.remove('hidden');
-                if (isMobileView()) {
-                    botWidget.classList.add('h-[85vh]', 'max-h-[85vh]', 'bottom-0', 'left-1/2', '-translate-x-1/2', 'w-[calc(100%-1rem)]', 'max-w-none', 'rounded-t-[28px]');
-                    botWidget.classList.remove('bottom-5');
-                    if (botOverlay) {
-                        botOverlay.classList.remove('hidden');
-                    }
-                    document.documentElement.style.overflow = 'hidden';
-                }
-            }
-
-            function closeBot() {
-                botBody.classList.add('hidden');
-                if (isMobileView()) {
-                    botWidget.classList.remove('h-[85vh]', 'max-h-[85vh]', 'bottom-0', 'left-1/2', '-translate-x-1/2', 'w-[calc(100%-1rem)]', 'max-w-none', 'rounded-t-[28px]');
-                    botWidget.classList.add('bottom-5');
-                    if (botOverlay) {
-                        botOverlay.classList.add('hidden');
-                    }
-                    document.documentElement.style.overflow = '';
-                }
-                collapseBot();
-            }
-
-            collapseBot();
-
-            if (botToggle && botBody) {
-                botToggle.addEventListener('click', () => {
-                    if (botBody.classList.contains('hidden')) {
-                        openBot();
-                    } else {
-                        closeBot();
-                    }
-                });
-            }
-
-            if (botClose) {
-                botClose.addEventListener('click', closeBot);
-            }
-
-            // Two-handle price range live update (min & max)
-            const minInput = document.getElementById('price-min-input');
-            const maxInput = document.getElementById('price-max-input');
-            const minValue = document.getElementById('price-min-value');
-            const maxValue = document.getElementById('price-max-value');
-            if (minInput && maxInput && minValue && maxValue) {
-                // ensure numeric sync and enforce min <= max
-                minInput.addEventListener('input', function() {
-                    let min = parseInt(this.value, 10);
-                    let max = parseInt(maxInput.value, 10);
-                    if (isNaN(min)) min = parseInt(minInput.min || 0, 10);
-                    if (isNaN(max)) max = parseInt(maxInput.max || 0, 10);
-                    if (min > max) {
-                        maxInput.value = min;
-                        max = min;
-                    }
-                    minValue.innerText = Math.round(min) + ' ZMW';
-                    maxValue.innerText = Math.round(max) + ' ZMW';
-                });
-
-                maxInput.addEventListener('input', function() {
-                    let max = parseInt(this.value, 10);
-                    let min = parseInt(minInput.value, 10);
-                    if (isNaN(max)) max = parseInt(maxInput.max || 0, 10);
-                    if (isNaN(min)) min = parseInt(minInput.min || 0, 10);
-                    if (max < min) {
-                        minInput.value = max;
-                        min = max;
-                    }
-                    minValue.innerText = Math.round(min) + ' ZMW';
-                    maxValue.innerText = Math.round(max) + ' ZMW';
-                });
-            }
-
-            if (botOverlay) {
-                botOverlay.addEventListener('click', closeBot);
-            }
-
-            async function sendBotQuestion() {
-                const question = botInput.value.trim();
-                if (!question) {
-                    return;
-                }
-
-                appendBotMessage(question, true);
-                botInput.value = '';
-
-                const payload = {
-                    message: question,
-                    product_name: productContext ? productContext.dataset.productName : ''
-                };
-
-                try {
-                    const response = await fetch('{% url "shopping_bot" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-                    const result = await response.json();
-                    appendBotMessage(result.response || 'Sorry, I could not respond right now.');
-                } catch (error) {
-                    appendBotMessage('Sorry, the bot is unavailable right now.');
-                    console.error(error);
-                }
-            }
-
-            if (botSend && botInput) {
-                botSend.addEventListener('click', sendBotQuestion);
-                botInput.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        sendBotQuestion();
-                    }
-                });
-            }
-
-            // Wishlist toggle (delegated)
             function getCookie(name) {
                 let cookieValue = null;
                 if (document.cookie && document.cookie !== '') {
@@ -683,66 +208,33 @@
             function setWishlistButtonState(button, active) {
                 button.classList.toggle('wish-active', active);
                 button.setAttribute('aria-pressed', active ? 'true' : 'false');
-                button.title = active ? 'Remove from wishlist' : 'Add to wishlist';
                 const svg = button.querySelector('svg');
-                if (svg) {
-                    svg.classList.toggle('text-gray-400', !active);
-                    svg.classList.toggle('text-pink-500', active);
-                    svg.classList.toggle('fill-pink-500', active);
-                    svg.classList.toggle('fill-none', !active);
-                }
-            }
-
-            function updateWishlistBadges(count) {
-                const badges = [
-                    document.getElementById('desktop-wishlist-badge'),
-                    document.getElementById('mobile-wishlist-count'),
-                ];
-                badges.forEach((badge) => {
-                    if (!badge) return;
-                    badge.textContent = count;
-                    badge.classList.toggle('hidden', Number(count) === 0);
-                });
+                svg?.classList.toggle('fill-black', active);
+                svg?.classList.toggle('fill-none', !active);
             }
 
             document.addEventListener('click', function(e) {
                 const btn = e.target.closest && e.target.closest('.wishlist-toggle');
                 if (!btn) return;
+                e.preventDefault();
                 const productId = btn.dataset.productId;
                 if (!productId) return;
                 const isActive = btn.classList.contains('wish-active');
                 const url = isActive ? '{% url "remove_from_wishlist" %}' : '{% url "add_to_wishlist" %}';
-                const csrftoken = getCookie('csrftoken');
 
                 fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrftoken,
+                        'X-CSRFToken': getCookie('csrftoken'),
                     },
                     body: JSON.stringify({product_id: productId})
                 }).then(r => r.json()).then(data => {
-                    if (data && data.success) {
-                        const shouldBeActive = Boolean(data.added || (data.added === undefined && !data.removed));
-                        document.querySelectorAll(`.wishlist-toggle[data-product-id="${productId}"]`).forEach((button) => {
-                            setWishlistButtonState(button, shouldBeActive);
-                        });
-                        if (typeof data.count !== 'undefined') {
-                            updateWishlistBadges(data.count);
-                        }
-                        if (data.removed) {
-                            const wishlistCard = btn.closest('[data-wishlist-card]');
-                            if (wishlistCard) {
-                                wishlistCard.remove();
-                            }
-                            const wishlistGrid = document.getElementById('wishlist-grid');
-                            const emptyState = document.getElementById('wishlist-empty-state');
-                            if (wishlistGrid && emptyState && !wishlistGrid.querySelector('[data-wishlist-card]')) {
-                                wishlistGrid.classList.add('hidden');
-                                emptyState.classList.remove('hidden');
-                            }
-                        }
-                    }
+                    if (!data || !data.success) return;
+                    const shouldBeActive = Boolean(data.added || (data.added === undefined && !data.removed));
+                    document.querySelectorAll(`.wishlist-toggle[data-product-id="${productId}"]`).forEach((button) => {
+                        setWishlistButtonState(button, shouldBeActive);
+                    });
                 }).catch(err => console.error('Wishlist error', err));
             });
         })();

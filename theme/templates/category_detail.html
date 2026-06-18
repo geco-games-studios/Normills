@@ -1,39 +1,55 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ category.name }} - Marketplace{% endblock %}
+{% block title %}{{ category.name }} - Normils{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-2xl font-bold">{{ category.name }}</h1>
-</div>
+<section class="border-b border-gray-200 bg-white">
+    <div class="mx-auto max-w-7xl px-0 pb-5 pt-8 md:px-6">
+        <h1 class="text-[24px] font-black leading-tight tracking-[.08em] text-black min-[430px]:text-[28px] min-[430px]:tracking-[.12em] md:text-4xl">NORMILS New In: {{ category.name }}</h1>
+        <p class="mt-5 truncate text-[15px] tracking-[.04em] text-[#333]">Fresh arrivals selected from {{ category.name }}</p>
+    </div>
+</section>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-    {% for product in products %}
-    <div class="bg-white rounded-lg overflow-hidden shadow-md">
-        <a href="{% url 'product_detail' product.slug %}">
-            {% if product.image %}
-            <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-64 object-cover">
-            {% else %}
-            <img src="/placeholder.svg?height=300&width=400" alt="{{ product.name }}" class="w-full h-64 object-cover">
-            {% endif %}
-            <div class="p-4">
-                <h2 class="text-lg font-semibold">{{ product.name }}</h2>
-                <p class="text-gray-600 mt-2">K{{ product.price }}</p>
-                <div class="mt-4">
-                    <form action="{% url 'add_to_cart' product.id %}" method="post" class="flex">
-                        {% csrf_token %}
-                        <input type="hidden" name="quantity" value="1">
-                        <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 w-full">Add to Cart</button>
-                    </form>
-                </div>
+<section class="mx-auto max-w-7xl bg-white md:px-6">
+    <div class="flex items-center justify-between px-4 py-8 text-[15px] tracking-[.04em] text-[#333]">
+        <div class="flex items-center gap-8">
+            <button type="button">Sort</button>
+            <button type="button">Filter</button>
+        </div>
+        <p class="text-right text-[#777]">{{ products.count }} styles found</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-x-[3px] gap-y-8 md:grid-cols-4 md:gap-x-4 md:gap-y-12">
+        {% for product in products %}
+        <article class="group relative bg-white">
+            <div class="image-tile relative overflow-hidden bg-[#f3f3f3]">
+                <a href="{% url 'product_detail' product.slug %}" class="absolute inset-0 z-[1]" aria-label="View {{ product.name }}"></a>
+                    {% if product.image %}
+                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.03]" onerror="this.onerror=null;this.src='{% cycle '/media/products/WhatsApp_Image_2025-03-20_at_15.52.43_9e937bc2.jpg' '/media/products/WhatsApp_Image_2025-03-20_at_15.52.43_d0b4855f.jpg' '/media/products/WhatsApp_Image_2025-03-20_at_15.52.44_ebeec294.jpg' '/media/products/WhatsApp_Image_2025-03-20_at_16.08.30_87478e24.jpg' %}';">
+                    {% else %}
+                    <div class="flex h-full w-full items-center justify-center bg-[#f1f1f1] text-xs uppercase tracking-[.18em] text-gray-400">No image</div>
+                    {% endif %}
+
+                    {% if product.stock < 5 %}
+                    <span class="absolute bottom-10 right-0 z-10 bg-[#3b3b3b] px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-white">Selling Fast</span>
+                    {% elif product.color %}
+                    <span class="absolute bottom-10 left-0 z-10 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-[#333]">More Colours</span>
+                    {% endif %}
+
+                    <button data-product-id="{{ product.id }}" class="wishlist-toggle absolute bottom-3 right-3 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-white/95 shadow-sm" aria-label="Save {{ product.name }}" aria-pressed="false">
+                        <svg class="h-7 w-7 fill-none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path d="M20.8 4.6c-2-1.9-5.1-1.8-6.9.3L12 7l-1.9-2.1C8.3 2.8 5.2 2.7 3.2 4.6c-2.1 2-2.2 5.4-.2 7.6L12 21l9-8.8c2-2.2 1.9-5.6-.2-7.6Z" stroke-linejoin="round"></path>
+                        </svg>
+                    </button>
             </div>
-        </a>
+            <a href="{% url 'product_detail' product.slug %}" class="block px-4 pt-4">
+                <h2 class="product-title min-h-[3.25rem] text-[15px] leading-[1.6] tracking-[.05em] text-[#333]">{{ product.name }}</h2>
+                <p class="mt-3 text-[17px] font-black tracking-[.12em] text-[#222]">K{{ product.price|floatformat:2 }}</p>
+            </a>
+        </article>
+        {% empty %}
+        <div class="col-span-full px-4 py-20 text-center text-gray-500">No products available in this category.</div>
+        {% endfor %}
     </div>
-    {% empty %}
-    <div class="col-span-3 text-center py-12">
-        <p class="text-gray-500">No products available in this category.</p>
-    </div>
-    {% endfor %}
-</div>
+</section>
 {% endblock %}
-

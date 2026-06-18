@@ -1,228 +1,130 @@
 {% extends "base.html" %}
-{% load custom_filters %}
 
-{% block title %}Home{% endblock %}
+{% block title %}Normils New In{% endblock %}
+
 {% block content %}
-<!-- Hero Section -->
-<section class="w-full bg-gray-100 flex flex-col md:flex-row items-center justify-between px-4 md:px-12 py-8 md:py-16 rounded-xl mb-8 relative overflow-hidden">
-  <div class="z-10">
-    <h1 class="text-4xl md:text-6xl font-bold text-gray-900 mb-4">Simple<br>is More</h1>
-    <p class="text-lg text-gray-600 mb-6">Designed to stand out. Limited editions. Styles for everyone.</p>
-  </div>
-  <div class="hidden md:block absolute right-0 top-0 h-full w-1/3 bg-cover bg-center" style="background-image: url('/static/img/hero.jpg'); opacity: 0.2;"></div>
+<section class="border-b border-gray-200 bg-white">
+    <div class="mx-auto max-w-7xl px-0 pb-5 pt-8 md:px-6">
+        <div class="px-0 md:px-0">
+            <h1 class="text-[24px] font-black leading-tight tracking-[.08em] text-black min-[430px]:text-[28px] min-[430px]:tracking-[.12em] md:text-4xl">NORMILS New In: Women's</h1>
+            <button type="button" class="mt-5 flex w-full items-center justify-between text-left text-[15px] tracking-[.04em] text-[#333] md:max-w-xl">
+                <span class="truncate">Stay ahead on style with our New In edit, featuring fresh drops daily</span>
+                <svg class="ml-3 h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="scrollbar-none mt-5 flex snap-x gap-2 overflow-x-auto border-b border-gray-300 pb-3">
+            <a href="/" class="snap-start whitespace-nowrap border border-gray-200 px-4 py-3 text-[15px] tracking-[.04em] text-[#555]">New in: Today</a>
+            {% for category in categories %}
+            <a href="{% url 'category_detail' category.slug %}" class="snap-start whitespace-nowrap border border-gray-200 px-4 py-3 text-[15px] tracking-[.04em] text-[#555]">New In: {{ category.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
 </section>
 
-<div class="flex flex-col md:flex-row gap-8">
-  <!-- Sidebar Filter (stacks below on mobile) -->
-  <aside class="w-full md:w-64 bg-white rounded-xl shadow p-4 mb-4 md:mb-0 order-2 md:order-1">
-    <h3 class="text-xl font-semibold mb-6">Filter</h3>
-    <form method="get" action="{% url 'home' %}" id="filtersForm">
-    <!-- Brand Filter -->
-    <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Brand</h4>
-      <ul class="space-y-2 max-h-32 overflow-y-auto">
-        {% if brands %}
-          {% for brand in brands %}
-            <li>
-              <label class="flex items-center gap-2">
-                <input type="checkbox" class="form-checkbox" name="brand" value="{{ brand.slug }}"> {{ brand.name }}
-              </label>
-            </li>
-          {% endfor %}
-        {% else %}
-          <li class="text-gray-400">No brands found.</li>
-        {% endif %}
-      </ul>
-    </div>
-    <!-- Price Filter (two-handle range) -->
-    <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Price</h4>
-      <div class="relative">
-        <input type="range" name="price_min" id="price-min-input" min="{{ min_price|floatformat:0 }}" max="{{ max_price|floatformat:0 }}" value="{{ selected_min_price|default:min_price }}" class="w-full absolute top-0 left-0">
-        <input type="range" name="price_max" id="price-max-input" min="{{ min_price|floatformat:0 }}" max="{{ max_price|floatformat:0 }}" value="{{ selected_max_price|default:max_price }}" class="w-full">
-      </div>
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span id="price-min-value">{{ selected_min_price|default:min_price|floatformat:0 }} ZMW</span>
-        <span id="price-max-value">{{ selected_max_price|default:max_price|floatformat:0 }} ZMW</span>
-      </div>
-      <p class="text-xs text-gray-400 mt-1">Drag the handles to set a minimum and maximum price.</p>
-    </div>
-    <!-- Size Filter -->
-    <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Size</h4>
-      <div class="flex flex-wrap gap-2">
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="XXS"> XXS
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="XS"> XS
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="S"> S
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="M"> M
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="L"> L
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="XL"> XL
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="size" value="XXL"> XXL
-        </label>
-      </div>
-    </div>
-    <!-- Color Filter -->
-    <div class="mb-6">
-      <h4 class="text-sm font-medium text-gray-700 mb-2">Color</h4>
-      <div class="flex flex-wrap gap-2">
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="color" value="black">
-          <span class="w-4 h-4 rounded-full border bg-black"></span>
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="color" value="gray">
-          <span class="w-4 h-4 rounded-full border bg-gray-400"></span>
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="color" value="blue">
-          <span class="w-4 h-4 rounded-full border bg-blue-500"></span>
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="color" value="red">
-          <span class="w-4 h-4 rounded-full border bg-red-500"></span>
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="color" value="green">
-          <span class="w-4 h-4 rounded-full border bg-green-500"></span>
-        </label>
-        <label class="inline-flex items-center gap-2 px-2 py-1 border rounded text-xs cursor-pointer">
-          <input type="checkbox" class="form-checkbox" name="color" value="yellow">
-          <span class="w-4 h-4 rounded-full border bg-yellow-400"></span>
-        </label>
-      </div>
-    </div>
-    <button type="submit" form="filtersForm" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Apply Filters</button>
-    </form>
-  </aside>
-
-  <!-- Main Content -->
-  <main class="flex-1 order-1 md:order-2">
-    <!-- Categories Section -->
-    <div class="mb-8">
-      <h2 class="text-2xl font-semibold mb-4">Categories</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {% for category in categories %}
-        <a href="{% url 'category_detail' category.slug %}" class="block group">
-          <div class="flex flex-col items-center p-4 bg-white rounded-xl shadow hover:shadow-lg transition">
-            {% if category.image %}
-              <img class="h-16 w-16 rounded-full object-cover mb-2 border-2 border-gray-200 group-hover:border-blue-400 transition" src="{{ category.image.url }}" alt="{{ category.name }}">
-            {% else %}
-              <div class="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center mb-2 border-2 border-gray-200 group-hover:border-blue-400 transition">
-                <span class="text-gray-400 text-xl font-bold">{{ category.name|slice:1 }}</span>
-              </div>
-            {% endif %}
-            <span class="text-sm font-medium text-gray-800 group-hover:text-blue-600 transition">{{ category.name }}</span>
-          </div>
-        </a>
-        {% empty %}
-        <div class="col-span-full text-center text-gray-400">No categories found.</div>
-        {% endfor %}
-      </div>
-    </div>
-
-    {% if personalized_products %}
-    <section class="mb-8 bg-white rounded-3xl shadow-sm p-6">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h2 class="text-2xl font-semibold">Recommended for you</h2>
-          <p class="text-sm text-gray-500">Based on your browsing and purchase activity.</p>
+<section class="mx-auto max-w-7xl bg-white md:px-6">
+    <div class="flex items-center justify-between px-4 py-8 text-[15px] tracking-[.04em] text-[#333]">
+        <div class="flex items-center gap-8">
+            <button type="button">Sort</button>
+            <button type="button">Filter</button>
         </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for product in personalized_products %}
-        <a href="{% url 'product_detail' product.slug %}" class="block overflow-hidden rounded-2xl border border-gray-200 hover:shadow-lg transition bg-white">
-          {% if product.image %}
-          <img class="w-full h-48 object-cover" src="{{ product.image.url }}" alt="{{ product.name }}">
-          {% else %}
-          <div class="h-48 bg-gray-100 flex items-center justify-center text-gray-400">No image</div>
-          {% endif %}
-          <div class="p-4">
-            <h3 class="text-lg font-semibold text-gray-900">{{ product.name }}</h3>
-            <p class="mt-2 text-sm text-gray-500">K{{ product.price|floatformat:2 }}</p>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
+        <p class="text-right text-[#777]">{{ total_products|default:products.count }} styles found</p>
+    </div>
 
-    {% if recently_viewed_products %}
-    <section class="mb-8 bg-white rounded-3xl shadow-sm p-6">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h2 class="text-2xl font-semibold">Recently Viewed</h2>
-          <p class="text-sm text-gray-500">Products you looked at so far.</p>
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for product in recently_viewed_products %}
-        <a href="{% url 'product_detail' product.slug %}" class="block overflow-hidden rounded-2xl border border-gray-200 hover:shadow-lg transition bg-white">
-          {% if product.image %}
-          <img class="w-full h-48 object-cover" src="{{ product.image.url }}" alt="{{ product.name }}">
-          {% else %}
-          <div class="h-48 bg-gray-100 flex items-center justify-center text-gray-400">No image</div>
-          {% endif %}
-          <div class="p-4">
-            <h3 class="text-lg font-semibold text-gray-900">{{ product.name }}</h3>
-            <p class="mt-2 text-sm text-gray-500">K{{ product.price|floatformat:2 }}</p>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
+    <div class="grid grid-cols-2 gap-x-[3px] gap-y-8 md:grid-cols-4 md:gap-x-4 md:gap-y-12">
+        {% for product in products %}
+        <article class="group relative bg-white">
+            <div class="image-tile relative overflow-hidden bg-[#f3f3f3]">
+                <a href="{% url 'product_detail' product.slug %}" class="absolute inset-0 z-[1]" aria-label="View {{ product.name }}"></a>
+                    {% if product.image %}
+                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.03]" onerror="this.onerror=null;this.src='{% cycle '/media/products/WhatsApp_Image_2025-03-20_at_15.52.43_9e937bc2.jpg' '/media/products/WhatsApp_Image_2025-03-20_at_15.52.43_d0b4855f.jpg' '/media/products/WhatsApp_Image_2025-03-20_at_15.52.44_ebeec294.jpg' '/media/products/WhatsApp_Image_2025-03-20_at_16.08.30_87478e24.jpg' %}';">
+                    {% else %}
+                    <div class="flex h-full w-full items-center justify-center bg-[#f1f1f1] text-xs uppercase tracking-[.18em] text-gray-400">No image</div>
+                    {% endif %}
 
-    <!-- Product Grid -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
-      {% for product in products %}
-      <div class="bg-white rounded-xl shadow hover:shadow-lg transition overflow-hidden relative group flex flex-col">
-        {% if product.is_new %}
-          <span class="absolute top-3 left-3 bg-cyan-100 text-cyan-700 text-xs font-semibold px-2 py-1 rounded">New Arrival</span>
-        {% endif %}
-        <!-- Wishlist Icon -->
-        <button data-product-id="{{ product.id }}" class="wishlist-toggle {% if product.id|stringformat:'s' in wishlist_ids %}wish-active{% endif %} absolute top-3 right-3 z-20 bg-white/80 rounded-full p-2 shadow hover:bg-pink-100 transition group/wishlist" title="{% if product.id|stringformat:'s' in wishlist_ids %}Remove from wishlist{% else %}Add to wishlist{% endif %}" aria-pressed="{% if product.id|stringformat:'s' in wishlist_ids %}true{% else %}false{% endif %}">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="{% if product.id|stringformat:'s' in wishlist_ids %}currentColor{% else %}none{% endif %}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 {% if product.id|stringformat:'s' in wishlist_ids %}text-pink-500 fill-pink-500{% else %}text-gray-400 fill-none{% endif %} group-hover/wishlist:text-pink-500 transition">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.623 0-3.06.936-3.812 2.25-.752-1.314-2.189-2.25-3.812-2.25C5.099 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-          </svg>
-        </button>
-        <a href="{% url 'product_detail' product.slug %}" class="block">
-          {% if product.image %}
-            <img class="w-full h-64 object-contain object-center bg-white transition-transform group-hover:scale-105" src="{{ product.image.url }}" alt="{{ product.name }}">
-          {% else %}
-            <img class="w-full h-64 object-contain object-center bg-white transition-transform group-hover:scale-105" src="https://via.placeholder.com/300x300?text=No+Image" alt="No Image Available">
-          {% endif %}
-        </a>
-        <div class="p-4 flex-1 flex flex-col justify-between">
-          <div>
-            <h3 class="text-lg font-medium text-gray-900 mb-1">{{ product.name }}</h3>
-            <div class="mb-2 flex items-end gap-2">
-              <span class="text-xl font-bold text-pink-600">ZMW {{ product.price|floatformat:2 }}</span>
-              <span class="text-xs text-gray-400 line-through">{% if product.old_price %}ZMW {{ product.old_price|floatformat:2 }}{% endif %}</span>
+                    {% if product.stock < 5 %}
+                    <span class="absolute bottom-10 right-0 z-10 bg-[#3b3b3b] px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-white">Selling Fast</span>
+                    {% elif product.color %}
+                    <span class="absolute bottom-10 left-0 z-10 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-[#333]">More Colours</span>
+                    {% endif %}
+
+                    <button data-product-id="{{ product.id }}" class="wishlist-toggle {% if product.id|stringformat:'s' in wishlist_ids %}wish-active{% endif %} absolute bottom-3 right-3 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-white/95 shadow-sm" aria-label="Save {{ product.name }}" aria-pressed="{% if product.id|stringformat:'s' in wishlist_ids %}true{% else %}false{% endif %}">
+                        <svg class="h-7 w-7 {% if product.id|stringformat:'s' in wishlist_ids %}fill-black{% else %}fill-none{% endif %}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path d="M20.8 4.6c-2-1.9-5.1-1.8-6.9.3L12 7l-1.9-2.1C8.3 2.8 5.2 2.7 3.2 4.6c-2.1 2-2.2 5.4-.2 7.6L12 21l9-8.8c2-2.2 1.9-5.6-.2-7.6Z" stroke-linejoin="round"></path>
+                        </svg>
+                    </button>
             </div>
-          </div>
-          <div class="flex items-center justify-between mt-2">
-            <span class="text-xs text-gray-500">Uniglo</span>
-            <span class="text-xs text-red-500">{% if product.stock < 15 %}{{ product.stock }} items left{% endif %}</span>
-          </div>
-        </div>
-      </div>
-      {% empty %}
-      <div class="col-span-full text-center py-12 text-gray-400">No products found.</div>
-      {% endfor %}
+            <a href="{% url 'product_detail' product.slug %}" class="block px-4 pt-4">
+                <h2 class="product-title min-h-[3.25rem] text-[15px] leading-[1.6] tracking-[.05em] text-[#333]">{{ product.name }}</h2>
+                <p class="mt-3 text-[17px] font-black tracking-[.12em] text-[#222]">K{{ product.price|floatformat:2 }}</p>
+            </a>
+        </article>
+        {% empty %}
+        <div class="col-span-full px-4 py-20 text-center text-gray-500">No products found.</div>
+        {% endfor %}
     </div>
-  </main>
-</div>
+
+    <div class="px-6 pb-20 pt-12 text-center">
+        <p class="text-[16px] tracking-[.05em] text-[#777]">You've viewed {{ viewed_count|default:products.count }} of {{ total_products|default:products.count }} products</p>
+        <div class="mx-auto mt-5 h-1 w-52 bg-[#e5e5e5]">
+            <div class="range-track h-full w-full"></div>
+        </div>
+        <button type="button" class="mt-8 w-full max-w-xl border-2 border-[#ddd] bg-white px-8 py-6 text-[22px] font-black uppercase tracking-[.24em] text-[#333]">Load More</button>
+    </div>
+</section>
+{% endblock %}
+
+{% block footer %}
+<footer class="bg-[#6b6b6b] text-white">
+    <section class="mx-auto max-w-7xl px-6 py-12">
+        <h2 class="max-w-3xl text-[24px] font-black uppercase leading-tight tracking-[.24em]">Hear about the best offers and the latest drops first</h2>
+        <form class="mt-8 max-w-3xl">
+            <input type="email" placeholder="Enter your email" class="w-full border-0 bg-white px-6 py-6 text-[22px] tracking-[.03em] text-gray-900 outline-none" />
+            <button type="submit" class="mt-8 w-full bg-black px-6 py-6 text-[20px] font-black uppercase tracking-[.18em] text-white">Subscribe</button>
+        </form>
+        <p class="mt-8 max-w-3xl text-[17px] leading-relaxed tracking-[.04em] text-white">*By entering your email, you consent to receive marketing emails from Normils in line with our <a href="/privacy-policy/" class="underline">Privacy Policy</a> and <a href="/returns-refunds/" class="underline">Terms & Conditions</a>. You can opt out at any time by clicking "Unsubscribe" at the bottom of our emails.</p>
+
+        <div class="mt-12 border-t border-white/15 pt-10">
+            <div class="flex items-center gap-6">
+                <div class="flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-black text-5xl font-black lowercase">n</div>
+                <div>
+                    <p class="text-2xl font-black uppercase tracking-[.18em]">Normils</p>
+                    <p class="mt-3 text-lg tracking-[.12em]">★★★★★ 1.8m</p>
+                </div>
+            </div>
+            <button type="button" class="mt-8 w-full bg-black px-6 py-6 text-[20px] font-black uppercase tracking-[.18em]">Download The App</button>
+        </div>
+    </section>
+
+    <section class="bg-[#1f1f1f] px-6 py-8">
+        <div class="mx-auto max-w-7xl">
+            <p class="text-[18px] tracking-[.08em]">Some of our international sites:</p>
+            <div class="mt-6 grid max-w-xl grid-cols-6 gap-6 md:grid-cols-10">
+                <span title="Spain" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#c60b1e 0 25%, #ffc400 25% 75%, #c60b1e 75%);"></span>
+                <span title="Germany" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#111 0 33%, #dd0000 33% 66%, #ffce00 66%);"></span>
+                <span title="Australia" class="h-11 w-11 rounded-full border border-white/20" style="background: radial-gradient(circle at 70% 65%, #fff 0 8%, transparent 9%), linear-gradient(135deg, #012169 0 48%, #c8102e 48% 56%, #012169 56%);"></span>
+                <span title="France" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, #0055a4 0 33%, #fff 33% 66%, #ef4135 66%);"></span>
+                <span title="Denmark" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, transparent 0 32%, #fff 32% 42%, transparent 42%), linear-gradient(0deg, #c60c30 0 42%, #fff 42% 55%, #c60c30 55%);"></span>
+                <span title="Italy" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, #008c45 0 33%, #fff 33% 66%, #cd212a 66%);"></span>
+                <span title="Netherlands" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#ae1c28 0 33%, #fff 33% 66%, #21468b 66%);"></span>
+                <span title="Poland" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#fff 0 50%, #dc143c 50%);"></span>
+                <span title="United States" class="h-11 w-11 rounded-full border border-white/20" style="background: repeating-linear-gradient(#b22234 0 4px, #fff 4px 8px);"></span>
+                <span title="Sweden" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, transparent 0 32%, #fecc00 32% 44%, transparent 44%), linear-gradient(0deg, #006aa7 0 42%, #fecc00 42% 56%, #006aa7 56%);"></span>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-[#2b2b2b] px-6 py-8">
+        <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 text-[17px] tracking-[.04em]">
+            <p>© 2026 Normils</p>
+            <div class="flex gap-5">
+                <a href="/shipping-policy/">Privacy & Cookies</a>
+                <span>|</span>
+                <a href="/returns-refunds/">Ts&Cs</a>
+            </div>
+        </div>
+    </section>
+</footer>
 {% endblock %}
