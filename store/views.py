@@ -5,13 +5,14 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
-from django.db import transaction
+from django.db import close_old_connections, transaction
 from django.db.models import Q, Min, Max, Sum
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 from decimal import Decimal, ROUND_HALF_UP
 import os
 import re
+import threading
 import uuid
 import json
 from django.conf import settings
@@ -1384,6 +1385,30 @@ def cart(request):
         'checkout_amounts': _checkout_amounts(cart.total, 'cash'),
     })
 
+
+def _send_order_created_notifications(order_id):
+    close_old_connections()
+    try:
+        order = Order.objects.prefetch_related('items__product').select_related('store').get(id=order_id)
+        send_order_receipt_sms(order)
+        send_admin_whatsapp_order_receipt(order)
+        send_order_confirmation_email(order)
+    except Exception:
+        logger.exception('Background order notification failed for Order ID %s', order_id)
+    finally:
+        close_old_connections()
+
+
+def _queue_order_created_notifications(order):
+    thread = threading.Thread(
+        target=_send_order_created_notifications,
+        args=(order.id,),
+        name=f'order-notifications-{order.id}',
+        daemon=True,
+    )
+    thread.start()
+
+
 def checkout(request):
     cart = get_or_create_cart(request)
     
@@ -1623,6 +1648,8 @@ def checkout(request):
                 cart.items.all().delete()
                 if not is_chat_checkout:
                     send_order_confirmation_email(order)
+                else:
+                    _queue_order_created_notifications(order)
                 if is_chat_checkout and request.user.is_authenticated:
                     cash_message = 'Your order will arrive in 3 - 4 business days, message me for questions. Thanks.'
                 elif is_chat_checkout:
