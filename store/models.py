@@ -425,6 +425,20 @@ class StockAdjustment(models.Model):
         return f"{self.product.name}: {self.previous_online_stock} -> {self.new_online_stock}"
 
 
+class DashboardAnalyticReset(models.Model):
+    key = models.CharField(max_length=50, unique=True)
+    label = models.CharField(max_length=100)
+    baseline_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    reset_at = models.DateTimeField(auto_now=True)
+    reset_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['key']
+
+    def __str__(self):
+        return f"{self.label} reset at {self.reset_at.isoformat()}"
+
+
 class OutboundSMSLog(models.Model):
     recipient = models.CharField(max_length=50)
     message = models.TextField()

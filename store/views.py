@@ -20,7 +20,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment
+from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -819,6 +819,30 @@ def admin_dashboard(request):
 
         return product
 
+    analytic_labels = {
+        'products': 'Products',
+        'low_stock': 'Low stock',
+        'out_of_stock': 'Out of stock',
+        'open_orders': 'Open orders',
+        'paid_orders': 'Paid orders',
+        'revenue': 'Revenue',
+    }
+
+    def current_analytic_value(key):
+        if key == 'products':
+            return Decimal(Product.objects.count())
+        if key == 'low_stock':
+            return Decimal(sum(1 for product in Product.objects.all() if product.is_low_stock))
+        if key == 'out_of_stock':
+            return Decimal(Product.objects.filter(stock=0).count())
+        if key == 'open_orders':
+            return Decimal(Order.objects.exclude(status__in=['delivered', 'cancelled', 'cleared', 'refunded']).count())
+        if key == 'paid_orders':
+            return Decimal(Order.objects.filter(Q(payment_status='completed') | Q(payment_confirmed=True)).count())
+        if key == 'revenue':
+            return Order.objects.filter(Q(payment_status='completed') | Q(payment_confirmed=True)).aggregate(earnings=Sum('total'))['earnings'] or Decimal('0')
+        return Decimal('0')
+
     if request.method == 'POST':
         action = request.POST.get('action')
 
@@ -851,22 +875,26 @@ def admin_dashboard(request):
 
         if action == 'delete_product':
             product = get_object_or_404(Product, id=request.POST.get('product_id'))
-            previous_online = product.stock
-            previous_offline = product.offline_stock
-            product.stock = 0
-            product.available = False
-            product.save(update_fields=['stock', 'available', 'updated'])
-            StockAdjustment.objects.create(
-                product=product,
-                user=request.user,
-                previous_online_stock=previous_online,
-                new_online_stock=product.stock,
-                previous_offline_stock=previous_offline,
-                new_offline_stock=product.offline_stock,
-                reason='Removed from storefront editor',
-            )
-            messages.success(request, f"Removed {product.name} from the storefront.")
+            product_name = product.name
+            product.delete()
+            messages.success(request, f"Deleted {product_name} from the database.")
             return dashboard_redirect('editor')
+
+        if action == 'reset_analytic':
+            analytic_key = request.POST.get('analytic_key') or ''
+            if analytic_key not in analytic_labels:
+                messages.error(request, 'Unknown analytic.')
+                return dashboard_redirect(request.POST.get('mode') or 'editor')
+            DashboardAnalyticReset.objects.update_or_create(
+                key=analytic_key,
+                defaults={
+                    'label': analytic_labels[analytic_key],
+                    'baseline_value': current_analytic_value(analytic_key),
+                    'reset_by': request.user,
+                },
+            )
+            messages.success(request, f"Reset {analytic_labels[analytic_key]} analytic.")
+            return dashboard_redirect(request.POST.get('mode') or 'editor')
 
         if action == 'create_product':
             store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
@@ -974,7 +1002,7 @@ def admin_dashboard(request):
 
     total_conversations = BotConversation.objects.count()
     total_learned_keywords = LearnedKeyword.objects.count()
-    total_products = Product.objects.count()
+    total_products_raw = Product.objects.count()
     total_categories = Category.objects.count()
     total_brands = Brand.objects.count()
     total_users = get_user_model().objects.filter(is_active=True)
@@ -988,10 +1016,10 @@ def admin_dashboard(request):
         average_login_age = age_sum / login_users.count() / 86400
     total_users = total_users.count()
     successful_deliveries = Order.objects.filter(status='delivered').count()
-    successful_payments = Order.objects.filter(
+    successful_payments_raw = Order.objects.filter(
         Q(payment_status='completed') | Q(payment_confirmed=True)
     ).count()
-    platform_earnings = Order.objects.filter(
+    platform_earnings_raw = Order.objects.filter(
         Q(payment_status='completed') | Q(payment_confirmed=True)
     ).aggregate(earnings=Sum('total'))['earnings'] or Decimal('0')
 
@@ -1057,6 +1085,26 @@ def admin_dashboard(request):
             if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
                 uploaded_product_images.append(f'products/{filename}')
 
+    out_of_stock_count_raw = Product.objects.filter(stock=0).count()
+    low_stock_count_raw = sum(1 for product in Product.objects.all() if product.is_low_stock)
+    pending_order_count_raw = Order.objects.exclude(status__in=['delivered', 'cancelled', 'cleared', 'refunded']).count()
+    analytic_resets = {
+        reset.key: reset
+        for reset in DashboardAnalyticReset.objects.filter(key__in=analytic_labels.keys())
+    }
+
+    def adjusted_analytic(key, raw_value):
+        baseline = analytic_resets.get(key).baseline_value if analytic_resets.get(key) else Decimal('0')
+        value = Decimal(raw_value) - baseline
+        return value if value > 0 else Decimal('0')
+
+    total_products = int(adjusted_analytic('products', total_products_raw))
+    low_stock_count = int(adjusted_analytic('low_stock', low_stock_count_raw))
+    out_of_stock_count = int(adjusted_analytic('out_of_stock', out_of_stock_count_raw))
+    pending_order_count = int(adjusted_analytic('open_orders', pending_order_count_raw))
+    successful_payments = int(adjusted_analytic('paid_orders', successful_payments_raw))
+    platform_earnings = adjusted_analytic('revenue', platform_earnings_raw)
+
     return render(request, 'admin_dashboard.html', {
         'total_conversations': total_conversations,
         'total_learned_keywords': total_learned_keywords,
@@ -1089,9 +1137,10 @@ def admin_dashboard(request):
         'payment_status': payment_status,
         'order_status_choices': Order.STATUS_CHOICES,
         'payment_status_choices': Order.PAYMENT_STATUS_CHOICES,
-        'out_of_stock_count': Product.objects.filter(stock=0).count(),
-        'low_stock_count': sum(1 for product in Product.objects.all() if product.is_low_stock),
-        'pending_order_count': Order.objects.exclude(status__in=['delivered', 'cancelled', 'cleared', 'refunded']).count(),
+        'out_of_stock_count': out_of_stock_count,
+        'low_stock_count': low_stock_count,
+        'pending_order_count': pending_order_count,
+        'analytic_resets': analytic_resets,
     })
 
 
