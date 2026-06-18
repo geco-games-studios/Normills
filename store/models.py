@@ -113,6 +113,20 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"{self.product.name} image"
+
+
+class ProductSubcategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Product Subcategory'
+        verbose_name_plural = 'Product Subcategories'
+
+    def __str__(self):
+        return self.name
     
 
 class LearnedKeyword(models.Model):

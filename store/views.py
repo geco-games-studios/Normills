@@ -20,7 +20,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -557,22 +557,35 @@ def _normalize_filter_slug(value):
     return slugify(value or '').strip('-')
 
 
+CORE_STOREFRONT_FILTER_SLUGS = {button['slug'] for button in BASE_STOREFRONT_FILTERS}
+
+
+def _ensure_custom_subcategory(name):
+    name = (name or '').strip()
+    subcategory_slug = _normalize_filter_slug(name)
+    if not name or not subcategory_slug or subcategory_slug in CORE_STOREFRONT_FILTER_SLUGS:
+        return None
+    subcategory, _ = ProductSubcategory.objects.get_or_create(
+        slug=subcategory_slug,
+        defaults={'name': name},
+    )
+    return subcategory
+
+
 def _storefront_filter_buttons():
     collection_slugs = {'kids-collection', 'mens-collection', 'women-collection'}
     buttons = [dict(button) for button in BASE_STOREFRONT_FILTERS]
     existing_slugs = {button['slug'] for button in buttons}
-    for subcategory in Product.objects.exclude(subcategory='').values_list('subcategory', flat=True).distinct().order_by('subcategory'):
-        subcategory = (subcategory or '').strip()
-        subcategory_slug = _normalize_filter_slug(subcategory)
-        if not subcategory_slug or subcategory_slug in existing_slugs:
+    for subcategory in ProductSubcategory.objects.order_by('name'):
+        if subcategory.slug in existing_slugs:
             continue
         buttons.append({
-            'label': subcategory,
-            'slug': subcategory_slug,
-            'subcategory': subcategory,
-            'terms': [subcategory, subcategory_slug.replace('-', ' ')],
+            'label': subcategory.name,
+            'slug': subcategory.slug,
+            'subcategory': subcategory.name,
+            'terms': [subcategory.name, subcategory.slug.replace('-', ' ')],
         })
-        existing_slugs.add(subcategory_slug)
+        existing_slugs.add(subcategory.slug)
     for category in Category.objects.exclude(slug__in=collection_slugs).order_by('name'):
         if category.slug in existing_slugs:
             continue
@@ -795,7 +808,9 @@ def admin_dashboard(request):
 
         product.name = (request.POST.get('name') or product.name).strip()
         product.description = (request.POST.get('description') or '').strip()
-        product.subcategory = (request.POST.get('subcategory') or '').strip()
+        selected_subcategory = (request.POST.get('subcategory') or '').strip()
+        custom_subcategory = _ensure_custom_subcategory(selected_subcategory)
+        product.subcategory = custom_subcategory.name if custom_subcategory else selected_subcategory
         product.price = _money(request.POST.get('price') or product.price)
         product.stock = _parse_positive_int(request.POST.get('stock'), product.stock, minimum=0)
         product.offline_stock = _parse_positive_int(request.POST.get('offline_stock'), product.offline_stock, minimum=0)
@@ -927,6 +942,35 @@ def admin_dashboard(request):
             )
             messages.success(request, f"Reset {analytic_labels[analytic_key]} analytic.")
             return dashboard_redirect(request.POST.get('mode') or 'editor')
+
+        if action == 'create_subcategory':
+            subcategory_name = (request.POST.get('subcategory_name') or '').strip()
+            subcategory_slug = _normalize_filter_slug(subcategory_name)
+            if not subcategory_name or not subcategory_slug:
+                messages.error(request, 'Enter a filter type name.')
+            elif subcategory_slug in CORE_STOREFRONT_FILTER_SLUGS:
+                messages.info(request, f"{subcategory_name} is already a built-in filter type.")
+            else:
+                subcategory, created = ProductSubcategory.objects.get_or_create(
+                    slug=subcategory_slug,
+                    defaults={'name': subcategory_name},
+                )
+                if created:
+                    messages.success(request, f"Added {subcategory.name} to the filter type list.")
+                else:
+                    messages.info(request, f"{subcategory.name} is already in the filter type list.")
+            return dashboard_redirect('editor')
+
+        if action == 'delete_subcategory':
+            subcategory = get_object_or_404(ProductSubcategory, id=request.POST.get('subcategory_id'))
+            subcategory_name = subcategory.name
+            Product.objects.filter(
+                Q(subcategory__iexact=subcategory_name) |
+                Q(subcategory__iexact=subcategory.slug)
+            ).update(subcategory='')
+            subcategory.delete()
+            messages.success(request, f"Removed {subcategory_name} from filter types and cleared it from matching products.")
+            return dashboard_redirect('editor')
 
         if action == 'create_product':
             store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
@@ -1111,10 +1155,10 @@ def admin_dashboard(request):
     categories = Category.objects.order_by('name')
     brands = Brand.objects.order_by('name')
     subcategory_options = ['Tops', 'Bottoms', 'Shoes', 'Accessories']
-    for subcategory in Product.objects.exclude(subcategory='').values_list('subcategory', flat=True).distinct().order_by('subcategory'):
-        subcategory = (subcategory or '').strip()
-        if subcategory and subcategory.lower() not in {option.lower() for option in subcategory_options}:
-            subcategory_options.append(subcategory)
+    custom_subcategories = ProductSubcategory.objects.order_by('name')
+    for subcategory in custom_subcategories:
+        if subcategory.name.lower() not in {option.lower() for option in subcategory_options}:
+            subcategory_options.append(subcategory.name)
     media_products_dir = os.path.join(settings.MEDIA_ROOT, 'products')
     uploaded_product_images = []
     if os.path.isdir(media_products_dir):
@@ -1165,6 +1209,7 @@ def admin_dashboard(request):
         'categories': categories,
         'brands': brands,
         'subcategory_options': subcategory_options,
+        'custom_subcategories': custom_subcategories,
         'uploaded_product_images': uploaded_product_images,
         'dashboard_mode': dashboard_mode,
         'recent_stock_adjustments': recent_stock_adjustments,

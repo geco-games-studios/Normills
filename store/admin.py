@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, ProductImage, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -62,6 +62,11 @@ class BrandAdmin(admin.ModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ['name', 'slug']
+    prepopulated_fields = {'slug': ('name',)}
+
+@admin.register(ProductSubcategory)
+class ProductSubcategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'created_at']
     prepopulated_fields = {'slug': ('name',)}
 
 class ProductVariantInline(admin.TabularInline):
