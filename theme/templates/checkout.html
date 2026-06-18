@@ -1,342 +1,286 @@
 {% extends 'base.html' %}
 {% load custom_filters %}
 
-{% block title %}Checkout - Marketplace{% endblock %}
+{% block title %}Chat Checkout - Normils{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-bold mb-8">Checkout</h1>
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <div class="lg:col-span-2">
-        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 class="text-lg font-medium text-gray-900 mb-4">Customer Details</h2>
-            
-            <div id="payment-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-                <div class="bg-white rounded-lg shadow-lg max-w-sm w-full p-6 text-center">
-                    <div id="payment-modal-spinner" class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600"></div>
-                    <div id="payment-modal-success" class="hidden mx-auto mb-4 h-12 w-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 111.414-1.414l2.543 2.543 6.543-6.543a1 1 0 011.414 0z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div id="payment-modal-error" class="hidden mx-auto mb-4 h-12 w-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <h3 id="payment-modal-title" class="text-lg font-semibold text-gray-900">Processing payment</h3>
-                    <p id="payment-modal-message" class="mt-2 text-sm text-gray-600">Please approve the mobile money prompt on your phone. Keep this page open while we confirm the payment.</p>
-                    <button id="payment-modal-close" type="button" class="hidden mt-5 w-full bg-gray-900 text-white px-4 py-2 rounded-md font-medium hover:bg-gray-800">Close</button>
-                </div>
+<section class="mx-auto max-w-5xl px-4 py-6 md:py-10">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="overflow-hidden border border-gray-200 bg-white">
+            <div class="border-b border-gray-200 bg-[#2b2b2b] px-5 py-5 text-white">
+                <p class="text-xs font-black uppercase tracking-[.24em] text-white/70">Normils checkout</p>
+                <h1 class="mt-2 text-2xl font-black tracking-[.08em]">Chat with checkout</h1>
             </div>
-            
-            <form method="post" id="checkout-form" onsubmit="submitForm(event)">
-                {% csrf_token %}
-                
-                <div class="mb-4">
-                    <div>
-                        <label for="id_first_name" class="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
-                        <input type="text" name="first_name" id="id_first_name" value="{{ form.first_name.value|default:'' }}" required placeholder="Enter your name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <input type="hidden" name="last_name" id="id_last_name" value="{{ form.last_name.value|default:'' }}">
-                    </div>
-                </div>
 
-                <div id="extra-fields">
-                    <div class="mb-4">
-                        <label for="id_email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                        <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div class="mb-4">
-                        <label for="id_address" class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                        <input type="text" name="address" id="id_address" value="{{ form.address.value|default:'' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label for="id_city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
-                            <input type="text" name="city" id="id_city" value="{{ form.city.value|default:'' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        </div>
-                        <div>
-                            <label for="id_postal_code" class="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-                            <input type="text" name="postal_code" id="id_postal_code" value="{{ form.postal_code.value|default:'' }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        </div>
-                    </div>
-                </div>
+            <div id="checkout-chat" class="min-h-[480px] space-y-4 bg-[#f7f7f7] px-4 py-5 md:px-6"></div>
 
-                <div class="mb-4">
-                    <label for="id_phone" class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                    <input type="text" name="phone" id="id_phone" value="{{ form.phone.value|default:'' }}" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <p class="mt-1 text-xs text-gray-500">This number will be used for mobile money payments and delivery notifications.</p>
+            <div id="chat-input-row" class="border-t border-gray-200 bg-white p-4">
+                <div class="flex gap-3">
+                    <input id="chat-input" type="text" autocomplete="off" class="min-w-0 flex-1 border border-gray-300 px-4 py-3 text-base outline-none focus:border-black" />
+                    <button id="chat-send" type="button" class="bg-black px-5 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Send</button>
                 </div>
-                <div class="mb-4">
-                    <span class="block text-sm font-medium text-gray-700 mb-2">Delivery Option</span>
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <label class="flex items-center rounded-lg border border-gray-200 p-3">
-                            <input id="delivery_method_delivery" name="delivery_method" value="delivery" type="radio" checked class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                            <span class="ml-3 text-sm font-medium text-gray-700">Delivery</span>
-                        </label>
-                        <label class="flex items-center rounded-lg border border-gray-200 p-3">
-                            <input id="delivery_method_pickup" name="delivery_method" value="pickup" type="radio" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                            <span class="ml-3 text-sm font-medium text-gray-700">Pickup</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label for="id_notes" class="block text-sm font-medium text-gray-700 mb-1">Order Notes</label>
-                    <textarea name="notes" id="id_notes" rows="3" placeholder="Delivery landmark, preferred time, size note, or pickup instruction" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ form.notes.value|default:'' }}</textarea>
-                </div>
-            <script>
-                // Hide extra fields if cash is selected
-                function toggleExtraFields() {
-                    const cashRadio = document.getElementById('payment_method_cash');
-                    const mobileRadio = document.getElementById('payment_method_mobile_money');
-                    const pickupRadio = document.getElementById('delivery_method_pickup');
-                    const extraFields = document.getElementById('extra-fields');
-                    if (cashRadio && extraFields && mobileRadio) {
-                        if (cashRadio.checked || (pickupRadio && pickupRadio.checked)) {
-                            extraFields.style.display = 'none';
-                        } else {
-                            extraFields.style.display = '';
-                        }
-                    }
-                }
-                
-                // Toggle mobile money options visibility
-                function toggleMobileMoneyOptions() {
-                    const cashRadio = document.getElementById('payment_method_cash');
-                    const mobileRadio = document.getElementById('payment_method_mobile_money');
-                    const mobileOptions = document.getElementById('mobile-money-options');
-                    const taxAmount = document.getElementById('summary-tax');
-                    const paymentChargeRow = document.getElementById('payment-charge-row');
-                    const paymentChargeAmount = document.getElementById('summary-payment-charge');
-                    const totalAmount = document.getElementById('summary-total');
-                    if (cashRadio && mobileRadio && mobileOptions) {
-                        if (mobileRadio.checked) {
-                            mobileOptions.style.display = 'block';
-                            if (paymentChargeRow) paymentChargeRow.style.display = '';
-                            if (taxAmount) taxAmount.textContent = taxAmount.dataset.mobile;
-                            if (paymentChargeAmount) paymentChargeAmount.textContent = paymentChargeAmount.dataset.mobile;
-                            if (totalAmount) totalAmount.textContent = totalAmount.dataset.mobile;
-                        } else {
-                            mobileOptions.style.display = 'none';
-                            if (paymentChargeRow) paymentChargeRow.style.display = 'none';
-                            if (taxAmount) taxAmount.textContent = taxAmount.dataset.cash;
-                            if (paymentChargeAmount) paymentChargeAmount.textContent = paymentChargeAmount.dataset.cash;
-                            if (totalAmount) totalAmount.textContent = totalAmount.dataset.cash;
-                        }
-                    }
-                }
-                
-                document.addEventListener('DOMContentLoaded', function() {
-                    const cashRadio = document.getElementById('payment_method_cash');
-                    const mobileRadio = document.getElementById('payment_method_mobile_money');
-                    const deliveryRadio = document.getElementById('delivery_method_delivery');
-                    const pickupRadio = document.getElementById('delivery_method_pickup');
-                    if (cashRadio && mobileRadio) {
-                        cashRadio.addEventListener('change', toggleExtraFields);
-                        mobileRadio.addEventListener('change', toggleExtraFields);
-                        cashRadio.addEventListener('change', toggleMobileMoneyOptions);
-                        mobileRadio.addEventListener('change', toggleMobileMoneyOptions);
-                        if (deliveryRadio) deliveryRadio.addEventListener('change', toggleExtraFields);
-                        if (pickupRadio) pickupRadio.addEventListener('change', toggleExtraFields);
-                        toggleExtraFields();
-                        toggleMobileMoneyOptions();
-                    }
-                });
-            </script>
-            </form>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h2 class="text-lg font-medium text-gray-900 mb-4">Payment Method</h2>
-            
-            <div class="space-y-4">
-                <!-- Add explicit payment method radio buttons -->
-                <div class="flex items-center">
-                    <input id="payment_method_mobile_money" name="payment_method" value="mobile_money" type="radio" checked form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                    <label for="payment_method_mobile_money" class="ml-3 block text-sm font-medium text-gray-700">
-                        Mobile Money
-                    </label>
-                </div>
-                <div class="flex items-center">
-                    <input id="payment_method_cash" name="payment_method" value="cash" type="radio" form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                    <label for="payment_method_cash" class="ml-3 block text-sm font-medium text-gray-700">
-                        Pay on delivery/pickup
-                    </label>
-                </div>
-                
-                <!-- Mobile Money Options (show only when mobile_money is selected) -->
-                <div id="mobile-money-options" class="ml-7 mt-2 mb-4" style="display: none;">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Mobile Money Provider</label>
-                    <div class="space-y-2">
-                        <div class="flex items-center">
-                            <input id="operator-airtel" name="mobile_operator" value="airtel" type="radio" checked form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                            <label for="operator-airtel" class="ml-3 block text-sm text-gray-700">Airtel Money</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input id="operator-mtn" name="mobile_operator" value="mtn" type="radio" form="checkout-form" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                            <label for="operator-mtn" class="ml-3 block text-sm text-gray-700">MTN Mobile Money</label>
-                        </div>
-                    </div>
-                    <p class="mt-2 text-xs text-gray-500">You will receive an official mobile money prompt on your phone to complete payment.</p>
-                </div>
+                <p id="chat-helper" class="mt-2 text-sm text-gray-500"></p>
             </div>
-        </div>
-    </div>
-    
-    <div class="lg:col-span-1">
-        <div class="bg-gray-50 rounded-lg p-6">
-            <h2 class="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
-            
-            <div class="max-h-64 overflow-y-auto mb-4">
+        </section>
+
+        <aside class="border border-gray-200 bg-white p-5">
+            <h2 class="text-lg font-black uppercase tracking-[.12em] text-gray-900">Order summary</h2>
+            <div class="mt-5 max-h-80 overflow-y-auto border-y border-gray-200">
                 {% for item in cart.items.all %}
-                <div class="flex items-center py-3 {% if not forloop.last %}border-b border-gray-200{% endif %}">
-                    <div class="flex-shrink-0 w-16 h-16">
+                <div class="flex gap-4 py-4 {% if not forloop.last %}border-b border-gray-200{% endif %}">
+                    <div class="h-20 w-16 shrink-0 overflow-hidden bg-gray-100">
                         {% if item.product.image %}
-                        <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="w-full h-full object-cover rounded">
+                        <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="h-full w-full object-cover" onerror="this.onerror=null;this.src='/media/products/WhatsApp_Image_2025-03-20_at_15.52.43_9e937bc2.jpg';">
                         {% else %}
-                        <img src="https://flowbite.s3.amazonaws.com/docs/gallery/square/image-{{ forloop.counter0|default:0|mod:12 }}.jpg" alt="{{ item.product.name }}" class="w-full h-full object-cover rounded">
+                        <div class="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-[.14em] text-gray-400">No image</div>
                         {% endif %}
                     </div>
-                    
-                    <div class="ml-4 flex-1">
-                        <h3 class="text-sm font-medium text-gray-900">{{ item.product.name }}</h3>
+                    <div class="min-w-0 flex-1">
+                        <h3 class="text-sm font-bold leading-5 text-gray-900">{{ item.product.name }}</h3>
+                        {% if item.variant %}
                         <p class="mt-1 text-xs text-gray-500">
-                            {% if item.variant %}
-                                {% if item.variant.color %}{{ item.variant.color }}{% endif %}
-                                {% if item.variant.size %}{% if item.variant.color %} / {% endif %}{{ item.variant.size }}{% endif %}
-                            {% endif %}
+                            {% if item.variant.color %}{{ item.variant.color }}{% endif %}
+                            {% if item.variant.size %}{% if item.variant.color %} / {% endif %}{{ item.variant.size }}{% endif %}
                         </p>
-                        <div class="flex justify-between mt-1">
-                            <span class="text-xs text-gray-500">Qty: {{ item.quantity }}</span>
-                            <span class="text-sm font-medium text-gray-900">K{{ item.subtotal }}</span>
+                        {% endif %}
+                        <div class="mt-2 flex justify-between text-sm">
+                            <span class="text-gray-500">Qty {{ item.quantity }}</span>
+                            <span class="font-bold text-gray-900">K{{ item.subtotal }}</span>
                         </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
-            
-            <div class="border-t border-gray-200 pt-4">
-                <div class="flex justify-between py-2">
+
+            <div class="mt-5 space-y-3 text-sm">
+                <div class="flex justify-between">
                     <span class="text-gray-600">Subtotal</span>
-                    <span class="text-gray-900 font-medium">K{{ checkout_amounts.subtotal|floatformat:2 }}</span>
+                    <span class="font-bold">K{{ checkout_amounts.subtotal|floatformat:2 }}</span>
                 </div>
-
-                <div class="flex justify-between py-2">
+                <div class="flex justify-between">
                     <span class="text-gray-600">Shipping</span>
-                    <span class="text-gray-900 font-medium">K{{ checkout_amounts.shipping|floatformat:2 }}</span>
+                    <span class="font-bold">K{{ checkout_amounts.shipping|floatformat:2 }}</span>
                 </div>
-
-                <div class="flex justify-between py-2">
+                <div class="flex justify-between">
                     <span class="text-gray-600">Tax</span>
-                    <span id="summary-tax" class="text-gray-900 font-medium" data-cash="K{{ checkout_amounts.tax|floatformat:2 }}" data-mobile="K{{ mobile_money_amounts.tax|floatformat:2 }}">K{{ checkout_amounts.tax|floatformat:2 }}</span>
+                    <span class="font-bold">K{{ checkout_amounts.tax|floatformat:2 }}</span>
                 </div>
-
-                <div id="payment-charge-row" class="flex justify-between py-2" style="display: none;">
-                    <span class="text-gray-600">Mobile money charge included in tax</span>
-                    <span id="summary-payment-charge" class="text-gray-900 font-medium" data-cash="K0.00" data-mobile="K{{ mobile_money_amounts.mobile_money_fee|floatformat:2 }}">K0.00</span>
-                </div>
-                
-                <div class="flex justify-between py-2 border-t border-gray-200 mt-2">
-                    <span class="text-lg font-medium text-gray-900">Total</span>
-                    <span id="summary-total" class="text-lg font-medium text-gray-900" data-cash="K{{ checkout_amounts.total|floatformat:2 }}" data-mobile="K{{ mobile_money_amounts.total|floatformat:2 }}">K{{ checkout_amounts.total|floatformat:2 }}</span>
+                <div class="flex justify-between border-t border-gray-200 pt-4 text-lg">
+                    <span class="font-black">Total</span>
+                    <span class="font-black">K{{ checkout_amounts.total|floatformat:2 }}</span>
                 </div>
             </div>
-            
-            <div class="mt-6">
-                <button id="place-order-button" type="submit" form="checkout-form" class="w-full bg-indigo-600 text-white text-center px-4 py-3 rounded-md font-medium hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">Place Order</button>
-            </div>
-        </div>
+        </aside>
     </div>
-</div>
+
+    <form method="post" id="checkout-form" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="first_name" id="id_first_name" value="{{ form.first_name.value|default:'' }}">
+        <input type="hidden" name="last_name" id="id_last_name" value="{{ form.last_name.value|default:'' }}">
+        <input type="hidden" name="email" id="id_email" value="{{ form.email.value|default:'' }}">
+        <input type="hidden" name="phone" id="id_phone" value="">
+        <input type="hidden" name="city" id="id_city" value="">
+        <input type="hidden" name="address" id="id_address" value="">
+        <input type="hidden" name="postal_code" id="id_postal_code" value="N/A">
+        <input type="hidden" name="notes" id="id_notes" value="">
+        <input type="hidden" name="delivery_method" value="delivery">
+        <input type="hidden" name="payment_method" value="cash">
+        <input type="hidden" name="checkout_mode" value="chat">
+    </form>
+</section>
 
 <script>
-    function setPaymentModalState(state, message) {
-        const modal = document.getElementById('payment-modal');
-        const spinner = document.getElementById('payment-modal-spinner');
-        const successIcon = document.getElementById('payment-modal-success');
-        const errorIcon = document.getElementById('payment-modal-error');
-        const title = document.getElementById('payment-modal-title');
-        const messageEl = document.getElementById('payment-modal-message');
-        const closeButton = document.getElementById('payment-modal-close');
-        const submitButton = document.getElementById('place-order-button');
-
-        modal.classList.remove('hidden');
-        spinner.classList.toggle('hidden', state !== 'processing');
-        successIcon.classList.toggle('hidden', state !== 'success');
-        errorIcon.classList.toggle('hidden', state !== 'error');
-        closeButton.classList.toggle('hidden', state !== 'error');
-        if (submitButton) submitButton.disabled = state === 'processing' || state === 'success';
-
-        if (state === 'processing') {
-            title.textContent = 'Processing payment';
-            messageEl.textContent = message || 'Please approve the mobile money prompt on your phone. Keep this page open while we confirm the payment.';
-        } else if (state === 'success') {
-            title.textContent = 'Payment request sent';
-            messageEl.textContent = message || 'Your payment is being confirmed. We will take you to the next step now.';
-        } else {
-            title.textContent = 'Payment failed';
-            messageEl.textContent = message || 'The payment could not be completed. Please check your balance or try again.';
-        }
-    }
-
-    function hidePaymentModal() {
-        document.getElementById('payment-modal').classList.add('hidden');
-        const submitButton = document.getElementById('place-order-button');
-        if (submitButton) submitButton.disabled = false;
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
-        const closeButton = document.getElementById('payment-modal-close');
-        if (closeButton) {
-            closeButton.addEventListener('click', hidePaymentModal);
+        const isSignedIn = {{ user.is_authenticated|yesno:"true,false" }};
+        const userName = "{{ user.get_full_name|default:user.username|default:''|escapejs }}";
+        const userEmail = "{{ user.email|default:''|escapejs }}";
+        const profilePhone = "{{ user.client_profile.phone_number|default:''|escapejs }}";
+        const profileAddress = "{{ user.client_profile.address|default:''|escapejs }}";
+        const chat = document.getElementById('checkout-chat');
+        const input = document.getElementById('chat-input');
+        const send = document.getElementById('chat-send');
+        const helper = document.getElementById('chat-helper');
+        const inputRow = document.getElementById('chat-input-row');
+        const form = document.getElementById('checkout-form');
+        const state = {
+            step: 'start',
+            name: '',
+            phone: '',
+            city: '',
+            area: '',
+            submitting: false,
+        };
+
+        function scrollChat() {
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function addMessage(text, fromCustomer) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex ' + (fromCustomer ? 'justify-end' : 'justify-start');
+            const bubble = document.createElement('div');
+            bubble.className = (fromCustomer ? 'bg-black text-white' : 'bg-white text-gray-900 border border-gray-200') + ' max-w-[82%] px-4 py-3 text-[15px] leading-relaxed shadow-sm';
+            bubble.textContent = text;
+            wrapper.appendChild(bubble);
+            chat.appendChild(wrapper);
+            scrollChat();
+        }
+
+        function addAction(label, action) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex justify-start';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'border-2 border-black bg-white px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-black';
+            button.textContent = label;
+            button.addEventListener('click', action, { once: true });
+            wrapper.appendChild(button);
+            chat.appendChild(wrapper);
+            scrollChat();
+        }
+
+        function setPrompt(placeholder, text) {
+            input.placeholder = placeholder;
+            helper.textContent = text || '';
+            input.focus();
+        }
+
+        function splitName(fullName) {
+            const parts = fullName.trim().split(/\s+/).filter(Boolean);
+            return {
+                first: parts[0] || 'Customer',
+                last: parts.slice(1).join(' '),
+            };
+        }
+
+        function setField(id, value) {
+            document.getElementById(id).value = value || '';
+        }
+
+        async function submitOrder() {
+            if (state.submitting) return;
+            state.submitting = true;
+            inputRow.classList.add('hidden');
+            addMessage('Placing your order now...', false);
+
+            const names = splitName(state.name || userName || 'Customer');
+            setField('id_first_name', names.first);
+            setField('id_last_name', names.last);
+            setField('id_email', userEmail);
+            setField('id_phone', state.phone || profilePhone || 'signed-in');
+            setField('id_city', state.city || 'Customer city');
+            setField('id_address', state.area || profileAddress || 'Saved customer address');
+            setField('id_notes', state.area ? `Checkout chat delivery area: ${state.area}` : 'Signed-in chat checkout');
+
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('{% url "checkout" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok || !data.status) {
+                    throw new Error(data.message || 'We could not place the order right now.');
+                }
+
+                addMessage(data.message || (isSignedIn
+                    ? 'Your order will arrive in 3 - 4 business days, message me for questions. Thanks.'
+                    : 'Great, your order will arrive in 3 - 4 business days, a cashier will call you for payment confirmation, Thanks.'), false);
+
+                if (data.data && data.data.order_id) {
+                    addAction('View order', function() {
+                        window.location.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', data.data.order_id);
+                    });
+                }
+            } catch (error) {
+                state.submitting = false;
+                inputRow.classList.remove('hidden');
+                addMessage(error.message || 'Something went wrong. Please try again.', false);
+                if (isSignedIn) {
+                    addAction('Try again', submitOrder);
+                } else {
+                    state.step = 'area';
+                    setPrompt('Enter your area', 'Please confirm the area again.');
+                }
+            }
+        }
+
+        function handleGuestAnswer(value) {
+            if (state.step === 'name_phone') {
+                const phoneMatch = value.match(/(?:\+?\d[\d\s-]{6,}\d)/);
+                if (!phoneMatch) {
+                    addMessage('Please send your name and phone number together, for example: Luyando, 0977123456.', false);
+                    return;
+                }
+                state.phone = phoneMatch[0].replace(/[^\d+]/g, '');
+                state.name = value.replace(phoneMatch[0], '').replace(/[,|-]/g, ' ').trim();
+                if (!state.name) {
+                    addMessage('I have your phone number. What name should we put on the order?', false);
+                    state.step = 'name_only';
+                    setPrompt('Enter your name', '');
+                    return;
+                }
+                state.step = 'city';
+                addMessage('Thanks. What is your home town or city?', false);
+                setPrompt('Enter home town or city', '');
+                return;
+            }
+
+            if (state.step === 'name_only') {
+                state.name = value;
+                state.step = 'city';
+                addMessage('Thanks. What is your home town or city?', false);
+                setPrompt('Enter home town or city', '');
+                return;
+            }
+
+            if (state.step === 'city') {
+                state.city = value;
+                state.step = 'area';
+                addMessage('Which area should we deliver to?', false);
+                setPrompt('Enter area', 'Example: Kabulonga, Chilenje, Matero, Roma');
+                return;
+            }
+
+            if (state.step === 'area') {
+                state.area = value;
+                submitOrder();
+            }
+        }
+
+        function handleSend() {
+            const value = input.value.trim();
+            if (!value || state.submitting) return;
+            input.value = '';
+            addMessage(value, true);
+            handleGuestAnswer(value);
+        }
+
+        send.addEventListener('click', handleSend);
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                handleSend();
+            }
+        });
+
+        if (isSignedIn) {
+            state.name = userName || 'Customer';
+            state.phone = profilePhone;
+            state.city = 'Customer city';
+            state.area = profileAddress || 'Saved customer address';
+            inputRow.classList.add('hidden');
+            addMessage(`Hi ${state.name}. I can see you are signed up.`, false);
+            addAction('Place my order', submitOrder);
+        } else {
+            state.step = 'name_phone';
+            addMessage('Hi, I will help you check out here.', false);
+            addMessage('What is your name and phone number?', false);
+            setPrompt('Enter name and phone number', 'Example: Luyando, 0977123456');
         }
     });
-
-    async function submitForm(event) {
-        event.preventDefault(); // Prevent the default form submission
-
-        setPaymentModalState('processing');
-
-        // Get form data
-        const form = document.getElementById('checkout-form');
-        const formData = new FormData(form);
-
-        try {
-            // Submit the form data to the server
-            const response = await fetch('{% url "checkout" %}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': formData.get('csrfmiddlewaretoken'), // Include CSRF token
-                },
-            });
-
-            let data;
-            try {
-                data = await response.json();
-            } catch (jsonError) {
-                // If response is not JSON, show a generic error
-                throw new Error('Server error: Invalid response format. Please try again or contact support.');
-            }
-
-            if (!response.ok || !data.status) {
-                throw new Error(data.message || 'Failed to submit the form');
-            }
-
-            // Redirect to the order confirmation page
-            if (data.data && data.data.order_id) {
-                setPaymentModalState('success', data.message || 'Payment request accepted. Redirecting now.');
-                setTimeout(() => {
-                    window.location.href = `{% url 'order_confirmation' order_id=0 %}`.replace('0', data.data.order_id);
-                }, 900);
-            } else {
-                throw new Error(data.message || 'Form submission failed');
-            }
-        } catch (error) {
-            console.error('Error:', error.message);
-            setPaymentModalState('error', error.message);
-        }
-    }
 </script>
-
 {% endblock %}

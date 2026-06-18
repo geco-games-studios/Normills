@@ -1301,6 +1301,7 @@ def checkout(request):
     
     if request.method == 'POST':
         logger.info(f"Checkout POST data: {request.POST}")
+        is_chat_checkout = request.POST.get('checkout_mode') == 'chat'
         stock_issues = _cart_stock_issues(cart)
         if stock_issues:
             return JsonResponse({
@@ -1378,16 +1379,17 @@ def checkout(request):
                     quantity=cart_item.quantity
                 )
             
-            # Send SMS immediately when the order is created
-            try:
-                if form.cleaned_data['payment_method'] == 'cash':
-                    send_order_receipt_sms(order)
-                else:
-                    send_order_sms(order)
-            except Exception as sms_exc:
-                logger.exception('Immediate order SMS failed for Order ID %s', order.id)
+            # Chat checkout should answer immediately once the order is stored.
+            if not is_chat_checkout:
+                try:
+                    if form.cleaned_data['payment_method'] == 'cash':
+                        send_order_receipt_sms(order)
+                    else:
+                        send_order_sms(order)
+                except Exception as sms_exc:
+                    logger.exception('Immediate order SMS failed for Order ID %s', order.id)
 
-            send_admin_whatsapp_order_receipt(order)
+                send_admin_whatsapp_order_receipt(order)
 
             # Process payment based on selected method
             payment_method = form.cleaned_data['payment_method']
@@ -1520,10 +1522,17 @@ def checkout(request):
                         'data': None
                     }, status=400)
                 cart.items.all().delete()
-                send_order_confirmation_email(order)
+                if not is_chat_checkout:
+                    send_order_confirmation_email(order)
+                if is_chat_checkout and request.user.is_authenticated:
+                    cash_message = 'Your order will arrive in 3 - 4 business days, message me for questions. Thanks.'
+                elif is_chat_checkout:
+                    cash_message = 'Great, your order will arrive in 3 - 4 business days, a cashier will call you for payment confirmation, Thanks.'
+                else:
+                    cash_message = 'Order placed successfully! You will pay on delivery.'
                 json_response = {
                     'status': True,
-                    'message': 'Order placed successfully! You will pay on delivery.',
+                    'message': cash_message,
                     'data': {
                         'order_id': order.id
                     }
