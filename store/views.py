@@ -192,6 +192,14 @@ def _set_order_paid(order):
     return order
 
 
+def _send_cashier_order_message(order, message):
+    try:
+        order.send_sms_notification(message, order.phone)
+        order._notify_store_owner(message)
+    except Exception:
+        logger.exception('Cashier order message failed for Order ID %s', order.id)
+
+
 def _remember_order_for_session(request, order):
     order_ids = request.session.get('guest_order_ids', [])
     if not isinstance(order_ids, list):
@@ -783,6 +791,47 @@ def admin_dashboard(request):
             order = get_object_or_404(Order, id=request.POST.get('order_id'))
             old_status = order.status
             old_payment_status = order.payment_status
+            cashier_step = request.POST.get('cashier_step') or ''
+
+            if cashier_step == 'money_received':
+                try:
+                    with transaction.atomic():
+                        order.payment_status = 'completed'
+                        order.payment_confirmed = True
+                        order.status = 'packing'
+                        order.save(update_fields=['payment_status', 'payment_confirmed', 'status'])
+                        _deduct_stock_for_order(order)
+                except ValueError as exc:
+                    messages.error(request, str(exc))
+                    return dashboard_redirect('cashier')
+                _send_cashier_order_message(
+                    order,
+                    f"Payment received for Order #{order.id}. Your order is now being packed. Thank you for shopping with Normils.",
+                )
+                messages.success(request, f"Money received for Order #{order.id}. Customer was told the order is being packed.")
+                return dashboard_redirect('cashier')
+
+            if cashier_step == 'en_route':
+                order.status = 'dispatched'
+                order.save(update_fields=['status'])
+                _send_cashier_order_message(
+                    order,
+                    f"Order #{order.id} is en route. Items: {order.product_details()}. Reply or call us if you have questions.",
+                )
+                messages.success(request, f"Order #{order.id} marked en route.")
+                return dashboard_redirect('cashier')
+
+            if cashier_step == 'arrived':
+                order.status = 'delivered'
+                order.delivered_at = timezone.now()
+                order.save(update_fields=['status', 'delivered_at'])
+                _send_cashier_order_message(
+                    order,
+                    f"Order #{order.id} has arrived. A cashier will call you with pickup or handover details. Thank you.",
+                )
+                messages.success(request, f"Order #{order.id} marked arrived.")
+                return dashboard_redirect('cashier')
+
             order.status = request.POST.get('status') or order.status
             order.payment_status = request.POST.get('payment_status') or order.payment_status
             order.notes = (request.POST.get('notes') or '').strip()
@@ -798,9 +847,15 @@ def admin_dashboard(request):
                     return redirect('admin_dashboard')
 
             if order.status == 'dispatched' and old_status != 'dispatched':
-                order.notify_shipped()
+                _send_cashier_order_message(
+                    order,
+                    f"Order #{order.id} is en route. Items: {order.product_details()}. Reply or call us if you have questions.",
+                )
             elif order.status == 'delivered' and old_status != 'delivered':
-                order.notify_delivered()
+                _send_cashier_order_message(
+                    order,
+                    f"Order #{order.id} has arrived. A cashier will call you with pickup or handover details. Thank you.",
+                )
 
             messages.success(request, f"Updated Order #{order.id}.")
             return dashboard_redirect('cashier')

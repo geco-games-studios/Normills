@@ -16,19 +16,33 @@
             </svg>
         </div>
         <h1 class="text-3xl font-bold text-gray-900">
-            {% if order.payment_status == 'completed' %}
-                Payment complete
+            {% if order.status == 'delivered' %}
+                Order arrived
+            {% elif order.status == 'dispatched' %}
+                Order en route
+            {% elif order.status == 'packing' %}
+                Order being packed
+            {% elif order.payment_status == 'completed' %}
+                Payment received
             {% elif order.payment_status == 'failed' %}
                 Payment failed
             {% else %}
-                Waiting for payment
+                Order received
             {% endif %}
         </h1>
         <p class="text-gray-600 mt-2">
-            {% if order.payment_status == 'completed' %}
-                Your order has been paid and is now being processed.
+            {% if order.status == 'delivered' %}
+                Your order has arrived. A cashier will call you with pickup or handover details.
+            {% elif order.status == 'dispatched' %}
+                Your order is on the way.
+            {% elif order.status == 'packing' %}
+                Your payment has been received and your order is being packed.
+            {% elif order.payment_status == 'completed' %}
+                Your payment has been received and your order is being processed.
             {% elif order.payment_status == 'failed' %}
                 Your order was created, but the mobile money payment did not complete.
+            {% elif order.payment_method == 'cash' %}
+                A cashier will contact you for payment processing. Thank you.
             {% else %}
                 Your order was created. Please complete the mobile money payment to continue.
             {% endif %}

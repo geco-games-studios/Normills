@@ -206,12 +206,12 @@
   </div>
   {% elif dashboard_mode == 'cashier' %}
   <section class="mt-8">
-    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div class="flex flex-col gap-4">
       <div>
         <h2 class="text-2xl font-black tracking-[.08em] text-gray-900">Cashier mode</h2>
-        <p class="mt-1 text-sm text-gray-500">Focused order desk: update order status, payment status, notes, and customer follow-up. Product editing stays in edit mode.</p>
+        <p class="mt-1 max-w-3xl text-sm leading-6 text-gray-500">Use the big action buttons in order: Money received, En route, Arrived. Each button saves the order status and sends the customer a follow-up cell message. Use Reply when you need to talk to the customer directly.</p>
       </div>
-      <form method="get" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <form method="get" class="grid gap-2 border border-gray-200 bg-white p-3 md:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
         <input type="hidden" name="mode" value="cashier">
         <input type="text" name="order_q" value="{{ order_query }}" placeholder="Order, customer, phone" class="border border-gray-300 px-3 py-2 text-sm">
         <select name="order_status" class="border border-gray-300 px-3 py-2 text-sm">
@@ -230,46 +230,86 @@
       </form>
     </div>
 
-    <div class="mt-5 grid gap-4 lg:grid-cols-2">
+    <div class="mt-5 grid gap-4 xl:grid-cols-2">
       {% for order in orders %}
-      <article class="border border-gray-200 bg-white p-5">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+      <article class="border border-gray-200 bg-white">
+        <div class="border-b border-gray-100 p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              {% if order.payment_status != 'completed' %}
+              <p class="mb-2 inline-flex bg-black px-3 py-1 text-xs font-black uppercase tracking-[.14em] text-white">New order</p>
+              {% endif %}
             <h3 class="text-lg font-black text-gray-900">Order #{{ order.id }} / {{ order.first_name }} {{ order.last_name }}</h3>
             <p class="mt-1 text-sm text-gray-500">{{ order.created|date:'M d, Y H:i' }} / {{ order.phone }} / {{ order.get_delivery_method_display }}</p>
             <p class="mt-2 text-sm leading-6 text-gray-700">{{ order.product_details }}</p>
-            {% if order.notes %}<p class="mt-3 bg-gray-50 p-3 text-sm text-gray-600">{{ order.notes }}</p>{% endif %}
-          </div>
-          <div class="flex flex-wrap gap-2 sm:justify-end">
-            <span class="bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">{{ order.get_status_display }}</span>
-            <span class="{% if order.payment_status == 'completed' %}bg-green-100 text-green-800{% elif order.payment_status == 'failed' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-3 py-1 text-xs font-bold">{{ order.get_payment_status_display }}</span>
-            <span class="bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700">K{{ order.total|floatformat:2 }}</span>
+              {% if order.notes %}<p class="mt-3 bg-gray-50 p-3 text-sm text-gray-600">{{ order.notes }}</p>{% endif %}
+            </div>
+            <div class="flex flex-wrap gap-2 sm:max-w-52 sm:justify-end">
+              <span class="bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">{{ order.get_status_display }}</span>
+              <span class="{% if order.payment_status == 'completed' %}bg-green-100 text-green-800{% elif order.payment_status == 'failed' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-3 py-1 text-xs font-bold">{{ order.get_payment_status_display }}</span>
+              <span class="bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700">K{{ order.total|floatformat:2 }}</span>
+            </div>
           </div>
         </div>
 
-        <form method="post" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_order">
-          <input type="hidden" name="order_id" value="{{ order.id }}">
-          <select name="status" class="border border-gray-300 px-3 py-2 text-sm">
-            {% for value,label in order_status_choices %}
-            <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          <select name="payment_status" class="border border-gray-300 px-3 py-2 text-sm">
-            {% for value,label in payment_status_choices %}
-            <option value="{{ value }}" {% if order.payment_status == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          <input type="text" name="notes" value="{{ order.notes }}" placeholder="Customer follow-up note" class="border border-gray-300 px-3 py-2 text-sm">
-          <button class="bg-black px-4 py-2 text-sm font-bold text-white">Update</button>
-        </form>
-
-        <div class="mt-4 flex flex-wrap gap-3">
-          <a href="{% url 'order_confirmation' order.id %}" class="border border-gray-300 px-3 py-2 text-sm font-bold text-gray-700">View order</a>
-          {% if order.whatsapp_url %}
-          <a href="{{ order.whatsapp_url }}" target="_blank" class="bg-green-600 px-3 py-2 text-sm font-bold text-white">Message customer</a>
+        <div class="grid gap-2 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          {% if order.payment_status != 'completed' %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_order">
+            <input type="hidden" name="cashier_step" value="money_received">
+            <input type="hidden" name="order_id" value="{{ order.id }}">
+            <button class="h-full w-full bg-black px-4 py-3 text-sm font-black uppercase tracking-[.12em] text-white">Money received</button>
+          </form>
+          {% else %}
+          <div class="flex items-center justify-center border border-green-200 bg-green-50 px-4 py-3 text-center text-sm font-black uppercase tracking-[.12em] text-green-800">Paid</div>
           {% endif %}
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_order">
+            <input type="hidden" name="cashier_step" value="en_route">
+            <input type="hidden" name="order_id" value="{{ order.id }}">
+            <button class="h-full w-full border border-gray-900 bg-white px-4 py-3 text-sm font-black uppercase tracking-[.12em] text-gray-900">En route</button>
+          </form>
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_order">
+            <input type="hidden" name="cashier_step" value="arrived">
+            <input type="hidden" name="order_id" value="{{ order.id }}">
+            <button class="h-full w-full border border-gray-900 bg-white px-4 py-3 text-sm font-black uppercase tracking-[.12em] text-gray-900">Arrived</button>
+          </form>
+
+          {% if order.whatsapp_url %}
+          <a href="{{ order.whatsapp_url }}" target="_blank" class="flex items-center justify-center bg-green-600 px-4 py-3 text-center text-sm font-black uppercase tracking-[.12em] text-white">Reply</a>
+          {% else %}
+          <a href="{% url 'order_confirmation' order.id %}" class="flex items-center justify-center border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.12em] text-gray-700">View order</a>
+          {% endif %}
+        </div>
+
+        <div class="border-t border-gray-100 p-5">
+          <details>
+            <summary class="cursor-pointer text-sm font-black uppercase tracking-[.14em] text-gray-700">Manual status and note</summary>
+            <form method="post" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_order">
+              <input type="hidden" name="order_id" value="{{ order.id }}">
+              <select name="status" class="border border-gray-300 px-3 py-2 text-sm">
+                {% for value,label in order_status_choices %}
+                <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <select name="payment_status" class="border border-gray-300 px-3 py-2 text-sm">
+                {% for value,label in payment_status_choices %}
+                <option value="{{ value }}" {% if order.payment_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="notes" value="{{ order.notes }}" placeholder="Customer follow-up note" class="border border-gray-300 px-3 py-2 text-sm">
+              <button class="bg-black px-4 py-2 text-sm font-bold text-white">Save</button>
+            </form>
+          </details>
+          <a href="{% url 'order_confirmation' order.id %}" class="mt-4 inline-block text-sm font-bold text-black underline">Open customer status page</a>
         </div>
       </article>
       {% empty %}
