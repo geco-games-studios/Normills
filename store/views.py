@@ -529,10 +529,74 @@ def get_personalized_products(request, exclude_product=None, limit=6):
     return products.order_by('-created')[:limit]
 
 
+BASE_STOREFRONT_FILTERS = [
+    {
+        'label': 'Tops',
+        'slug': 'tops',
+        'terms': ['top', 'tops', 'shirt', 'blouse', 'tee', 't-shirt', 'vest', 'jacket', 'hoodie', 'sweater'],
+    },
+    {
+        'label': 'Bottoms',
+        'slug': 'bottoms',
+        'terms': ['bottom', 'bottoms', 'trouser', 'pants', 'jeans', 'denim', 'shorts', 'skirt', 'leggings'],
+    },
+    {
+        'label': 'Shoes',
+        'slug': 'shoes',
+        'terms': ['shoe', 'shoes', 'sneaker', 'sneakers', 'sandal', 'sandals', 'heel', 'heels', 'boot', 'boots'],
+    },
+    {
+        'label': 'Accessories',
+        'slug': 'accessories',
+        'terms': ['accessory', 'accessories', 'bag', 'belt', 'hat', 'cap', 'jewellery', 'jewelry', 'watch', 'scarf'],
+    },
+]
+
+
+def _storefront_filter_buttons():
+    collection_slugs = {'kids-collection', 'mens-collection', 'women-collection'}
+    buttons = [dict(button) for button in BASE_STOREFRONT_FILTERS]
+    existing_slugs = {button['slug'] for button in buttons}
+    for category in Category.objects.exclude(slug__in=collection_slugs).order_by('name'):
+        if category.slug in existing_slugs:
+            continue
+        buttons.append({
+            'label': category.name,
+            'slug': category.slug,
+            'category_id': category.id,
+            'terms': [category.name, category.slug.replace('-', ' ')],
+        })
+        existing_slugs.add(category.slug)
+    return buttons
+
+
+def _apply_storefront_filter(products, selected_filter, filter_buttons):
+    if not selected_filter:
+        return products
+
+    filter_config = next((button for button in filter_buttons if button['slug'] == selected_filter), None)
+    if not filter_config:
+        return products
+
+    filters = Q()
+    if filter_config.get('category_id'):
+        filters |= Q(category_id=filter_config['category_id'])
+
+    for term in filter_config.get('terms', []):
+        filters |= Q(name__icontains=term)
+        filters |= Q(description__icontains=term)
+        filters |= Q(category__name__icontains=term)
+        filters |= Q(brand__name__icontains=term)
+
+    return products.filter(filters).distinct()
+
+
 def home(request):
     categories = Category.objects.all()
     products = Product.objects.filter(available=True, stock__gt=0)
     brands = Brand.objects.all()
+    filter_buttons = _storefront_filter_buttons()
+    selected_filter = request.GET.get('filter') or ''
 
     # price bounds for the UI slider
     price_bounds = Product.objects.aggregate(min_price=Min('price'), max_price=Max('price'))
@@ -586,6 +650,8 @@ def home(request):
             Q(color__in=color_filters) | Q(variants__color__in=color_filters)
         ).distinct()
 
+    products = _apply_storefront_filter(products, selected_filter, filter_buttons)
+
     personalized_products = []
     recently_viewed_products = []
     viewed_product_ids = request.session.get('viewed_product_ids', [])
@@ -623,6 +689,8 @@ def home(request):
         'total_products': total_products,
         'viewed_count': viewed_count,
         'wishlist_ids': [str(product_id) for product_id in wishlist_ids],
+        'filter_buttons': filter_buttons,
+        'selected_filter': selected_filter,
     })
     
     
@@ -644,10 +712,17 @@ def search_products(request):
 
 def category_detail(request, slug):
     category = get_object_or_404(Category, slug=slug)
+    categories = Category.objects.all()
+    filter_buttons = _storefront_filter_buttons()
+    selected_filter = request.GET.get('filter') or ''
     products = category.products.filter(available=True, stock__gt=0)
+    products = _apply_storefront_filter(products, selected_filter, filter_buttons)
     return render(request, 'category_detail.html', {
         'category': category,
-        'products': products
+        'categories': categories,
+        'products': products,
+        'filter_buttons': filter_buttons,
+        'selected_filter': selected_filter,
     })
 
 def product_detail(request, slug):

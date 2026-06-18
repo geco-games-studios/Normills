@@ -4,19 +4,31 @@
 
 {% block content %}
 <section class="border-b border-gray-200 bg-white">
-    <div class="mx-auto max-w-7xl px-0 pb-5 pt-8 md:px-6">
-        <h1 class="text-[24px] font-black leading-tight tracking-[.08em] text-black min-[430px]:text-[28px] min-[430px]:tracking-[.12em] md:text-4xl">NORMILS New In: {{ category.name }}</h1>
-        <p class="mt-5 truncate text-[15px] tracking-[.04em] text-[#333]">Fresh arrivals selected from {{ category.name }}</p>
+    <div class="mx-auto max-w-7xl px-4 pb-5 pt-7 md:px-6 md:pt-8">
+        <h1 class="text-[21px] font-black leading-tight tracking-[.08em] text-black min-[430px]:text-[26px] md:text-4xl">NORMILS New In: {{ category.name }}</h1>
+        <p class="mt-4 max-w-2xl text-[14px] leading-6 tracking-[.04em] text-[#333] md:text-[15px]">Fresh arrivals selected from {{ category.name }}</p>
+
+        <div class="scrollbar-none mt-5 flex snap-x gap-2 overflow-x-auto border-b border-gray-300 pb-3">
+            <a href="/" class="snap-start whitespace-nowrap border border-gray-200 px-4 py-3 text-[15px] tracking-[.04em] text-[#555]">New in: Today</a>
+            {% for nav_category in categories %}
+            <a href="{% url 'category_detail' nav_category.slug %}" class="snap-start whitespace-nowrap border {% if nav_category.id == category.id %}border-black bg-black text-white{% else %}border-gray-200 text-[#555]{% endif %} px-4 py-3 text-[15px] tracking-[.04em]">New In: {{ nav_category.name }}</a>
+            {% endfor %}
+        </div>
     </div>
 </section>
 
 <section class="mx-auto max-w-7xl bg-white md:px-6">
-    <div class="flex items-center justify-between px-4 py-8 text-[15px] tracking-[.04em] text-[#333]">
-        <div class="flex items-center gap-8">
-            <button type="button">Sort</button>
-            <button type="button">Filter</button>
+    <div class="px-4 py-6">
+        <div class="flex items-center justify-between gap-4">
+            <p class="text-[15px] font-black uppercase tracking-[.16em] text-[#333]">Shop by type</p>
+            <p class="shrink-0 text-right text-[15px] tracking-[.04em] text-[#777]">{{ products.count }} styles found</p>
         </div>
-        <p class="text-right text-[#777]">{{ products.count }} styles found</p>
+        <div class="scrollbar-none mt-4 flex gap-2 overflow-x-auto pb-1">
+            <a href="{% url 'category_detail' category.slug %}" class="whitespace-nowrap border {% if not selected_filter %}border-black bg-black text-white{% else %}border-gray-300 bg-white text-[#333]{% endif %} px-4 py-3 text-[14px] font-bold tracking-[.04em]">All</a>
+            {% for button in filter_buttons %}
+            <a href="?filter={{ button.slug }}" class="whitespace-nowrap border {% if selected_filter == button.slug %}border-black bg-black text-white{% else %}border-gray-300 bg-white text-[#333]{% endif %} px-4 py-3 text-[14px] font-bold tracking-[.04em]">{{ button.label }}</a>
+            {% endfor %}
+        </div>
     </div>
 
     <div class="grid grid-cols-2 gap-x-[3px] gap-y-8 md:grid-cols-4 md:gap-x-4 md:gap-y-12">
