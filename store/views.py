@@ -8,7 +8,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.db.models import Q, Min, Max, Sum
 from django.utils.crypto import get_random_string
+from django.utils.text import slugify
 from decimal import Decimal, ROUND_HALF_UP
+import os
 import re
 import uuid
 import json
@@ -26,6 +28,7 @@ from datetime import timedelta
 from .payment import best_lenco_data, get_collection_status, lenco_data_items, process_lenco_payment, submit_lenco_otp
 from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
+from manager.models import Store
 
 import logging
 
@@ -671,6 +674,67 @@ def admin_dashboard(request):
     if not request.user.is_superuser:
         return HttpResponseForbidden('Superuser access only.')
 
+    def dashboard_redirect(mode='editor'):
+        return redirect(f"{request.path}?mode={mode}")
+
+    def update_product_from_post(product, mode='editor'):
+        previous_online = product.stock
+        previous_offline = product.offline_stock
+
+        product.name = (request.POST.get('name') or product.name).strip()
+        product.description = (request.POST.get('description') or '').strip()
+        product.price = _money(request.POST.get('price') or product.price)
+        product.stock = _parse_positive_int(request.POST.get('stock'), product.stock, minimum=0)
+        product.offline_stock = _parse_positive_int(request.POST.get('offline_stock'), product.offline_stock, minimum=0)
+        product.low_stock_threshold = _parse_positive_int(request.POST.get('low_stock_threshold'), product.low_stock_threshold, minimum=0)
+        product.available = request.POST.get('available') == 'on' and product.stock > 0
+        if 'color' in request.POST:
+            product.color = (request.POST.get('color') or '').strip() or None
+        if 'season' in request.POST:
+            product.season = request.POST.get('season') or None
+        if 'fabric' in request.POST:
+            product.fabric = request.POST.get('fabric') or None
+        if 'cost_range' in request.POST:
+            product.cost_range = request.POST.get('cost_range') or None
+
+        category_id = request.POST.get('category')
+        if category_id:
+            product.category = get_object_or_404(Category, id=category_id)
+
+        brand_id = request.POST.get('brand')
+        product.brand = Brand.objects.filter(id=brand_id).first() if brand_id else None
+
+        uploaded_image = request.FILES.get('image')
+        existing_image = (request.POST.get('existing_image') or '').strip()
+        if uploaded_image:
+            product.image = uploaded_image
+        elif existing_image:
+            product.image = existing_image
+
+        if not product.slug:
+            base_slug = slugify(product.name) or f"product-{product.id or get_random_string(6)}"
+            slug = base_slug
+            suffix = 2
+            while Product.objects.filter(slug=slug).exclude(id=product.id).exists():
+                slug = f"{base_slug}-{suffix}"
+                suffix += 1
+            product.slug = slug
+
+        product.save()
+
+        if product.stock != previous_online or product.offline_stock != previous_offline:
+            StockAdjustment.objects.create(
+                product=product,
+                user=request.user,
+                previous_online_stock=previous_online,
+                new_online_stock=product.stock,
+                previous_offline_stock=previous_offline,
+                new_offline_stock=product.offline_stock,
+                reason=(request.POST.get('reason') or f'{mode.title()} update').strip(),
+            )
+
+        return product
+
     if request.method == 'POST':
         action = request.POST.get('action')
 
@@ -693,7 +757,26 @@ def admin_dashboard(request):
                 reason=(request.POST.get('reason') or 'Dashboard update').strip(),
             )
             messages.success(request, f"Updated stock for {product.name}.")
-            return redirect('admin_dashboard')
+            return dashboard_redirect('stock')
+
+        if action == 'update_product':
+            product = get_object_or_404(Product, id=request.POST.get('product_id'))
+            update_product_from_post(product, 'editor')
+            messages.success(request, f"Updated storefront item: {product.name}.")
+            return dashboard_redirect('editor')
+
+        if action == 'create_product':
+            store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
+            default_store = Store.objects.filter(id=store).first() if store else Store.objects.first()
+            category = Category.objects.filter(id=request.POST.get('category')).first() or Category.objects.first()
+            if not default_store or not category:
+                messages.error(request, 'Create a store and category before adding products.')
+                return dashboard_redirect('editor')
+
+            product = Product(store=default_store, category=category, name='New product', price=Decimal('0.00'), image='products/WhatsApp_Image_2025-03-20_at_15.52.43_9e937bc2.jpg')
+            update_product_from_post(product, 'editor')
+            messages.success(request, f"Added storefront item: {product.name}.")
+            return dashboard_redirect('editor')
 
         if action == 'update_order':
             order = get_object_or_404(Order, id=request.POST.get('order_id'))
@@ -719,7 +802,7 @@ def admin_dashboard(request):
                 order.notify_delivered()
 
             messages.success(request, f"Updated Order #{order.id}.")
-            return redirect('admin_dashboard')
+            return dashboard_redirect('cashier')
 
     total_conversations = BotConversation.objects.count()
     total_learned_keywords = LearnedKeyword.objects.count()
@@ -754,6 +837,10 @@ def admin_dashboard(request):
     average_tokens = 0
     if total_conversations:
         average_tokens = token_summary.get('total_tokens', 0) / total_conversations
+
+    dashboard_mode = request.GET.get('mode') or 'editor'
+    if dashboard_mode not in {'editor', 'cashier', 'stock'}:
+        dashboard_mode = 'editor'
 
     stock_query = (request.GET.get('stock_q') or '').strip()
     stock_filter = request.GET.get('stock_filter') or 'all'
@@ -791,6 +878,14 @@ def admin_dashboard(request):
         orders = orders.filter(payment_status=payment_status)
 
     recent_stock_adjustments = StockAdjustment.objects.select_related('product', 'user')[:12]
+    categories = Category.objects.order_by('name')
+    brands = Brand.objects.order_by('name')
+    media_products_dir = os.path.join(settings.MEDIA_ROOT, 'products')
+    uploaded_product_images = []
+    if os.path.isdir(media_products_dir):
+        for filename in sorted(os.listdir(media_products_dir))[:120]:
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
+                uploaded_product_images.append(f'products/{filename}')
 
     return render(request, 'admin_dashboard.html', {
         'total_conversations': total_conversations,
@@ -812,6 +907,10 @@ def admin_dashboard(request):
         'average_tokens': average_tokens,
         'products': products[:80],
         'orders': orders[:80],
+        'categories': categories,
+        'brands': brands,
+        'uploaded_product_images': uploaded_product_images,
+        'dashboard_mode': dashboard_mode,
         'recent_stock_adjustments': recent_stock_adjustments,
         'stock_query': stock_query,
         'stock_filter': stock_filter,
