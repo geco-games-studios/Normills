@@ -4,12 +4,15 @@
 
 {% block content %}
 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-    <div>
+    <div class="space-y-3">
         {% if product.image %}
         <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full rounded-lg">
         {% else %}
         <img src="/placeholder.svg?height=500&width=500" alt="{{ product.name }}" class="w-full rounded-lg">
         {% endif %}
+        {% for image in supporting_images %}
+        <img src="{{ image.image.url }}" alt="{{ product.name }}" class="w-full rounded-lg">
+        {% endfor %}
     </div>
     
     <div>

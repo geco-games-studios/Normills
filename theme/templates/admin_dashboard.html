@@ -122,13 +122,8 @@
           <input name="image" type="file" accept="image/*" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Or use uploaded image</label>
-          <select name="existing_image" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
-            <option value="">Keep uploaded/default image</option>
-            {% for image_name in uploaded_product_images %}
-            <option value="{{ image_name }}">{{ image_name }}</option>
-            {% endfor %}
-          </select>
+          <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Upload Supporting Images</label>
+          <input name="supporting_images" type="file" accept="image/*" multiple class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
         </div>
         <div>
           <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Description</label>
@@ -234,6 +229,9 @@
                   <option value="{{ image_name }}" {% if product.image.name == image_name %}selected{% endif %}>{{ image_name }}</option>
                   {% endfor %}
                 </select>
+              </label>
+              <label class="block text-xs font-bold text-gray-600">Upload supporting images
+                <input name="supporting_images" type="file" accept="image/*" multiple class="mt-1 w-full border border-gray-300 px-2 py-2 text-sm">
               </label>
               <label class="block text-xs font-bold text-gray-600">Description
                 <textarea name="description" rows="3" class="mt-1 w-full border border-gray-300 px-2 py-2 text-sm">{{ product.description }}</textarea>

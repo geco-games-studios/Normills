@@ -100,6 +100,18 @@ class Product(models.Model):
     @property
     def is_low_stock(self):
         return self.stock <= self.low_stock_threshold
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='supporting_images')
+    image = models.ImageField(upload_to='products/supporting/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.product.name} image"
     
 
 class LearnedKeyword(models.Model):

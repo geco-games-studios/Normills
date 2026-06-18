@@ -20,7 +20,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -726,8 +726,13 @@ def category_detail(request, slug):
     })
 
 def product_detail(request, slug):
-    product = get_object_or_404(Product, slug=slug, available=True)
+    product = get_object_or_404(
+        Product.objects.prefetch_related('supporting_images'),
+        slug=slug,
+        available=True,
+    )
     variants = product.variants.all()
+    supporting_images = product.supporting_images.all()
 
     viewed_product_ids = request.session.get('viewed_product_ids', [])
     if not isinstance(viewed_product_ids, list):
@@ -748,6 +753,7 @@ def product_detail(request, slug):
     return render(request, 'product_details.html', {
         'product': product,
         'variants': variants,
+        'supporting_images': supporting_images,
         'recommended_products': recommended_products,
         'product_url': product_url,
     })
@@ -805,6 +811,9 @@ def admin_dashboard(request):
             product.slug = slug
 
         product.save()
+
+        for supporting_image in request.FILES.getlist('supporting_images'):
+            ProductImage.objects.create(product=product, image=supporting_image)
 
         if product.stock != previous_online or product.offline_stock != previous_offline:
             StockAdjustment.objects.create(

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
+from .models import Category, Product, ProductVariant, ProductImage, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -68,13 +68,17 @@ class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 1
 
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'brand', 'price', 'stock', 'offline_stock', 'low_stock_threshold', 'available', 'created', 'updated']
     list_filter = ['available', 'created', 'updated', 'category', 'brand']
     list_editable = ['price', 'stock', 'offline_stock', 'low_stock_threshold', 'available']
     prepopulated_fields = {'slug': ('name',)}
-    inlines = [ProductVariantInline]
+    inlines = [ProductVariantInline, ProductImageInline]
 
 class CartItemInline(admin.TabularInline):
     model = CartItem
