@@ -146,6 +146,24 @@ class CashierContact(models.Model):
         return self.name
 
 
+class PaymentInfo(models.Model):
+    title = models.CharField(max_length=120)
+    number = models.CharField(max_length=40)
+    recipient_name = models.CharField(max_length=120)
+    active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'title']
+        verbose_name = 'Payment Info'
+        verbose_name_plural = 'Payment Info'
+
+    def __str__(self):
+        return f"{self.title} - {self.number}"
+
+
 class NewsletterSubscriber(models.Model):
     email = models.EmailField(unique=True)
     active = models.BooleanField(default=True)

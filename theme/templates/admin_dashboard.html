@@ -499,9 +499,77 @@
         </label>
         <button class="w-full bg-black px-4 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Add cashier</button>
       </form>
+
+      <div class="mt-8 border-t border-gray-200 pt-6">
+        <h3 class="text-lg font-black uppercase tracking-[.14em] text-gray-900">Payment info</h3>
+        <p class="mt-2 text-sm leading-6 text-gray-500">These are the payment numbers customers see at checkout.</p>
+        <form method="post" class="mt-5 space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_payment_info">
+          <label class="block text-xs font-bold text-gray-600">Title
+            <input name="payment_title" required class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Airtel Money">
+          </label>
+          <label class="block text-xs font-bold text-gray-600">Number
+            <input name="payment_number" required class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm" placeholder="0977123456">
+          </label>
+          <label class="block text-xs font-bold text-gray-600">Recipient/receiver name
+            <input name="recipient_name" required class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm" placeholder="Normils Online">
+          </label>
+          <label class="block text-xs font-bold text-gray-600">Display order
+            <input name="sort_order" type="number" min="0" value="0" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+          </label>
+          <label class="inline-flex items-center gap-2 border border-gray-300 px-3 py-2 text-sm font-bold text-gray-700">
+            <input type="checkbox" name="active" checked>
+            Active
+          </label>
+          <button class="w-full bg-black px-4 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Add payment info</button>
+        </form>
+      </div>
     </aside>
 
     <section class="grid gap-4">
+      <div class="border border-gray-200 bg-white p-5">
+        <h3 class="text-lg font-black uppercase tracking-[.14em] text-gray-900">Payment info shown at checkout</h3>
+        <div class="mt-4 grid gap-3">
+          {% for info in payment_infos %}
+          <article class="border border-gray-200 p-4">
+            <form method="post" class="grid gap-3 md:grid-cols-[1fr_1fr_1fr_90px_auto] md:items-end">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_payment_info">
+              <input type="hidden" name="payment_info_id" value="{{ info.id }}">
+              <label class="block text-xs font-bold text-gray-600">Title
+                <input name="payment_title" value="{{ info.title }}" required class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block text-xs font-bold text-gray-600">Number
+                <input name="payment_number" value="{{ info.number }}" required class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block text-xs font-bold text-gray-600">Recipient/receiver
+                <input name="recipient_name" value="{{ info.recipient_name }}" required class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block text-xs font-bold text-gray-600">Order
+                <input name="sort_order" type="number" min="0" value="{{ info.sort_order }}" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <div class="flex gap-2">
+                <label class="inline-flex items-center gap-2 border border-gray-300 px-3 py-2 text-sm font-bold text-gray-700">
+                  <input type="checkbox" name="active" {% if info.active %}checked{% endif %}>
+                  Active
+                </label>
+                <button class="bg-black px-4 py-2 text-sm font-bold text-white">Save</button>
+              </div>
+            </form>
+            <form method="post" class="mt-3" onsubmit="return confirm('Remove payment info {{ info.title|escapejs }}?');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_payment_info">
+              <input type="hidden" name="payment_info_id" value="{{ info.id }}">
+              <button class="text-sm font-black uppercase tracking-[.12em] text-red-700">Remove payment info</button>
+            </form>
+          </article>
+          {% empty %}
+          <div class="border border-dashed border-gray-300 p-6 text-center text-gray-500">No payment info added yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
       {% for contact in cashier_contacts %}
       <article class="border border-gray-200 bg-white p-5">
         <form method="post" class="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">

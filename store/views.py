@@ -22,7 +22,7 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -68,6 +68,49 @@ def _checkout_amounts(subtotal, payment_method='cash'):
         'tax': tax,
         'total': total,
     }
+
+
+def _money_display(value):
+    return f"K{_money(value):,.2f}"
+
+
+def _active_payment_infos():
+    return PaymentInfo.objects.filter(active=True).order_by('sort_order', 'title')
+
+
+def _payment_info_payload():
+    return [
+        {
+            'title': info.title,
+            'number': info.number,
+            'recipient_name': info.recipient_name,
+        }
+        for info in _active_payment_infos()
+    ]
+
+
+def _payment_confirmed_receipt_message(order):
+    return (
+        f"Payment Confirmed. Receipt for Order #{order.id}: {_money_display(order.total)}. "
+        "Your order will be delivered in 3 - 4 business days depending on your location via courier service. "
+        "For any questions contact us."
+    )
+
+
+def _message_payment_text(order):
+    payment_infos = list(_active_payment_infos())
+    lines = [
+        f"Hello, Thank You for shopping with Normils Online, your Bill due is {_money_display(order.total)}.",
+        "Kindly send the money to either of the following numbers;",
+    ]
+    if payment_infos:
+        lines.extend(
+            f"{info.title}: {info.number} - {info.recipient_name}"
+            for info in payment_infos
+        )
+    else:
+        lines.append("A cashier will share payment details shortly.")
+    return "\n".join(lines)
 
 
 def _order_payment_status(lenco_status):
@@ -1065,6 +1108,42 @@ def admin_dashboard(request):
             messages.success(request, f"Removed cashier contact {contact_name}.")
             return dashboard_redirect('cashiers')
 
+        if action == 'create_payment_info':
+            title = (request.POST.get('payment_title') or '').strip()
+            number = (request.POST.get('payment_number') or '').strip()
+            recipient_name = (request.POST.get('recipient_name') or '').strip()
+            sort_order = _parse_positive_int(request.POST.get('sort_order'), 0, minimum=0)
+            if not title or not number or not recipient_name:
+                messages.error(request, 'Payment title, number, and recipient/receiver name are required.')
+                return dashboard_redirect('cashiers')
+            PaymentInfo.objects.create(
+                title=title,
+                number=number,
+                recipient_name=recipient_name,
+                sort_order=sort_order,
+                active=request.POST.get('active') == 'on',
+            )
+            messages.success(request, f"Added payment info {title}.")
+            return dashboard_redirect('cashiers')
+
+        if action == 'update_payment_info':
+            payment_info = get_object_or_404(PaymentInfo, id=request.POST.get('payment_info_id'))
+            payment_info.title = (request.POST.get('payment_title') or payment_info.title).strip()
+            payment_info.number = (request.POST.get('payment_number') or payment_info.number).strip()
+            payment_info.recipient_name = (request.POST.get('recipient_name') or payment_info.recipient_name).strip()
+            payment_info.sort_order = _parse_positive_int(request.POST.get('sort_order'), payment_info.sort_order, minimum=0)
+            payment_info.active = request.POST.get('active') == 'on'
+            payment_info.save()
+            messages.success(request, f"Updated payment info {payment_info.title}.")
+            return dashboard_redirect('cashiers')
+
+        if action == 'delete_payment_info':
+            payment_info = get_object_or_404(PaymentInfo, id=request.POST.get('payment_info_id'))
+            title = payment_info.title
+            payment_info.delete()
+            messages.success(request, f"Removed payment info {title}.")
+            return dashboard_redirect('cashiers')
+
         if action == 'create_social_link':
             label = (request.POST.get('social_label') or '').strip()
             url = (request.POST.get('social_url') or '').strip()
@@ -1153,11 +1232,15 @@ def admin_dashboard(request):
                 except ValueError as exc:
                     messages.error(request, str(exc))
                     return dashboard_redirect('cashier')
+                try:
+                    send_order_confirmation_email(order)
+                except Exception:
+                    logger.exception('Payment confirmation email failed for Order ID %s', order.id)
                 _send_cashier_order_message(
                     order,
-                    f"Payment received for Order #{order.id}. Your order is now being packed. Thank you for shopping with Normils.",
+                    _payment_confirmed_receipt_message(order),
                 )
-                messages.success(request, f"Money received for Order #{order.id}. Customer was told the order is being packed.")
+                messages.success(request, f"Money received for Order #{order.id}. Customer payment confirmation is now live.")
                 return dashboard_redirect('cashier')
 
             if cashier_step == 'en_route':
@@ -1315,6 +1398,7 @@ def admin_dashboard(request):
             Q(phone_number__icontains=customer_query)
         )
     cashier_contacts = CashierContact.objects.order_by('name')
+    payment_infos = PaymentInfo.objects.order_by('sort_order', 'title')
     newsletter_subscribers = NewsletterSubscriber.objects.order_by('-created_at')
     social_links = SocialLink.objects.order_by('sort_order', 'label')
     storefront_control = StorefrontControl.objects.first() or StorefrontControl.objects.create()
@@ -1375,6 +1459,7 @@ def admin_dashboard(request):
         'customers': customers[:120],
         'customer_query': customer_query,
         'cashier_contacts': cashier_contacts,
+        'payment_infos': payment_infos,
         'newsletter_subscribers': newsletter_subscribers[:200],
         'newsletter_subscriber_count': NewsletterSubscriber.objects.filter(active=True).count(),
         'social_links': social_links,
@@ -2099,7 +2184,7 @@ def checkout(request):
                 )
             
             # Chat checkout should answer immediately once the order is stored.
-            if not is_chat_checkout:
+            if not is_chat_checkout and form.cleaned_data['payment_method'] != 'cash':
                 try:
                     if form.cleaned_data['payment_method'] == 'cash':
                         send_order_receipt_sms(order)
@@ -2229,38 +2314,25 @@ def checkout(request):
 
             elif payment_method == 'cash':
                 order.payment_status = 'pending'
-                order.status = 'packing'
+                order.status = 'payment_awaiting'
                 order.save(update_fields=['payment_status', 'status'])
-                try:
-                    _deduct_stock_for_order(order)
-                except ValueError as exc:
-                    order.status = 'cancelled'
-                    order.save(update_fields=['status'])
-                    return JsonResponse({
-                        'status': False,
-                        'message': str(exc),
-                        'data': None
-                    }, status=400)
                 cart.items.all().delete()
-                if not is_chat_checkout:
-                    send_order_confirmation_email(order)
-                else:
-                    _queue_order_created_notifications(order)
-                if is_chat_checkout and request.user.is_authenticated:
-                    cash_message = 'Your order will arrive in 3 - 4 business days, message me for questions. Thanks.'
-                elif is_chat_checkout:
-                    cash_message = 'Great, your order will arrive in 3 - 4 business days, a cashier will call you for payment confirmation, Thanks.'
-                else:
-                    cash_message = 'Order placed successfully! You will pay on delivery.'
+                _notify_cashiers_order_created(order)
+                cash_message = _message_payment_text(order)
                 json_response = {
                     'status': True,
                     'message': cash_message,
                     'data': {
-                        'order_id': order.id
+                        'order_id': order.id,
+                        'total': str(order.total),
+                        'total_display': _money_display(order.total),
+                        'payment_status': order.payment_status,
+                        'payment_infos': _payment_info_payload(),
+                        'receipt_message': _payment_confirmed_receipt_message(order),
                     }
                 }
                 logger.info(f"Cash payment response - Order ID: {order.id}, Response: {json.dumps(json_response, indent=2)}")
-                messages.success(request, "Your order has been placed successfully! You'll pay on delivery.")
+                messages.success(request, "Your order has been placed. Please send payment and wait for cashier confirmation.")
                 return JsonResponse(json_response)
         else:
             errors = {field: error[0] for field, error in form.errors.items()}
@@ -2291,6 +2363,7 @@ def checkout(request):
         'form': form,
         'checkout_amounts': cash_amounts,
         'mobile_money_amounts': mobile_money_amounts,
+        'payment_infos': _active_payment_infos(),
     })
 
 def send_order_confirmation_email(order):
@@ -2440,7 +2513,11 @@ def order_confirmation(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     if not _can_access_order(request, order):
         return HttpResponseForbidden('You do not have access to this order.')
-    return render(request, 'order_confirmation.html', {'order': order})
+    return render(request, 'order_confirmation.html', {
+        'order': order,
+        'payment_infos': _active_payment_infos(),
+        'receipt_message': _payment_confirmed_receipt_message(order),
+    })
 
 @login_required
 def order_history(request):
@@ -2512,19 +2589,21 @@ def confirm_payment(request, order_id):
     if not _can_access_order(request, order):
         return HttpResponseForbidden('You do not have access to this order.')
 
-    # For cash on delivery, skip the timer and go directly to confirmation
     if order.payment_method == 'cash':
-        # Mark payment as completed for cash on delivery
-        order.payment_status = 'completed'
-        order.status = 'paid'
-        order.save()
-        try:
-            _deduct_stock_for_order(order)
-        except ValueError as exc:
-            messages.error(request, str(exc))
-            return redirect('order_confirmation', order_id=order.id)
-
-        messages.success(request, 'Order placed successfully! Your order is being processed.')
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.META.get('HTTP_ACCEPT', '').find('application/json') != -1:
+            is_confirmed = order.payment_confirmed or order.payment_status == 'completed'
+            return JsonResponse({
+                'status': True,
+                'order_id': order.id,
+                'payment_status': 'completed' if is_confirmed else order.payment_status,
+                'order_status': order.status,
+                'message': 'Payment Confirmed' if is_confirmed else 'Waiting confirmation.',
+                'data': {
+                    'order_id': order.id,
+                    'receipt_message': _payment_confirmed_receipt_message(order) if is_confirmed else '',
+                },
+            })
+        messages.info(request, 'Waiting for cashier payment confirmation.')
         return redirect('order_confirmation', order_id=order.id)
 
     if request.method == 'POST':

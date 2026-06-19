@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -75,6 +75,12 @@ class CashierContactAdmin(admin.ModelAdmin):
     list_display = ['name', 'email', 'phone', 'active', 'updated_at']
     list_editable = ['active']
     search_fields = ['name', 'email', 'phone']
+
+@admin.register(PaymentInfo)
+class PaymentInfoAdmin(admin.ModelAdmin):
+    list_display = ['title', 'number', 'recipient_name', 'active', 'sort_order', 'updated_at']
+    list_editable = ['number', 'recipient_name', 'active', 'sort_order']
+    search_fields = ['title', 'number', 'recipient_name']
 
 @admin.register(NewsletterSubscriber)
 class NewsletterSubscriberAdmin(admin.ModelAdmin):

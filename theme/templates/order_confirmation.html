@@ -23,7 +23,7 @@
             {% elif order.status == 'packing' %}
                 Order being packed
             {% elif order.payment_status == 'completed' %}
-                Payment received
+                Payment Confirmed
             {% elif order.payment_status == 'failed' %}
                 Payment failed
             {% else %}
@@ -36,13 +36,13 @@
             {% elif order.status == 'dispatched' %}
                 Your order is on the way.
             {% elif order.status == 'packing' %}
-                Your payment has been received and your order is being packed.
+                Payment Confirmed. Your order will be delivered in 3 - 4 business days depending on your location via courier service. For any questions contact us.
             {% elif order.payment_status == 'completed' %}
-                Your payment has been received and your order is being processed.
+                Payment Confirmed. Your order will be delivered in 3 - 4 business days depending on your location via courier service. For any questions contact us.
             {% elif order.payment_status == 'failed' %}
                 Your order was created, but the mobile money payment did not complete.
             {% elif order.payment_method == 'cash' %}
-                A cashier will contact you for payment processing. Thank you.
+                Please send payment to one of the payment numbers below, then wait for cashier confirmation.
             {% else %}
                 Your order was created. Please complete the mobile money payment to continue.
             {% endif %}
@@ -129,6 +129,51 @@
         <p class="text-xs text-gray-500 mb-4">Payment reference: {{ order.payment_reference }}</p>
         {% endif %}
         
+        {% if order.payment_method == 'cash' and order.payment_status != 'completed' and not order.payment_confirmed %}
+        <div class="bg-yellow-50 p-4 rounded-md mt-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Message payment waiting</h3>
+                    <div class="mt-2 text-sm text-yellow-700">
+                        <p>Hello, Thank You for shopping with Normils Online, your Bill due is K{{ order.total }}.</p>
+                        <p class="mt-2">Kindly send the money to either of the following numbers:</p>
+                        <div class="mt-3 grid gap-2">
+                            {% for info in payment_infos %}
+                            <div class="border border-yellow-200 bg-white px-3 py-2">
+                                <p class="font-bold text-yellow-900">{{ info.title }}</p>
+                                <p>{{ info.number }} - {{ info.recipient_name }}</p>
+                            </div>
+                            {% empty %}
+                            <p>A cashier will share payment details shortly.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="button" id="money-sent-button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-black uppercase tracking-[.12em] text-white bg-black">
+                            Money Sent
+                        </button>
+                        <span id="manual-payment-status" class="ml-3 text-sm text-yellow-700">Waiting confirmation.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif order.payment_method == 'cash' and order.payment_status == 'completed' %}
+        <div id="manual-payment-receipt" class="bg-green-50 p-4 rounded-md mt-4">
+            <h3 class="text-sm font-bold text-green-800">Payment Confirmed</h3>
+            <p class="mt-2 text-sm text-green-700">{{ receipt_message }}</p>
+        </div>
+        {% elif order.payment_method == 'cash' and order.payment_confirmed %}
+        <div id="manual-payment-receipt" class="bg-green-50 p-4 rounded-md mt-4">
+            <h3 class="text-sm font-bold text-green-800">Payment Confirmed</h3>
+            <p class="mt-2 text-sm text-green-700">{{ receipt_message }}</p>
+        </div>
+        {% endif %}
+
         {% if order.payment_method == 'mobile_money' and order.payment_status == 'processing' %}
         <div class="bg-yellow-50 p-4 rounded-md mt-4">
             <div class="flex">
@@ -204,6 +249,50 @@
         <a href="{% url 'home' %}" class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-md font-medium hover:bg-indigo-700">Continue Shopping</a>
     </div>
 </div>
+
+{% if order.payment_method == 'cash' and order.payment_status != 'completed' and not order.payment_confirmed %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const moneySentButton = document.getElementById('money-sent-button');
+        const statusMessage = document.getElementById('manual-payment-status');
+        let statusInterval = null;
+
+        function checkManualPayment() {
+            fetch('{% url "confirm_payment" order.id %}', {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.payment_status === 'completed') {
+                        if (statusInterval) clearInterval(statusInterval);
+                        statusMessage.textContent = 'Payment Confirmed';
+                        statusMessage.className = 'ml-3 text-sm text-green-700 font-bold';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1200);
+                    } else {
+                        statusMessage.textContent = 'Waiting confirmation.';
+                        statusMessage.className = 'ml-3 text-sm text-yellow-700';
+                    }
+                })
+                .catch(() => {
+                    statusMessage.textContent = 'Still waiting. Try again shortly.';
+                    statusMessage.className = 'ml-3 text-sm text-yellow-700';
+                });
+        }
+
+        moneySentButton.addEventListener('click', function() {
+            moneySentButton.disabled = true;
+            moneySentButton.classList.add('opacity-60');
+            checkManualPayment();
+            statusInterval = setInterval(checkManualPayment, 5000);
+        }, { once: true });
+    });
+</script>
+{% endif %}
 
 {% if order.payment_method == 'mobile_money' and order.payment_status == 'processing' %}
 

@@ -193,6 +193,49 @@
             container.appendChild(wrapper);
         }
 
+        function addMoneySentButton(container, orderId, receiptMessage) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex justify-start';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'border-2 border-black bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white';
+            button.textContent = 'Money Sent';
+            wrapper.appendChild(button);
+            container.appendChild(wrapper);
+
+            let statusInterval = null;
+            let confirmed = false;
+
+            async function checkManualPayment() {
+                try {
+                    const response = await fetch(`{% url 'confirm_payment' order_id=0 %}`.replace('0', orderId), {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                    });
+                    const data = await response.json();
+                    if (data.payment_status === 'completed' && !confirmed) {
+                        confirmed = true;
+                        if (statusInterval) clearInterval(statusInterval);
+                        addBubble(container, 'Payment Confirmed', false);
+                        addBubble(container, (data.data && data.data.receipt_message) || receiptMessage || 'Your order will be delivered in 3 - 4 business days depending on your location via courier service, for any questions contact us.', false);
+                        addViewOrder(container, orderId);
+                    }
+                } catch (error) {
+                    console.error('Payment status check failed:', error);
+                }
+            }
+
+            button.addEventListener('click', function() {
+                button.disabled = true;
+                button.classList.add('opacity-60');
+                addBubble(container, 'Waiting confirmation.', false);
+                checkManualPayment();
+                statusInterval = setInterval(checkManualPayment, 5000);
+            }, { once: true });
+        }
+
         async function submitOrder(resultContainer) {
             if (state.submitting) return;
             state.submitting = true;
@@ -212,9 +255,9 @@
                 if (!response.ok || !data.status) {
                     throw new Error(data.message || 'We could not place the order right now.');
                 }
-                addBubble(resultContainer, data.message || 'Great, your order will arrive in 3 - 4 business days, a cashier will call you for payment confirmation, Thanks.', false);
+                addBubble(resultContainer, data.message || 'Hello, Thank You for shopping with Normils Online. Kindly send the money to one of the payment numbers.', false);
                 if (data.data && data.data.order_id) {
-                    addViewOrder(resultContainer, data.data.order_id);
+                    addMoneySentButton(resultContainer, data.data.order_id, data.data.receipt_message);
                 }
             } catch (error) {
                 state.submitting = false;
