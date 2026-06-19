@@ -169,7 +169,29 @@ class SocialLink(models.Model):
 
     def __str__(self):
         return self.label
-    
+
+
+class StorefrontControl(models.Model):
+    HEADER_MODE_CHOICES = [
+        ('interactive', 'Interactive menu'),
+        ('banner', 'Single banner'),
+    ]
+
+    header_mode = models.CharField(max_length=20, choices=HEADER_MODE_CHOICES, default='interactive')
+    header_banner = models.ImageField(upload_to='storefront/banners/', blank=True)
+    new_in_message = models.CharField(
+        max_length=240,
+        default='Fresh styles, latest arrivals, and new products added to the storefront.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Storefront Control'
+        verbose_name_plural = 'Storefront Controls'
+
+    def __str__(self):
+        return 'Storefront controls'
+
 
 class LearnedKeyword(models.Model):
     term = models.CharField(max_length=100, unique=True)

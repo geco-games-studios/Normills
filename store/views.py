@@ -22,7 +22,7 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -1098,6 +1098,21 @@ def admin_dashboard(request):
             messages.success(request, f"Removed social link {label}.")
             return dashboard_redirect('footer')
 
+        if action == 'update_storefront_control':
+            control = StorefrontControl.objects.first() or StorefrontControl.objects.create()
+            header_mode = request.POST.get('header_mode') or 'interactive'
+            control.header_mode = header_mode if header_mode in {'interactive', 'banner'} else 'interactive'
+            control.new_in_message = (
+                request.POST.get('new_in_message')
+                or 'Fresh styles, latest arrivals, and new products added to the storefront.'
+            ).strip()
+            uploaded_banner = request.FILES.get('header_banner')
+            if uploaded_banner:
+                control.header_banner = uploaded_banner
+            control.save()
+            messages.success(request, 'Updated Header and ADs controls.')
+            return dashboard_redirect('header_ads')
+
         if action == 'create_product':
             store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
             default_store = Store.objects.filter(id=store).first() if store else Store.objects.first()
@@ -1237,7 +1252,7 @@ def admin_dashboard(request):
         average_tokens = token_summary.get('total_tokens', 0) / total_conversations
 
     dashboard_mode = request.GET.get('mode') or 'editor'
-    if dashboard_mode not in {'editor', 'cashier', 'stock', 'customers', 'cashiers', 'footer'}:
+    if dashboard_mode not in {'editor', 'cashier', 'stock', 'customers', 'cashiers', 'footer', 'header_ads'}:
         dashboard_mode = 'editor'
 
     stock_query = (request.GET.get('stock_q') or '').strip()
@@ -1292,6 +1307,7 @@ def admin_dashboard(request):
     cashier_contacts = CashierContact.objects.order_by('name')
     newsletter_subscribers = NewsletterSubscriber.objects.order_by('-created_at')
     social_links = SocialLink.objects.order_by('sort_order', 'label')
+    storefront_control = StorefrontControl.objects.first() or StorefrontControl.objects.create()
     subcategory_options = ['Tops', 'Bottoms', 'Shoes', 'Accessories']
     custom_subcategories = ProductSubcategory.objects.order_by('name')
     for subcategory in custom_subcategories:
@@ -1352,6 +1368,7 @@ def admin_dashboard(request):
         'newsletter_subscribers': newsletter_subscribers[:200],
         'newsletter_subscriber_count': NewsletterSubscriber.objects.filter(active=True).count(),
         'social_links': social_links,
+        'storefront_control': storefront_control,
         'subcategory_options': subcategory_options,
         'custom_subcategories': custom_subcategories,
         'uploaded_product_images': uploaded_product_images,

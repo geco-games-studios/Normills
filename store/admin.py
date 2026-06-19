@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -87,6 +87,10 @@ class SocialLinkAdmin(admin.ModelAdmin):
     list_display = ['label', 'url', 'active', 'sort_order', 'updated_at']
     list_editable = ['url', 'active', 'sort_order']
     search_fields = ['label', 'url']
+
+@admin.register(StorefrontControl)
+class StorefrontControlAdmin(admin.ModelAdmin):
+    list_display = ['header_mode', 'new_in_message', 'updated_at']
 
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant

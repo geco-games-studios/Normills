@@ -54,6 +54,15 @@
 </head>
 <body class="min-h-screen bg-white text-[#2d2d33] antialiased">
     <header class="sticky top-0 z-50 bg-[#2b2b2b] text-white">
+        {% if storefront_control.header_mode == 'banner' %}
+        <a href="/" class="block h-16 overflow-hidden bg-black" aria-label="Normils home">
+            {% if storefront_control.header_banner %}
+            <img src="{{ storefront_control.header_banner.url }}" alt="Normils" class="h-full w-full object-cover object-center">
+            {% else %}
+            <span class="flex h-full items-center justify-center px-5 text-center text-lg font-black uppercase tracking-[.24em]">Normils</span>
+            {% endif %}
+        </a>
+        {% else %}
         <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
             <button id="nav-toggle" class="flex h-10 w-10 items-center justify-center text-white md:hidden" aria-label="Open menu">
                 <svg id="menu-icon-open" class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -68,8 +77,8 @@
 
             <nav class="hidden items-center gap-8 text-sm font-bold uppercase tracking-[.18em] md:flex">
                 <a href="/" class="hover:text-gray-200">New In</a>
-                <a href="/search/?q=dress" class="hover:text-gray-200">Women</a>
-                <a href="/search/?q=shoes" class="hover:text-gray-200">Shoes</a>
+                <a href="/category/women-collection/" class="hover:text-gray-200">Women</a>
+                <a href="/category/mens-collection/" class="hover:text-gray-200">Men</a>
                 <a href="/search/?q=accessories" class="hover:text-gray-200">Accessories</a>
             </nav>
 
@@ -86,12 +95,12 @@
                         </button>
                     </label>
                 </form>
-                <a href="/search/" class="md:hidden" aria-label="Search">
+                <button id="mobile-search-toggle" type="button" class="md:hidden" aria-label="Open search" aria-expanded="false">
                     <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="7"></circle>
                         <path d="m20 20-3.5-3.5" stroke-linecap="round"></path>
                     </svg>
-                </a>
+                </button>
                 <button id="account-popup-toggle" type="button" aria-label="Account" aria-expanded="false">
                     <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                         <circle cx="12" cy="8" r="4"></circle>
@@ -107,6 +116,19 @@
                 </a>
             </div>
         </div>
+        <form id="mobile-search-form" action="/search/" method="get" class="hidden border-t border-white/10 bg-[#2b2b2b] px-4 pb-4 md:hidden">
+            <label class="relative block">
+                <span class="sr-only">Search</span>
+                <input type="text" name="q" placeholder="Search products" class="w-full border-0 bg-white px-4 py-3 pr-12 text-base text-gray-900 outline-none focus:ring-2 focus:ring-white" />
+                <button type="submit" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-900" aria-label="Search">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <path d="m20 20-3.5-3.5" stroke-linecap="round"></path>
+                    </svg>
+                </button>
+            </label>
+        </form>
+        {% endif %}
     </header>
 
     {% if messages %}
@@ -190,8 +212,8 @@
         </form>
         <nav class="flex flex-col text-base font-bold uppercase tracking-[.14em]">
             <a href="/" class="border-b border-gray-200 px-5 py-5">New In</a>
-            <a href="/search/?q=dress" class="border-b border-gray-200 px-5 py-5">Women</a>
-            <a href="/search/?q=shoes" class="border-b border-gray-200 px-5 py-5">Shoes</a>
+            <a href="/category/women-collection/" class="border-b border-gray-200 px-5 py-5">Women</a>
+            <a href="/category/mens-collection/" class="border-b border-gray-200 px-5 py-5">Men</a>
             <a href="/wishlist/" class="border-b border-gray-200 px-5 py-5">Wishlist</a>
             <a href="/cart/" class="border-b border-gray-200 px-5 py-5">Bag</a>
         </nav>
@@ -212,6 +234,8 @@
             const body = document.body;
             const openIcon = document.getElementById('menu-icon-open');
             const closeIcon = document.getElementById('menu-icon-close');
+            const mobileSearchToggle = document.getElementById('mobile-search-toggle');
+            const mobileSearchForm = document.getElementById('mobile-search-form');
 
             function openMenu() {
                 if (!menuPanel || !overlay) return;
@@ -240,6 +264,15 @@
             });
             closeBtn?.addEventListener('click', closeMenu);
             overlay?.addEventListener('click', closeMenu);
+
+            mobileSearchToggle?.addEventListener('click', function() {
+                if (!mobileSearchForm) return;
+                const isHidden = mobileSearchForm.classList.toggle('hidden');
+                mobileSearchToggle.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+                if (!isHidden) {
+                    mobileSearchForm.querySelector('input')?.focus();
+                }
+            });
 
             const cartCount = {{ cart.item_count|default:0 }};
             const cartBadge = document.getElementById('desktop-cart-badge');

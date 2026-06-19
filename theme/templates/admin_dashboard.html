@@ -13,12 +13,13 @@
     <a href="/admin/" class="inline-flex items-center justify-center bg-black px-5 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Django admin</a>
   </div>
 
-  <nav class="mt-5 grid gap-2 sm:grid-cols-6">
+  <nav class="mt-5 grid gap-2 sm:grid-cols-7">
     <a href="{% url 'admin_dashboard' %}?mode=editor" class="{% if dashboard_mode == 'editor' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Edit mode</a>
     <a href="{% url 'admin_dashboard' %}?mode=cashier" class="{% if dashboard_mode == 'cashier' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Cashier mode</a>
     <a href="{% url 'admin_dashboard' %}?mode=stock" class="{% if dashboard_mode == 'stock' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Stock list</a>
     <a href="{% url 'admin_dashboard' %}?mode=customers" class="{% if dashboard_mode == 'customers' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Customer list</a>
     <a href="{% url 'admin_dashboard' %}?mode=cashiers" class="{% if dashboard_mode == 'cashiers' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Cashier management</a>
+    <a href="{% url 'admin_dashboard' %}?mode=header_ads" class="{% if dashboard_mode == 'header_ads' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Header and ADs</a>
     <a href="{% url 'admin_dashboard' %}?mode=footer" class="{% if dashboard_mode == 'footer' %}bg-black text-white{% else %}border border-gray-300 bg-white text-gray-900{% endif %} px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em]">Footer</a>
   </nav>
 
@@ -534,6 +535,56 @@
       {% empty %}
       <div class="border border-gray-200 bg-white p-8 text-center text-gray-500">No cashier contacts yet.</div>
       {% endfor %}
+    </section>
+  </section>
+  {% elif dashboard_mode == 'header_ads' %}
+  <section class="mt-8 grid gap-8 lg:grid-cols-[420px_minmax(0,1fr)]">
+    <aside class="h-fit border border-gray-200 bg-white p-5">
+      <h2 class="text-xl font-black uppercase tracking-[.14em] text-gray-900">Header and ADs control</h2>
+      <p class="mt-2 text-sm leading-6 text-gray-500">Switch the top bar between the normal interactive menu and a single full-width banner. The banner uses the same 64px height as the menu.</p>
+      <form method="post" enctype="multipart/form-data" class="mt-5 space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_storefront_control">
+        <label class="block text-xs font-bold text-gray-600">Top bar mode
+          <select name="header_mode" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+            <option value="interactive" {% if storefront_control.header_mode == 'interactive' %}selected{% endif %}>Interactive menu</option>
+            <option value="banner" {% if storefront_control.header_mode == 'banner' %}selected{% endif %}>Single banner</option>
+          </select>
+        </label>
+        <label class="block text-xs font-bold text-gray-600">Banner image
+          <input name="header_banner" type="file" accept="image/*" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
+        </label>
+        <label class="block text-xs font-bold text-gray-600">New In message
+          <textarea name="new_in_message" rows="4" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">{{ storefront_control.new_in_message }}</textarea>
+        </label>
+        <button class="w-full bg-black px-4 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Save header controls</button>
+      </form>
+    </aside>
+
+    <section class="space-y-6">
+      <div class="border border-gray-200 bg-white p-5">
+        <h3 class="text-lg font-black uppercase tracking-[.14em] text-gray-900">Top bar preview</h3>
+        <div class="mt-4 overflow-hidden border border-gray-200 bg-[#2b2b2b] text-white">
+          {% if storefront_control.header_mode == 'banner' %}
+          <div class="h-16 bg-black">
+            {% if storefront_control.header_banner %}
+            <img src="{{ storefront_control.header_banner.url }}" alt="Header banner preview" class="h-full w-full object-cover object-center">
+            {% else %}
+            <div class="flex h-full items-center justify-center px-5 text-center text-lg font-black uppercase tracking-[.24em]">Normils</div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="flex h-16 items-center justify-between px-5">
+            <span class="text-2xl font-black tracking-[-.08em]">normils</span>
+            <span class="text-xs font-black uppercase tracking-[.18em]">Interactive menu</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="border border-gray-200 bg-white p-5">
+        <h3 class="text-lg font-black uppercase tracking-[.14em] text-gray-900">New In message preview</h3>
+        <p class="mt-4 max-w-2xl text-[15px] leading-6 tracking-[.04em] text-[#333]">{{ storefront_control.new_in_message }}</p>
+      </div>
     </section>
   </section>
   {% elif dashboard_mode == 'footer' %}
