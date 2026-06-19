@@ -17,10 +17,12 @@ import uuid
 import json
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, NewsletterSubscriber, SocialLink, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm
 from store.sms_client import SMSClient
@@ -765,7 +767,30 @@ def home(request):
         'wishlist_ids': [str(product_id) for product_id in wishlist_ids],
         'filter_buttons': filter_buttons,
         'selected_filter': selected_filter,
+        'social_links': SocialLink.objects.filter(active=True).exclude(url=''),
     })
+
+
+def subscribe_newsletter(request):
+    if request.method != 'POST':
+        return redirect('home')
+
+    email = (request.POST.get('email') or '').strip().lower()
+    try:
+        validate_email(email)
+    except ValidationError:
+        messages.error(request, 'Enter a valid email address.')
+        return redirect(request.META.get('HTTP_REFERER') or 'home')
+
+    subscriber, created = NewsletterSubscriber.objects.get_or_create(
+        email=email,
+        defaults={'active': True},
+    )
+    if not created and not subscriber.active:
+        subscriber.active = True
+        subscriber.save(update_fields=['active'])
+    messages.success(request, 'Thanks for subscribing.')
+    return redirect(request.META.get('HTTP_REFERER') or 'home')
     
     
 def search_products(request):
@@ -1040,6 +1065,39 @@ def admin_dashboard(request):
             messages.success(request, f"Removed cashier contact {contact_name}.")
             return dashboard_redirect('cashiers')
 
+        if action == 'create_social_link':
+            label = (request.POST.get('social_label') or '').strip()
+            url = (request.POST.get('social_url') or '').strip()
+            sort_order = _parse_positive_int(request.POST.get('sort_order'), 0, minimum=0)
+            if not label:
+                messages.error(request, 'Enter a social name.')
+                return dashboard_redirect('footer')
+            SocialLink.objects.create(
+                label=label,
+                url=url,
+                sort_order=sort_order,
+                active=request.POST.get('active') == 'on' and bool(url),
+            )
+            messages.success(request, f"Added social link {label}.")
+            return dashboard_redirect('footer')
+
+        if action == 'update_social_link':
+            social_link = get_object_or_404(SocialLink, id=request.POST.get('social_id'))
+            social_link.label = (request.POST.get('social_label') or social_link.label).strip()
+            social_link.url = (request.POST.get('social_url') or '').strip()
+            social_link.sort_order = _parse_positive_int(request.POST.get('sort_order'), social_link.sort_order, minimum=0)
+            social_link.active = request.POST.get('active') == 'on' and bool(social_link.url)
+            social_link.save()
+            messages.success(request, f"Updated social link {social_link.label}.")
+            return dashboard_redirect('footer')
+
+        if action == 'delete_social_link':
+            social_link = get_object_or_404(SocialLink, id=request.POST.get('social_id'))
+            label = social_link.label
+            social_link.delete()
+            messages.success(request, f"Removed social link {label}.")
+            return dashboard_redirect('footer')
+
         if action == 'create_product':
             store = Product.objects.exclude(store__isnull=True).values_list('store_id', flat=True).first()
             default_store = Store.objects.filter(id=store).first() if store else Store.objects.first()
@@ -1179,7 +1237,7 @@ def admin_dashboard(request):
         average_tokens = token_summary.get('total_tokens', 0) / total_conversations
 
     dashboard_mode = request.GET.get('mode') or 'editor'
-    if dashboard_mode not in {'editor', 'cashier', 'stock', 'customers', 'cashiers'}:
+    if dashboard_mode not in {'editor', 'cashier', 'stock', 'customers', 'cashiers', 'footer'}:
         dashboard_mode = 'editor'
 
     stock_query = (request.GET.get('stock_q') or '').strip()
@@ -1232,6 +1290,8 @@ def admin_dashboard(request):
             Q(phone_number__icontains=customer_query)
         )
     cashier_contacts = CashierContact.objects.order_by('name')
+    newsletter_subscribers = NewsletterSubscriber.objects.order_by('-created_at')
+    social_links = SocialLink.objects.order_by('sort_order', 'label')
     subcategory_options = ['Tops', 'Bottoms', 'Shoes', 'Accessories']
     custom_subcategories = ProductSubcategory.objects.order_by('name')
     for subcategory in custom_subcategories:
@@ -1289,6 +1349,9 @@ def admin_dashboard(request):
         'customers': customers[:120],
         'customer_query': customer_query,
         'cashier_contacts': cashier_contacts,
+        'newsletter_subscribers': newsletter_subscribers[:200],
+        'newsletter_subscriber_count': NewsletterSubscriber.objects.filter(active=True).count(),
+        'social_links': social_links,
         'subcategory_options': subcategory_options,
         'custom_subcategories': custom_subcategories,
         'uploaded_product_images': uploaded_product_images,

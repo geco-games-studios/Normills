@@ -143,6 +143,32 @@ class CashierContact(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class NewsletterSubscriber(models.Model):
+    email = models.EmailField(unique=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.email
+
+
+class SocialLink(models.Model):
+    label = models.CharField(max_length=60, unique=True)
+    url = models.URLField(blank=True)
+    active = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'label']
+
+    def __str__(self):
+        return self.label
     
 
 class LearnedKeyword(models.Model):

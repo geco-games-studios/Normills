@@ -80,8 +80,9 @@
 <footer class="bg-[#6b6b6b] text-white">
     <section class="mx-auto max-w-7xl px-6 py-12">
         <h2 class="max-w-3xl text-[24px] font-black uppercase leading-tight tracking-[.24em]">Hear about the best offers and the latest drops first</h2>
-        <form class="mt-8 max-w-3xl">
-            <input type="email" placeholder="Enter your email" class="w-full border-0 bg-white px-6 py-6 text-[22px] tracking-[.03em] text-gray-900 outline-none" />
+        <form method="post" action="{% url 'subscribe_newsletter' %}" class="mt-8 max-w-3xl">
+            {% csrf_token %}
+            <input type="email" name="email" required placeholder="Enter your email" class="w-full border-0 bg-white px-6 py-6 text-[22px] tracking-[.03em] text-gray-900 outline-none" />
             <button type="submit" class="mt-8 w-full bg-black px-6 py-6 text-[20px] font-black uppercase tracking-[.18em] text-white">Subscribe</button>
         </form>
         <p class="mt-8 max-w-3xl text-[17px] leading-relaxed tracking-[.04em] text-white">*By entering your email, you consent to receive marketing emails from Normils in line with our <a href="/privacy-policy/" class="underline">Privacy Policy</a> and <a href="/returns-refunds/" class="underline">Terms & Conditions</a>. You can opt out at any time by clicking "Unsubscribe" at the bottom of our emails.</p>
@@ -100,18 +101,13 @@
 
     <section class="bg-[#1f1f1f] px-6 py-8">
         <div class="mx-auto max-w-7xl">
-            <p class="text-[18px] tracking-[.08em]">Some of our international sites:</p>
-            <div class="mt-6 grid max-w-xl grid-cols-6 gap-6 md:grid-cols-10">
-                <span title="Spain" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#c60b1e 0 25%, #ffc400 25% 75%, #c60b1e 75%);"></span>
-                <span title="Germany" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#111 0 33%, #dd0000 33% 66%, #ffce00 66%);"></span>
-                <span title="Australia" class="h-11 w-11 rounded-full border border-white/20" style="background: radial-gradient(circle at 70% 65%, #fff 0 8%, transparent 9%), linear-gradient(135deg, #012169 0 48%, #c8102e 48% 56%, #012169 56%);"></span>
-                <span title="France" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, #0055a4 0 33%, #fff 33% 66%, #ef4135 66%);"></span>
-                <span title="Denmark" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, transparent 0 32%, #fff 32% 42%, transparent 42%), linear-gradient(0deg, #c60c30 0 42%, #fff 42% 55%, #c60c30 55%);"></span>
-                <span title="Italy" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, #008c45 0 33%, #fff 33% 66%, #cd212a 66%);"></span>
-                <span title="Netherlands" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#ae1c28 0 33%, #fff 33% 66%, #21468b 66%);"></span>
-                <span title="Poland" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(#fff 0 50%, #dc143c 50%);"></span>
-                <span title="United States" class="h-11 w-11 rounded-full border border-white/20" style="background: repeating-linear-gradient(#b22234 0 4px, #fff 4px 8px);"></span>
-                <span title="Sweden" class="h-11 w-11 rounded-full border border-white/20" style="background: linear-gradient(90deg, transparent 0 32%, #fecc00 32% 44%, transparent 44%), linear-gradient(0deg, #006aa7 0 42%, #fecc00 42% 56%, #006aa7 56%);"></span>
+            <p class="text-[18px] tracking-[.08em]">Our Socials</p>
+            <div class="mt-6 flex flex-wrap gap-3">
+                {% for social in social_links %}
+                <a href="{{ social.url }}" target="_blank" rel="noopener noreferrer" class="border border-white/25 bg-black px-5 py-3 text-sm font-black uppercase tracking-[.16em] text-white">{{ social.label }}</a>
+                {% empty %}
+                <p class="text-sm tracking-[.06em] text-white/70">Social links coming soon.</p>
+                {% endfor %}
             </div>
         </div>
     </section>
