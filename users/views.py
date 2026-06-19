@@ -6,6 +6,7 @@ from django.views.decorators.http import require_http_methods
 from store.forms import EmailOrPhoneAuthenticationForm
 from django.contrib import messages
 from .forms import ProfileUpdateForm
+from .phone_verification import send_phone_verification_code
 
 
 @require_http_methods(["GET", "POST"])
@@ -47,10 +48,29 @@ def profile_view(request):
         if form_type == 'profile':
             profile_form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
             if profile_form.is_valid():
-                profile_form.save()
-                messages.success(request, 'Your profile has been updated.')
+                user = profile_form.save()
+                if getattr(profile_form, 'phone_changed', False):
+                    sent, message = send_phone_verification_code(user, user.client_profile.phone_number)
+                    request.session['pending_user_id'] = user.id
+                    if sent:
+                        messages.warning(request, 'Phone number updated. Verify Phone to finish securing your account.')
+                    else:
+                        messages.warning(request, message)
+                else:
+                    messages.success(request, 'Your profile has been updated.')
                 return redirect('profile')
             messages.error(request, 'Please correct the profile form errors.')
+
+        elif form_type == 'verify_phone':
+            profile = getattr(request.user, 'client_profile', None)
+            phone = getattr(profile, 'phone_number', '')
+            sent, message = send_phone_verification_code(request.user, phone)
+            request.session['pending_user_id'] = request.user.id
+            if sent:
+                messages.success(request, message)
+                return redirect('verify_otp')
+            messages.error(request, message)
+            return redirect('profile')
 
         elif form_type == 'password':
             password_form = PasswordChangeForm(user=request.user, data=request.POST)

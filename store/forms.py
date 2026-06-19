@@ -3,38 +3,31 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.utils.crypto import get_random_string
 from users.models import User
+from users.phone_verification import normalize_phone
 from .models import Order
 
 class CustomUserCreationForm(UserCreationForm):
     username = forms.CharField(widget=forms.HiddenInput(), required=False)
-    email = forms.EmailField(required=True)
+    email = forms.EmailField(required=False)
     first_name = forms.CharField(max_length=30, required=True)
     last_name = forms.CharField(max_length=30, required=True)
     phone = forms.CharField(max_length=20, required=True)
 
     def clean_email(self):
         email = (self.cleaned_data.get('email') or '').strip().lower()
-        if User.objects.filter(email__iexact=email).exists():
+        if email and User.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError('A user with that email already exists.')
         return email
 
     def clean_phone(self):
-        phone = (self.cleaned_data.get('phone') or '').strip()
-        digits = ''.join(ch for ch in phone if ch.isdigit())
-        if phone.startswith('00'):
-            digits = digits[2:]
-        if phone.startswith('0') and not phone.startswith('00') and len(digits) == 10:
-            digits = '260' + digits[1:]
-        elif len(digits) == 9:
-            digits = '260' + digits
-        if len(digits) < 12:
+        digits = normalize_phone(self.cleaned_data.get('phone') or '')
+        if not digits:
             raise forms.ValidationError('Please enter a complete phone number (including country code).')
-        if not digits.isdigit():
-            raise forms.ValidationError('Invalid phone number format.')
         return digits
 
-    def _generate_username(self, email):
-        base = re.sub(r'[^a-zA-Z0-9._+-]', '', email.split('@')[0]) or get_random_string(8)
+    def _generate_username(self, email, phone=''):
+        base_value = email.split('@')[0] if email else f"normils-{phone}"
+        base = re.sub(r'[^a-zA-Z0-9._+-]', '', base_value) or get_random_string(8)
         username = base[:30]
         while User.objects.filter(username=username).exists():
             username = f"{base[:24]}{get_random_string(6)}"
@@ -51,7 +44,8 @@ class CustomUserCreationForm(UserCreationForm):
         user.last_name = self.cleaned_data['last_name']
         user.is_client = True
         user.is_active = False
-        user.username = self.cleaned_data.get('username') or self._generate_username(user.email)
+        user.is_verified = False
+        user.username = self.cleaned_data.get('username') or self._generate_username(user.email, self.cleaned_data.get('phone', ''))
         if commit:
             user.save()
             from users.models import ClientProfile

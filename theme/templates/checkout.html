@@ -163,7 +163,7 @@
             setField('id_first_name', names.first);
             setField('id_last_name', names.last);
             setField('id_email', state.email || userEmail);
-            setField('id_phone', state.phone || profilePhone || 'signed-in');
+            setField('id_phone', state.phone || profilePhone);
             setField('id_city', state.city || 'Customer city');
             setField('id_address', state.area || profileAddress || 'Saved customer address');
             setField('id_notes', state.area ? `Checkout delivery area: ${state.area}. Primary contact: ${state.phone || profilePhone || 'phone not provided'}` : 'Signed-in chat checkout');

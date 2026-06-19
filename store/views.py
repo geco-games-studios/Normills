@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.forms import SetPasswordForm
@@ -33,6 +34,7 @@ from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
 from users.models import ClientProfile
+from users.phone_verification import normalize_phone as normalize_account_phone, send_phone_verification_code
 
 import logging
 
@@ -1562,16 +1564,7 @@ def shopping_bot(request):
 #     })
 
 def _normalize_phone(phone):
-    if not phone or not isinstance(phone, str):
-        return ''
-    digits = ''.join(ch for ch in phone if ch.isdigit())
-    if digits.startswith('00'):
-        digits = digits[2:]
-    if digits.startswith('0') and len(digits) == 10:
-        digits = '260' + digits[1:]
-    elif len(digits) == 9:
-        digits = '260' + digits
-    return digits
+    return normalize_account_phone(phone)
 
 
 def _find_user_by_email_or_phone(identifier):
@@ -1633,27 +1626,15 @@ def signup(request):
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            import random
-            code = f"{random.randint(100000, 999999)}"
             phone = form.cleaned_data.get('phone', '')
-            expires = timezone.now() + timedelta(minutes=10)
-            from users.models import PhoneOTP
-            PhoneOTP.objects.create(user=user, phone=phone, code=code, expires_at=expires)
-
-            try:
-                sms_client = SMSClient()
-                result = sms_client.send_sms(phone, f"Your Normils verification code is {code}")
-                logger.info('OTP SMS send result for user=%s phone=%s: %s', user.id, phone, result)
-                if isinstance(result, dict) and result.get('status') != 'success':
-                    raise Exception(result.get('message', 'SMS send failed'))
-            except Exception as e:
-                logger.exception('Failed to send OTP SMS for new user %s: %s', user.id, e)
+            sent, message = send_phone_verification_code(user, phone)
+            if not sent:
                 user.delete()
-                messages.error(request, 'We were unable to send the verification SMS. Please check your phone number and try again.')
+                messages.error(request, message)
                 return render(request, 'registration/signup.html', {'form': form})
 
             request.session['pending_user_id'] = user.id
-            messages.success(request, 'A verification code has been sent to your phone number.')
+            messages.success(request, message)
             return redirect('verify_otp')
     else:
         form = CustomUserCreationForm()
@@ -1663,6 +1644,9 @@ def signup(request):
 
 def verify_otp(request):
     pending_user_id = request.session.get('pending_user_id')
+    if not pending_user_id and request.user.is_authenticated and not request.user.is_verified:
+        pending_user_id = request.user.id
+        request.session['pending_user_id'] = pending_user_id
     if not pending_user_id:
         messages.error(request, 'No pending registration to verify.')
         return redirect('signup')
@@ -1711,6 +1695,9 @@ def verify_otp(request):
 
 def resend_otp(request):
     pending_user_id = request.session.get('pending_user_id')
+    if not pending_user_id and request.user.is_authenticated and not request.user.is_verified:
+        pending_user_id = request.user.id
+        request.session['pending_user_id'] = pending_user_id
     is_json = request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.META.get('HTTP_ACCEPT', '').find('application/json') != -1
     if not pending_user_id:
         if is_json:
@@ -1990,7 +1977,7 @@ def _create_customer_account(request, first_name, last_name, email, phone, passw
     UserModel = get_user_model()
 
     if not phone:
-        return None, 'Please enter your phone number.'
+        return None, 'Please enter a valid phone number.'
     if email and UserModel.objects.filter(email__iexact=email).exists():
         return None, 'That email is already signed up. Please log in before checkout.'
     if ClientProfile.objects.filter(phone_number__iexact=phone).exists():
@@ -2002,7 +1989,7 @@ def _create_customer_account(request, first_name, last_name, email, phone, passw
         first_name=first_name,
         last_name=last_name,
         is_client=True,
-        is_verified=True,
+        is_verified=False,
         is_active=True,
     )
     user.set_password(password)
@@ -2012,6 +1999,11 @@ def _create_customer_account(request, first_name, last_name, email, phone, passw
     profile.phone_number = phone
     profile.address = address or ''
     profile.save(update_fields=['phone_number', 'address', 'updated_at'])
+    sent, message = send_phone_verification_code(user, phone)
+    if sent:
+        request.session['pending_user_id'] = user.id
+    else:
+        logger.warning('Account %s created but OTP was not sent: %s', user.id, message)
     return user, None
 
 
@@ -2063,6 +2055,7 @@ def account_quick_create(request):
             'name': user.get_full_name() or user.username,
             'phone': profile.phone_number,
             'email': user.email,
+            'verify_url': reverse('verify_otp'),
         },
     })
 
@@ -2110,6 +2103,12 @@ def checkout(request):
         
         form = CheckoutForm(request.POST)
         if form.is_valid():
+            if request.user.is_authenticated and not _normalize_phone(form.cleaned_data.get('phone', '')):
+                return JsonResponse({
+                    'status': False,
+                    'message': 'Please add a valid phone number in Account Settings before checkout.',
+                    'data': {'profile_url': reverse('profile')},
+                }, status=400)
             checkout_user, customer_error = _create_checkout_customer(request, form)
             if customer_error:
                 return JsonResponse({
@@ -2542,12 +2541,20 @@ def start_lenco_payment(request, order_id):
     if operator not in {'airtel', 'mtn'}:
         operator = 'airtel'
 
+    billing_phone = order.phone
+    if order.user_id and order.user_id == request.user.id:
+        profile_phone = getattr(getattr(request.user, 'client_profile', None), 'phone_number', '')
+        billing_phone = profile_phone or billing_phone
+        if profile_phone and profile_phone != order.phone:
+            order.phone = profile_phone
+            order.save(update_fields=['phone'])
+
     reference = order.payment_reference
     if not reference or order.payment_status == 'failed':
         reference = f"ORDER-{order.id}-{uuid.uuid4().hex[:6]}"
     payment_response = process_lenco_payment(
         amount=float(order.total),
-        phone_number=order.phone,
+        phone_number=billing_phone,
         reference=reference,
         operator=operator,
     )

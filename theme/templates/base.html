@@ -101,11 +101,16 @@
                         <path d="m20 20-3.5-3.5" stroke-linecap="round"></path>
                     </svg>
                 </button>
-                <button id="account-popup-toggle" type="button" aria-label="Account" aria-expanded="false">
+                <button id="account-popup-toggle" type="button" class="relative" aria-label="Account" aria-expanded="false">
                     <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                         <circle cx="12" cy="8" r="4"></circle>
                         <path d="M4 21c1.8-4.2 5-6 8-6s6.2 1.8 8 6" stroke-linecap="round"></path>
                     </svg>
+                    {% if user.is_authenticated %}
+                        {% if not user.is_verified or not user.client_profile.phone_number %}
+                        <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500 ring-2 ring-[#2b2b2b]"></span>
+                        {% endif %}
+                    {% endif %}
                 </button>
                 <a href="/cart/" class="relative" aria-label="Cart">
                     <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -153,6 +158,9 @@
 
         {% if user.is_authenticated %}
         <div class="p-5">
+            {% if not user.is_verified or not user.client_profile.phone_number %}
+            <a href="{% url 'profile' %}" class="mb-5 block border border-yellow-300 bg-yellow-50 px-4 py-4 text-center text-sm font-black uppercase tracking-[.16em] text-yellow-900">Verify Phone</a>
+            {% endif %}
             <p class="text-sm text-gray-500">{{ user.get_full_name|default:user.username }}</p>
             <div class="mt-5 grid gap-3">
                 <a href="{% url 'profile' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Edit Account</a>
@@ -333,6 +341,7 @@
             const accountAddressSubmit = document.getElementById('account-address-submit');
             const accountCreateError = document.getElementById('account-create-error');
             const accountAddressError = document.getElementById('account-address-error');
+            let accountVerifyUrl = '';
 
             function setAccountMessage(element, message, isError) {
                 if (!element) return;
@@ -380,6 +389,7 @@
                         throw new Error(data.message || 'Account could not be created.');
                     }
                     accountTitle.textContent = 'Account';
+                    accountVerifyUrl = (data.data && data.data.verify_url) || '';
                     accountCreateStep?.classList.add('hidden');
                     accountAddressStep?.classList.remove('hidden');
                 }).catch((error) => {
@@ -418,7 +428,9 @@
                         throw new Error(data.message || 'Address could not be saved.');
                     }
                     setAccountMessage(accountAddressError, data.message || 'Address saved.', false);
-                    window.setTimeout(() => window.location.reload(), 700);
+                    window.setTimeout(() => {
+                        window.location.href = accountVerifyUrl || window.location.href;
+                    }, 700);
                 }).catch((error) => {
                     setAccountMessage(accountAddressError, error.message, true);
                     accountAddressSubmit.disabled = false;
