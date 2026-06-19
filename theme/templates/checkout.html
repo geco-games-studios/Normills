@@ -199,16 +199,16 @@
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'border-2 border-black bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white';
-            button.textContent = 'Money Sent';
+            button.textContent = 'Made Payment';
             wrapper.appendChild(button);
             container.appendChild(wrapper);
 
             let statusInterval = null;
             let confirmed = false;
 
-            async function checkManualPayment() {
+            async function checkLencoPayment() {
                 try {
-                    const response = await fetch(`{% url 'confirm_payment' order_id=0 %}`.replace('0', orderId), {
+                    const response = await fetch(`{% url 'verify_payment' order_id=0 %}`.replace('0', orderId), {
                         headers: {
                             'X-Requested-With': 'XMLHttpRequest',
                             'Accept': 'application/json',
@@ -221,6 +221,9 @@
                         addBubble(container, 'Payment Confirmed', false);
                         addBubble(container, (data.data && data.data.receipt_message) || receiptMessage || 'Your order will be delivered in 3 - 4 business days depending on your location via courier service, for any questions contact us.', false);
                         addViewOrder(container, orderId);
+                    } else if (data.payment_status === 'failed') {
+                        if (statusInterval) clearInterval(statusInterval);
+                        addBubble(container, data.message || 'Payment failed. Please try again or contact the cashier.', false);
                     }
                 } catch (error) {
                     console.error('Payment status check failed:', error);
@@ -230,10 +233,39 @@
             button.addEventListener('click', function() {
                 button.disabled = true;
                 button.classList.add('opacity-60');
-                addBubble(container, 'Waiting confirmation.', false);
-                checkManualPayment();
-                statusInterval = setInterval(checkManualPayment, 5000);
-            }, { once: true });
+                addBubble(container, 'Sending the payment request to your phone...', false);
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+                fetch(`{% url 'start_lenco_payment' order_id=0 %}`.replace('0', orderId), {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                })
+                    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                    .then(({ ok, data }) => {
+                        if (!ok || !data.status) {
+                            throw new Error(data.message || 'Could not start the Lenco payment.');
+                        }
+                        addBubble(container, data.message || 'Payment request sent. Please approve the prompt on your phone.', false);
+                        if (data.data && data.data.payment_status === 'completed') {
+                            confirmed = true;
+                            addBubble(container, 'Payment Confirmed', false);
+                            addBubble(container, data.data.receipt_message || receiptMessage, false);
+                            addViewOrder(container, orderId);
+                            return;
+                        }
+                        checkLencoPayment();
+                        statusInterval = setInterval(checkLencoPayment, 5000);
+                    })
+                    .catch(error => {
+                        button.disabled = false;
+                        button.classList.remove('opacity-60');
+                        addBubble(container, error.message || 'Could not start the payment. Please try again.', false);
+                    });
+            });
         }
 
         async function submitOrder(resultContainer) {

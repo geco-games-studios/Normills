@@ -453,13 +453,18 @@ class Order(models.Model):
             self.save()
 
             # Prepare receipt message
-            store_owner_name = None
+            store_owner = None
             if self.store and getattr(self.store, 'owner', None):
-                store_owner_name = self.store.owner.username
+                store_owner = self.store.owner
             elif self.items.exists() and getattr(self.items.first().product.store, 'owner', None):
-                store_owner_name = self.items.first().product.store.owner.username
-            else:
-                store_owner_name = 'Store Owner'
+                store_owner = self.items.first().product.store.owner
+
+            store_owner_user = getattr(store_owner, 'user', None)
+            store_owner_name = (
+                getattr(store_owner_user, 'username', None)
+                or getattr(store_owner, 'store_name', None)
+                or 'Store Owner'
+            )
 
             receipt_message = (
                 f"Receipt for Transaction ID: {self.transaction_id}\n"

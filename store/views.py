@@ -101,9 +101,10 @@ def _message_payment_text(order):
     payment_infos = list(_active_payment_infos())
     lines = [
         f"Hello, Thank You for shopping with Normils Online, your Bill due is {_money_display(order.total)}.",
-        "Kindly send the money to either of the following numbers;",
+        "Tap Made Payment to receive a secure Lenco payment prompt on your phone for this amount.",
     ]
     if payment_infos:
+        lines.append("If the prompt fails, you can still contact the cashier using the payment info below:")
         lines.extend(
             f"{info.title}: {info.number} - {info.recipient_name}"
             for info in payment_infos
@@ -2519,6 +2520,99 @@ def order_confirmation(request, order_id):
         'receipt_message': _payment_confirmed_receipt_message(order),
     })
 
+
+def start_lenco_payment(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    if not _can_access_order(request, order):
+        return JsonResponse({'status': False, 'message': 'Forbidden', 'data': None}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'status': False, 'message': 'POST required', 'data': None}, status=405)
+    if order.payment_status == 'completed' or order.payment_confirmed:
+        return JsonResponse({
+            'status': True,
+            'message': 'Payment Confirmed',
+            'data': {
+                'order_id': order.id,
+                'payment_status': 'completed',
+                'receipt_message': _payment_confirmed_receipt_message(order),
+            },
+        })
+
+    operator = (request.POST.get('mobile_operator') or 'airtel').lower()
+    if operator not in {'airtel', 'mtn'}:
+        operator = 'airtel'
+
+    reference = order.payment_reference
+    if not reference or order.payment_status == 'failed':
+        reference = f"ORDER-{order.id}-{uuid.uuid4().hex[:6]}"
+    payment_response = process_lenco_payment(
+        amount=float(order.total),
+        phone_number=order.phone,
+        reference=reference,
+        operator=operator,
+    )
+
+    if not payment_response.get('status', False):
+        order.payment_method = 'mobile_money'
+        order.payment_reference = reference
+        order.payment_details = {
+            **(order.payment_details or {}),
+            'lenco_response': payment_response,
+        }
+        order.save(update_fields=['payment_method', 'payment_reference', 'payment_details'])
+        return JsonResponse({
+            'status': False,
+            'message': payment_response.get('message', 'Lenco payment request failed.'),
+            'data': None,
+        }, status=400)
+
+    payment_data = payment_response.get('data') or {}
+    lenco_status = payment_data.get('status', 'pending')
+    order.payment_method = 'mobile_money'
+    order.payment_reference = payment_data.get('lencoReference') or payment_data.get('reference') or reference
+    order.payment_status = _order_payment_status(lenco_status)
+    if order.payment_status == 'completed':
+        order.status = 'paid'
+    else:
+        order.status = 'payment_awaiting'
+    order.payment_details = {
+        **(order.payment_details or {}),
+        'lenco_response': payment_response,
+    }
+    order.save(update_fields=['payment_method', 'payment_reference', 'payment_status', 'status', 'payment_details'])
+
+    if order.payment_status == 'completed':
+        try:
+            _set_order_paid(order)
+        except ValueError as exc:
+            return JsonResponse({'status': False, 'message': str(exc), 'data': None}, status=400)
+        try:
+            send_order_confirmation_email(order)
+        except Exception:
+            logger.exception('Payment confirmation email failed for Order ID %s', order.id)
+        return JsonResponse({
+            'status': True,
+            'message': 'Payment Confirmed',
+            'data': {
+                'order_id': order.id,
+                'payment_status': 'completed',
+                'payment_reference': order.payment_reference,
+                'receipt_message': _payment_confirmed_receipt_message(order),
+            },
+        })
+
+    return JsonResponse({
+        'status': True,
+        'message': 'Payment request sent. Please approve the Lenco prompt on your phone.',
+        'data': {
+            'order_id': order.id,
+            'payment_status': order.payment_status,
+            'lenco_status': lenco_status,
+            'payment_reference': order.payment_reference,
+        },
+    })
+
+
 @login_required
 def order_history(request):
     orders = Order.objects.filter(user=request.user)
@@ -2561,7 +2655,11 @@ def verify_payment(request, order_id):
             'order_id': order.id,
             'payment_status': order.payment_status,
             'lenco_status': lenco_status,
-            'payment_reference': order.payment_reference
+            'payment_reference': order.payment_reference,
+            'data': {
+                'order_id': order.id,
+                'receipt_message': _payment_confirmed_receipt_message(order) if order.payment_status == 'completed' else '',
+            }
         })
     else:
         return JsonResponse({

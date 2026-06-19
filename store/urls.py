@@ -42,6 +42,7 @@ urlpatterns = [
     # Order related urls
     path('order/<int:order_id>/submit-otp/', views.submit_otp, name='submit_otp'),
     path('order/<int:order_id>/confirmation/', views.order_confirmation, name='order_confirmation'),
+    path('order/<int:order_id>/start-lenco-payment/', views.start_lenco_payment, name='start_lenco_payment'),
     path('order/<int:order_id>/add-on-delivery/', views.add_on_delivery, name='add_on_delivery'),
     path('order/<int:order_id>/received-parcel/', views.received_parcel, name='received_parcel'),
     path('order/<int:order_id>/confirm-payment/', views.confirm_payment, name='confirm_payment'),

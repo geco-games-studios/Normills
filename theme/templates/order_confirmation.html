@@ -42,7 +42,7 @@
             {% elif order.payment_status == 'failed' %}
                 Your order was created, but the mobile money payment did not complete.
             {% elif order.payment_method == 'cash' %}
-                Please send payment to one of the payment numbers below, then wait for cashier confirmation.
+                Tap Made Payment to receive a secure Lenco payment prompt on your phone for this order total.
             {% else %}
                 Your order was created. Please complete the mobile money payment to continue.
             {% endif %}
@@ -141,7 +141,8 @@
                     <h3 class="text-sm font-medium text-yellow-800">Message payment waiting</h3>
                     <div class="mt-2 text-sm text-yellow-700">
                         <p>Hello, Thank You for shopping with Normils Online, your Bill due is K{{ order.total }}.</p>
-                        <p class="mt-2">Kindly send the money to either of the following numbers:</p>
+                        <p class="mt-2">Tap Made Payment to receive a secure Lenco payment prompt on your phone.</p>
+                        <p class="mt-2">If the prompt fails, contact the cashier using the payment info below:</p>
                         <div class="mt-3 grid gap-2">
                             {% for info in payment_infos %}
                             <div class="border border-yellow-200 bg-white px-3 py-2">
@@ -155,9 +156,9 @@
                     </div>
                     <div class="mt-4">
                         <button type="button" id="money-sent-button" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-black uppercase tracking-[.12em] text-white bg-black">
-                            Money Sent
+                            Made Payment
                         </button>
-                        <span id="manual-payment-status" class="ml-3 text-sm text-yellow-700">Waiting confirmation.</span>
+                        <span id="manual-payment-status" class="ml-3 text-sm text-yellow-700">Waiting for payment to start.</span>
                     </div>
                 </div>
             </div>
@@ -255,10 +256,18 @@
     document.addEventListener('DOMContentLoaded', function() {
         const moneySentButton = document.getElementById('money-sent-button');
         const statusMessage = document.getElementById('manual-payment-status');
+        const csrfToken = '{{ csrf_token }}';
         let statusInterval = null;
 
-        function checkManualPayment() {
-            fetch('{% url "confirm_payment" order.id %}', {
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        function checkLencoPayment() {
+            fetch('{% url "verify_payment" order.id %}', {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
@@ -273,8 +282,14 @@
                         setTimeout(() => {
                             window.location.reload();
                         }, 1200);
+                    } else if (data.payment_status === 'failed') {
+                        if (statusInterval) clearInterval(statusInterval);
+                        statusMessage.textContent = data.message || 'Payment failed. Please try again or contact the cashier.';
+                        statusMessage.className = 'ml-3 text-sm text-red-700';
+                        moneySentButton.disabled = false;
+                        moneySentButton.classList.remove('opacity-60');
                     } else {
-                        statusMessage.textContent = 'Waiting confirmation.';
+                        statusMessage.textContent = 'Waiting for Lenco confirmation. Please approve the prompt on your phone.';
                         statusMessage.className = 'ml-3 text-sm text-yellow-700';
                     }
                 })
@@ -287,9 +302,42 @@
         moneySentButton.addEventListener('click', function() {
             moneySentButton.disabled = true;
             moneySentButton.classList.add('opacity-60');
-            checkManualPayment();
-            statusInterval = setInterval(checkManualPayment, 5000);
-        }, { once: true });
+            statusMessage.textContent = 'Sending the payment request to your phone...';
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', csrfToken || getCookie('csrftoken'));
+            fetch('{% url "start_lenco_payment" order.id %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+                .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || !data.status) {
+                        throw new Error(data.message || 'Could not start the Lenco payment.');
+                    }
+                    statusMessage.textContent = data.message || 'Payment request sent. Please approve the prompt on your phone.';
+                    statusMessage.className = 'ml-3 text-sm text-yellow-700';
+                    if (data.data && data.data.payment_status === 'completed') {
+                        statusMessage.textContent = 'Payment Confirmed';
+                        statusMessage.className = 'ml-3 text-sm text-green-700 font-bold';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1200);
+                        return;
+                    }
+                    checkLencoPayment();
+                    statusInterval = setInterval(checkLencoPayment, 5000);
+                })
+                .catch(error => {
+                    moneySentButton.disabled = false;
+                    moneySentButton.classList.remove('opacity-60');
+                    statusMessage.textContent = error.message || 'Could not start the payment. Please try again.';
+                    statusMessage.className = 'ml-3 text-sm text-red-700';
+                });
+        });
     });
 </script>
 {% endif %}
