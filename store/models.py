@@ -81,6 +81,7 @@ class Product(models.Model):
     offline_stock = models.PositiveIntegerField(default=0)
     low_stock_threshold = models.PositiveIntegerField(default=5)
     available = models.BooleanField(default=True)
+    show_selling_fast = models.BooleanField(default=False)
     season = models.CharField(max_length=20, choices=SEASON_CHOICES, blank=True, null=True)
     fabric = models.CharField(max_length=20, choices=FABRIC_CHOICES, blank=True, null=True)
     color = models.CharField(max_length=20, choices=COLOR_CHOICES, blank=True, null=True)

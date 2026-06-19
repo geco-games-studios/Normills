@@ -42,10 +42,10 @@
                     <div class="flex h-full w-full items-center justify-center bg-[#f1f1f1] text-xs uppercase tracking-[.18em] text-gray-400">No image</div>
                     {% endif %}
 
-                    {% if product.stock < 5 %}
-                    <span class="absolute bottom-10 right-0 z-10 bg-[#3b3b3b] px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-white">Selling Fast</span>
+                    {% if product.show_selling_fast %}
+                    <span class="absolute bottom-3 left-0 z-10 bg-[#3b3b3b] px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-white">Selling Fast</span>
                     {% elif product.color %}
-                    <span class="absolute bottom-10 left-0 z-10 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-[#333]">More Colours</span>
+                    <span class="absolute bottom-3 left-0 z-10 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[.18em] text-[#333]">More Colours</span>
                     {% endif %}
 
                     <button data-product-id="{{ product.id }}" class="wishlist-toggle absolute bottom-3 right-3 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-white/95 shadow-sm" aria-label="Save {{ product.name }}" aria-pressed="false">

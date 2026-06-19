@@ -131,6 +131,10 @@
           <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Upload Supporting Images</label>
           <input name="supporting_images" type="file" accept="image/*" multiple class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
         </div>
+        <label class="inline-flex items-center gap-2 text-sm font-bold text-gray-700">
+          <input type="checkbox" name="show_selling_fast">
+          Show Selling Fast label
+        </label>
         <div>
           <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Description</label>
           <textarea name="description" rows="3" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm"></textarea>
@@ -285,6 +289,10 @@
               <label class="inline-flex items-center gap-2 text-sm font-bold text-gray-700">
                 <input type="checkbox" name="available" {% if product.available and product.stock > 0 %}checked{% endif %}>
                 Available on storefront
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm font-bold text-gray-700">
+                <input type="checkbox" name="show_selling_fast" {% if product.show_selling_fast %}checked{% endif %}>
+                Show Selling Fast label
               </label>
               <button class="w-full bg-black px-3 py-3 text-xs font-black uppercase tracking-[.16em] text-white">Save item</button>
             </form>

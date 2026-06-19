@@ -855,6 +855,7 @@ def admin_dashboard(request):
         product.offline_stock = _parse_positive_int(request.POST.get('offline_stock'), product.offline_stock, minimum=0)
         product.low_stock_threshold = _parse_positive_int(request.POST.get('low_stock_threshold'), product.low_stock_threshold, minimum=0)
         product.available = request.POST.get('available') == 'on' and product.stock > 0
+        product.show_selling_fast = request.POST.get('show_selling_fast') == 'on'
         if 'color' in request.POST:
             product.color = (request.POST.get('color') or '').strip() or None
         if 'season' in request.POST:
