@@ -7,13 +7,13 @@
     <div class="mx-auto max-w-7xl px-4 pb-5 pt-7 md:px-6 md:pt-8">
         <div>
             <h1 class="text-[21px] font-black leading-tight tracking-[.08em] text-black min-[430px]:text-[26px] md:text-4xl">NORMILS New In: Today's Drops</h1>
-            <p class="mt-4 max-w-2xl text-[14px] leading-6 tracking-[.04em] text-[#333] md:text-[15px]">{{ storefront_control.new_in_message|default:"Fresh styles, latest arrivals, and new products added to the storefront." }}</p>
+            <p class="mt-4 max-w-2xl text-[14px] leading-6 tracking-[.04em] text-[#333] md:text-[15px]">{{ storefront_control.today_new_in_message|default:"Fresh styles, latest arrivals, and new products added to the storefront." }}</p>
         </div>
 
-        <div class="scrollbar-none mt-5 flex snap-x gap-2 overflow-x-auto border-b border-gray-300 pb-3">
-            <a href="/" class="snap-start whitespace-nowrap border border-black bg-black px-4 py-3 text-[15px] tracking-[.04em] text-white">New in: Today</a>
+        <div data-new-in-tabs class="scrollbar-none mt-5 flex snap-x gap-2 overflow-x-auto border-b border-gray-300 pb-3">
+            <a href="/" data-new-in-tab data-selected="true" class="snap-start whitespace-nowrap border border-black bg-black px-4 py-3 text-[15px] tracking-[.04em] text-white">New in: Today</a>
             {% for category in categories %}
-            <a href="{% url 'category_detail' category.slug %}" class="snap-start whitespace-nowrap border border-gray-200 px-4 py-3 text-[15px] tracking-[.04em] text-[#555]">New In: {{ category.name }}</a>
+            <a href="{% url 'category_detail' category.slug %}" data-new-in-tab data-selected="false" class="snap-start whitespace-nowrap border border-gray-200 px-4 py-3 text-[15px] tracking-[.04em] text-[#555]">New In: {{ category.name }}</a>
             {% endfor %}
         </div>
     </div>

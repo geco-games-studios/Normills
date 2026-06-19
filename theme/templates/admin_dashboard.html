@@ -554,9 +554,20 @@
         <label class="block text-xs font-bold text-gray-600">Banner image
           <input name="header_banner" type="file" accept="image/*" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">
         </label>
-        <label class="block text-xs font-bold text-gray-600">New In message
-          <textarea name="new_in_message" rows="4" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">{{ storefront_control.new_in_message }}</textarea>
+        <label class="block text-xs font-bold text-gray-600">Fallback New In message
+          <textarea name="new_in_message" rows="3" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">{{ storefront_control.new_in_message }}</textarea>
         </label>
+        <label class="block text-xs font-bold text-gray-600">New In: Today message
+          <textarea name="today_new_in_message" rows="3" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">{{ storefront_control.today_new_in_message }}</textarea>
+        </label>
+        <div class="space-y-3 border-t border-gray-200 pt-4">
+          <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Collection messages</p>
+          {% for category in categories %}
+          <label class="block text-xs font-bold text-gray-600">New In: {{ category.name }}
+            <textarea name="category_message_{{ category.id }}" rows="3" class="mt-1 w-full border border-gray-300 px-3 py-2 text-sm">{{ category.new_in_message }}</textarea>
+          </label>
+          {% endfor %}
+        </div>
         <button class="w-full bg-black px-4 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Save header controls</button>
       </form>
     </aside>
@@ -582,8 +593,19 @@
         </div>
       </div>
       <div class="border border-gray-200 bg-white p-5">
-        <h3 class="text-lg font-black uppercase tracking-[.14em] text-gray-900">New In message preview</h3>
-        <p class="mt-4 max-w-2xl text-[15px] leading-6 tracking-[.04em] text-[#333]">{{ storefront_control.new_in_message }}</p>
+        <h3 class="text-lg font-black uppercase tracking-[.14em] text-gray-900">New In message previews</h3>
+        <div class="mt-4 space-y-4">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Today</p>
+            <p class="mt-1 max-w-2xl text-[15px] leading-6 tracking-[.04em] text-[#333]">{{ storefront_control.today_new_in_message }}</p>
+          </div>
+          {% for category in categories %}
+          <div>
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">{{ category.name }}</p>
+            <p class="mt-1 max-w-2xl text-[15px] leading-6 tracking-[.04em] text-[#333]">{{ category.new_in_message|default:storefront_control.new_in_message }}</p>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </section>
   </section>

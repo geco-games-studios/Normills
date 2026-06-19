@@ -61,7 +61,8 @@ class BrandAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug']
+    list_display = ['name', 'slug', 'new_in_message']
+    list_editable = ['new_in_message']
     prepopulated_fields = {'slug': ('name',)}
 
 @admin.register(ProductSubcategory)

@@ -1106,10 +1106,20 @@ def admin_dashboard(request):
                 request.POST.get('new_in_message')
                 or 'Fresh styles, latest arrivals, and new products added to the storefront.'
             ).strip()
+            control.today_new_in_message = (
+                request.POST.get('today_new_in_message')
+                or control.new_in_message
+                or 'Fresh styles, latest arrivals, and new products added to the storefront.'
+            ).strip()
             uploaded_banner = request.FILES.get('header_banner')
             if uploaded_banner:
                 control.header_banner = uploaded_banner
             control.save()
+            for category in Category.objects.all():
+                category_message = request.POST.get(f'category_message_{category.id}')
+                if category_message is not None:
+                    category.new_in_message = category_message.strip()
+                    category.save(update_fields=['new_in_message'])
             messages.success(request, 'Updated Header and ADs controls.')
             return dashboard_redirect('header_ads')
 

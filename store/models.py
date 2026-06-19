@@ -14,6 +14,7 @@ class Category(models.Model):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
     image = models.ImageField(upload_to='categories/', blank=True, null=True)
+    new_in_message = models.CharField(max_length=240, blank=True)
     
     class Meta:
         verbose_name_plural = 'Categories'
@@ -179,6 +180,10 @@ class StorefrontControl(models.Model):
 
     header_mode = models.CharField(max_length=20, choices=HEADER_MODE_CHOICES, default='interactive')
     header_banner = models.ImageField(upload_to='storefront/banners/', blank=True)
+    today_new_in_message = models.CharField(
+        max_length=240,
+        default="Fresh styles, latest arrivals, and new products added to the storefront.",
+    )
     new_in_message = models.CharField(
         max_length=240,
         default='Fresh styles, latest arrivals, and new products added to the storefront.',
