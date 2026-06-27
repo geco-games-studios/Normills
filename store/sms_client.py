@@ -10,7 +10,7 @@ EXCITESMS_HTTP_SEND_URL = "https://gateway.excitesms.com/api/http/sms/send"
 
 class SMSClient:
     def __init__(self, api_token=None, sender_id=None, request_timeout=10):
-        self.api_token = api_token or getattr(settings, 'EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJfEVzyD2e44Vo8I0jpWZw65ec96a2')
+        self.api_token = api_token or getattr(settings, 'EXCITESMS_API_TOKEN', '')
         self.sender_id = sender_id or getattr(settings, 'EXCITESMS_SENDER_ID', 'Gecogames')
         self.timeout = request_timeout
 

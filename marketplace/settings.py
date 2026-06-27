@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,16 +21,34 @@ if env_path.exists():
             os.environ.setdefault(key, value)
 
 
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().upper() in ('TRUE', '1', 'YES', 'ON')
+
+
+def env_list(name, default=None):
+    value = os.getenv(name)
+    if not value:
+        return default or []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$^lgls_p2^^55dk)fz^6&&jv$1=t=)=bq&kf*8v_g@=elcgk_h'
+LOCAL_DEV_SECRET_KEY = 'django-insecure-local-dev-only-change-me'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', LOCAL_DEV_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DJANGO_DEBUG', True)
 
-ALLOWED_HOSTS = ['*','marketplace.gecogames.com']
+if not DEBUG and SECRET_KEY == LOCAL_DEV_SECRET_KEY:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=False.')
+
+ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', ['localhost', '127.0.0.1', 'marketplace.gecogames.com'])
 
 
 # Application definition
@@ -50,9 +69,7 @@ INSTALLED_APPS = [
 ]
 
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://marketplace.gecogames.com',
-]
+CSRF_TRUSTED_ORIGINS = env_list('DJANGO_CSRF_TRUSTED_ORIGINS', ['https://marketplace.gecogames.com'])
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -147,7 +164,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # For production
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+static_dir = BASE_DIR / 'static'
+STATICFILES_DIRS = [static_dir] if static_dir.exists() else []
 
 # Media files
 MEDIA_URL = '/media/'
@@ -163,9 +181,9 @@ LOGOUT_REDIRECT_URL = '/'
 
 # Security settings for production
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = False  # Set to True if using HTTPS
-SESSION_COOKIE_SECURE = False  # Set to True if using HTTPS
-CSRF_COOKIE_SECURE = False  # Set to True if using HTTPS
+SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
+SESSION_COOKIE_SECURE = env_bool('DJANGO_SESSION_COOKIE_SECURE', False)
+CSRF_COOKIE_SECURE = env_bool('DJANGO_CSRF_COOKIE_SECURE', False)
 
 
 # Lenco Payment Gateway Settings
@@ -177,16 +195,16 @@ LENCO_MOBILE_MONEY_PERCENT_FEE = os.getenv('LENCO_MOBILE_MONEY_PERCENT_FEE', '0.
 # CHECKOUT_SHIPPING_FEE = os.getenv('CHECKOUT_SHIPPING_FEE', '5.00')
 
 # ExciteSMS SMS Gateway Settings
-EXCITESMS_API_TOKEN = os.getenv('EXCITESMS_API_TOKEN', '119|NKxrvTCsKex9LgFGPaZJfEVzyD2e44Vo8I0jpWZw65ec96a2')
+EXCITESMS_API_TOKEN = os.getenv('EXCITESMS_API_TOKEN', '')
 EXCITESMS_SENDER_ID = os.getenv('EXCITESMS_SENDER_ID', 'Gecogames')
 
 # Email (SMTP) settings for Outlook
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.getenv('SMTP_HOST', 'smtp-mail.outlook.com')
 EMAIL_PORT = int(os.getenv('SMTP_PORT', '587'))
-EMAIL_HOST_USER = os.getenv('SMTP_USER', 'hello@gecogames.com')
-EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASS', 'Worldwar@2026?')
-EMAIL_USE_TLS = os.getenv('SMTP_SECURE', 'TRUE').strip().upper() in ('TRUE', '1', 'YES', 'ON')
+EMAIL_HOST_USER = os.getenv('SMTP_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASS', '')
+EMAIL_USE_TLS = env_bool('SMTP_SECURE', True)
 DEFAULT_FROM_EMAIL = os.getenv('SMTP_FROM', 'Geco Marketplace <hello@gecogames.com>')
 
 # WhatsApp Business Cloud API settings for automatic admin order receipts.
