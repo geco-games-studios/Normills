@@ -80,6 +80,10 @@ class User(AbstractUser):
         return self.is_staff or self.is_superuser or self.is_merchant_role
 
     @property
+    def can_access_platform_admin(self):
+        return self.is_superuser or self.role == self.Role.ADMINISTRATOR
+
+    @property
     def can_access_finance_admin(self):
         return self.is_superuser or self.role == self.Role.FINANCE_ADMINISTRATOR
 

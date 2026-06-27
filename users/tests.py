@@ -1,5 +1,9 @@
 from django.contrib.auth import authenticate, get_user_model
-from django.test import TestCase
+from django.http import HttpResponse
+from django.test import RequestFactory, TestCase
+from django.urls import reverse
+
+from .permissions import finance_admin_required, merchant_required, moderator_required, platform_admin_required
 
 
 class EmailOrPhoneBackendTests(TestCase):
@@ -70,3 +74,96 @@ class UserRoleTests(TestCase):
         self.assertFalse(finance_user.can_access_moderation)
         self.assertTrue(moderator.can_access_moderation)
         self.assertFalse(moderator.can_access_finance_admin)
+
+    def test_administrator_role_can_access_platform_admin(self):
+        User = get_user_model()
+        administrator = User.objects.create_user(
+            username='administrator',
+            password='password',
+            role=User.Role.ADMINISTRATOR,
+        )
+        merchant = User.objects.create_user(
+            username='merchant-user',
+            password='password',
+            role=User.Role.MERCHANT,
+        )
+
+        self.assertTrue(administrator.can_access_platform_admin)
+        self.assertFalse(merchant.can_access_platform_admin)
+
+
+class RolePermissionDecoratorTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _request_for(self, user):
+        request = self.factory.get('/protected/')
+        request.user = user
+        return request
+
+    def _ok_view(self, request):
+        return HttpResponse('ok')
+
+    def test_merchant_required_allows_merchants(self):
+        User = get_user_model()
+        user = User.objects.create_user(username='merchant', role=User.Role.MERCHANT)
+
+        response = merchant_required(self._ok_view)(self._request_for(user))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_merchant_required_blocks_customers(self):
+        User = get_user_model()
+        user = User.objects.create_user(username='customer')
+
+        response = merchant_required(self._ok_view)(self._request_for(user))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_finance_admin_required_allows_only_finance_scope(self):
+        User = get_user_model()
+        finance_user = User.objects.create_user(username='finance', role=User.Role.FINANCE_ADMINISTRATOR)
+        moderator = User.objects.create_user(username='moderator', role=User.Role.MODERATOR)
+
+        self.assertEqual(finance_admin_required(self._ok_view)(self._request_for(finance_user)).status_code, 200)
+        self.assertEqual(finance_admin_required(self._ok_view)(self._request_for(moderator)).status_code, 403)
+
+    def test_moderator_required_allows_support_scope(self):
+        User = get_user_model()
+        support_user = User.objects.create_user(username='support', role=User.Role.SUPPORT_OFFICER)
+        finance_user = User.objects.create_user(username='finance', role=User.Role.FINANCE_ADMINISTRATOR)
+
+        self.assertEqual(moderator_required(self._ok_view)(self._request_for(support_user)).status_code, 200)
+        self.assertEqual(moderator_required(self._ok_view)(self._request_for(finance_user)).status_code, 403)
+
+    def test_platform_admin_required_blocks_merchants(self):
+        User = get_user_model()
+        administrator = User.objects.create_user(username='admin-role', role=User.Role.ADMINISTRATOR)
+        merchant = User.objects.create_user(username='merchant-role', role=User.Role.MERCHANT)
+
+        self.assertEqual(platform_admin_required(self._ok_view)(self._request_for(administrator)).status_code, 200)
+        self.assertEqual(platform_admin_required(self._ok_view)(self._request_for(merchant)).status_code, 403)
+
+
+class DashboardPermissionTests(TestCase):
+    def test_customer_cannot_access_broad_admin_dashboard(self):
+        User = get_user_model()
+        customer = User.objects.create_user(username='customer', password='password')
+        self.client.force_login(customer)
+
+        response = self.client.get(reverse('admin_dashboard'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_cannot_access_broad_admin_dashboard(self):
+        User = get_user_model()
+        merchant = User.objects.create_user(
+            username='merchant',
+            password='password',
+            role=User.Role.MERCHANT,
+        )
+        self.client.force_login(merchant)
+
+        response = self.client.get(reverse('admin_dashboard'))
+
+        self.assertEqual(response.status_code, 403)

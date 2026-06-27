@@ -34,6 +34,7 @@ from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
 from users.models import ClientProfile
+from users.permissions import platform_admin_required
 from users.phone_verification import normalize_phone as normalize_account_phone, send_phone_verification_code
 
 import logging
@@ -904,11 +905,8 @@ def product_detail(request, slug):
     })
 
 
-@login_required
+@platform_admin_required
 def admin_dashboard(request):
-    if not request.user.is_superuser:
-        return HttpResponseForbidden('Superuser access only.')
-
     def dashboard_redirect(mode='editor'):
         return redirect(f"{request.path}?mode={mode}")
 
