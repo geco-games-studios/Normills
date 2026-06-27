@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Add Product | Merchant Centre{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="border-b border-gray-200 pb-6">
+        <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Merchant Centre</p>
+        <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">Add product</h1>
+        <p class="mt-2 text-sm leading-6 text-gray-600">Publish the essentials first. Detailed promotion, variants, and PayGo settings can come after the product is live.</p>
+    </div>
+
+    {% if not has_stores %}
+    <div class="mt-6 border border-yellow-300 bg-yellow-50 p-5 text-sm leading-6 text-yellow-900">
+        Your account does not have a store attached yet. Ask an administrator to attach a store before adding products.
+    </div>
+    {% else %}
+    <form method="post" enctype="multipart/form-data" class="mt-6 space-y-5">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        {% for field in form %}
+        <label class="block text-xs font-black uppercase tracking-[.16em] text-gray-500">
+            {{ field.label }}
+            <span class="mt-2 block">{{ field }}</span>
+            {% if field.help_text %}
+            <span class="mt-1 block text-xs font-normal normal-case tracking-normal text-gray-500">{{ field.help_text }}</span>
+            {% endif %}
+            {% if field.errors %}
+            <span class="mt-1 block text-xs font-bold normal-case tracking-normal text-red-700">{{ field.errors|striptags }}</span>
+            {% endif %}
+        </label>
+        {% endfor %}
+
+        <div class="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:justify-between">
+            <a href="{% url 'merchant_dashboard' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Cancel</a>
+            <button type="submit" class="inline-flex items-center justify-center bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Publish product</button>
+        </div>
+    </form>
+    {% endif %}
+</main>
+{% endblock %}

@@ -25,7 +25,7 @@ from django.utils.html import strip_tags
 
 from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
-from .forms import CustomUserCreationForm, CheckoutForm
+from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
@@ -923,6 +923,26 @@ def merchant_dashboard(request):
         'order_count': orders.count(),
         'low_stock_count': low_stock_count,
         'total_revenue': total_revenue,
+    })
+
+
+@merchant_required
+def merchant_product_create(request):
+    owner_profile = getattr(request.user, 'store_owner_profile', None)
+    stores = Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
+
+    if request.method == 'POST':
+        form = MerchantProductForm(request.POST, request.FILES, stores=stores)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Product published.')
+            return redirect('merchant_dashboard')
+    else:
+        form = MerchantProductForm(stores=stores)
+
+    return render(request, 'merchant_product_form.html', {
+        'form': form,
+        'has_stores': stores.exists(),
     })
 
 

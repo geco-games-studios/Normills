@@ -22,6 +22,7 @@ urlpatterns = [
     path('product_detail/<slug:slug>/', views.product_detail, name='product_detail'),
     path('shopping-bot/', views.shopping_bot, name='shopping_bot'),
     path('merchant/', views.merchant_dashboard, name='merchant_dashboard'),
+    path('merchant/products/new/', views.merchant_product_create, name='merchant_product_create'),
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('wishlist/', views.wishlist, name='wishlist'),
     path('wishlist/add/', views.add_to_wishlist, name='add_to_wishlist'),

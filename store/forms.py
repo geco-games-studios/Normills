@@ -2,9 +2,10 @@ import re
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.utils.crypto import get_random_string
+from django.utils.text import slugify
 from users.models import User
 from users.phone_verification import normalize_phone
-from .models import Order
+from .models import Brand, Category, Order, Product
 
 class CustomUserCreationForm(UserCreationForm):
     username = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -84,6 +85,49 @@ class EmailOrPhoneAuthenticationForm(AuthenticationForm):
     def __init__(self, request=None, *args, **kwargs):
         super().__init__(request, *args, **kwargs)
         self.fields['username'].label = "Email, Phone Number, or Username"
+
+
+class MerchantProductForm(forms.ModelForm):
+    image = forms.FileField(required=True)
+
+    class Meta:
+        model = Product
+        fields = ('store', 'image', 'name', 'price', 'category', 'brand', 'stock', 'description')
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, stores=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['store'].queryset = stores if stores is not None else self.fields['store'].queryset.none()
+        self.fields['category'].queryset = Category.objects.order_by('name')
+        self.fields['brand'].queryset = Brand.objects.order_by('name')
+        self.fields['brand'].required = False
+        self.fields['description'].required = False
+        self.fields['stock'].min_value = 0
+
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                'class',
+                'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
+            )
+
+    def save(self, commit=True):
+        product = super().save(commit=False)
+        product.available = product.stock > 0
+        if not product.slug:
+            base_slug = slugify(product.name) or f"product-{get_random_string(6)}"
+            slug = base_slug
+            suffix = 2
+            while Product.objects.filter(slug=slug).exclude(pk=product.pk).exists():
+                slug = f"{base_slug}-{suffix}"
+                suffix += 1
+            product.slug = slug
+        if commit:
+            product.save()
+            self.save_m2m()
+        return product
+
 
 class CheckoutForm(forms.Form):
     first_name = forms.CharField(max_length=100, required=True)

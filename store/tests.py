@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
@@ -162,3 +163,59 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(response.context['total_revenue'], Decimal('2500'))
         self.assertContains(response, 'Merchant Phone')
         self.assertNotContains(response, 'Other Phone')
+
+    def _uploaded_image(self):
+        return SimpleUploadedFile('product.jpg', b'product-image-bytes', content_type='image/jpeg')
+
+    def test_customer_cannot_access_product_create_form(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('merchant_product_create'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_can_open_product_create_form(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_product_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Add product')
+
+    def test_merchant_can_publish_product_to_own_store(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_create'), {
+            'store': self.store.id,
+            'image': self._uploaded_image(),
+            'name': 'Fresh Jacket',
+            'price': '650.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '4',
+            'description': 'Warm jacket',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        product = Product.objects.get(slug='fresh-jacket')
+        self.assertEqual(product.store, self.store)
+        self.assertEqual(product.price, Decimal('650.00'))
+        self.assertEqual(product.stock, 4)
+        self.assertTrue(product.available)
+
+    def test_merchant_cannot_publish_product_to_another_merchants_store(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_create'), {
+            'store': self.other_store.id,
+            'image': self._uploaded_image(),
+            'name': 'Wrong Store Product',
+            'price': '100.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '1',
+            'description': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Product.objects.filter(name='Wrong Store Product').exists())
