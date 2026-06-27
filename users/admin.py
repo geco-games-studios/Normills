@@ -3,19 +3,50 @@ from django.contrib.auth.admin import UserAdmin
 from .models import User, StoreOwnerProfile, ClientProfile
 
 class CustomUserAdmin(UserAdmin):
-    list_display = ('username', 'email', 'is_verified', 'is_store_owner', 'is_client', 'is_staff', 'is_superuser')
-    list_filter = ('is_verified', 'is_store_owner', 'is_client', 'is_staff', 'is_superuser')
+    list_display = (
+        'username',
+        'email',
+        'role',
+        'verification_status',
+        'is_verified',
+        'is_store_owner',
+        'is_client',
+        'is_staff',
+        'is_superuser',
+    )
+    list_filter = (
+        'role',
+        'verification_status',
+        'is_verified',
+        'is_store_owner',
+        'is_client',
+        'is_staff',
+        'is_superuser',
+    )
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
         ('Permissions', {'fields': ('is_active', 'is_verified', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Custom Fields', {'fields': ('is_store_owner', 'is_client')}),  # Add custom fields here
+        ('Marketplace Role', {'fields': ('role', 'verification_status', 'trust_badges')}),
+        ('Legacy Fields', {'fields': ('is_store_owner', 'is_client')}),
         ('Important Dates', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2', 'is_verified', 'is_store_owner', 'is_client', 'is_staff', 'is_superuser'),
+            'fields': (
+                'username',
+                'email',
+                'password1',
+                'password2',
+                'role',
+                'verification_status',
+                'is_verified',
+                'is_store_owner',
+                'is_client',
+                'is_staff',
+                'is_superuser',
+            ),
         }),
     )
 
