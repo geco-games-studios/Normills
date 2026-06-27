@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.db import close_old_connections, transaction
-from django.db.models import Q, Min, Max, Sum
+from django.db.models import F, Q, Min, Max, Sum
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 from decimal import Decimal, ROUND_HALF_UP
@@ -34,7 +34,7 @@ from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
 from users.models import ClientProfile
-from users.permissions import platform_admin_required
+from users.permissions import merchant_required, platform_admin_required
 from users.phone_verification import normalize_phone as normalize_account_phone, send_phone_verification_code
 
 import logging
@@ -902,6 +902,27 @@ def product_detail(request, slug):
         'supporting_images': supporting_images,
         'recommended_products': recommended_products,
         'product_url': product_url,
+    })
+
+
+@merchant_required
+def merchant_dashboard(request):
+    owner_profile = getattr(request.user, 'store_owner_profile', None)
+    stores = Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
+    products = Product.objects.filter(store__in=stores).select_related('store', 'category', 'brand')
+    orders = Order.objects.filter(items__product__store__in=stores).distinct()
+
+    total_revenue = orders.filter(payment_status='completed').aggregate(total=Sum('total'))['total'] or Decimal('0')
+    low_stock_count = products.filter(stock__lte=F('low_stock_threshold')).count()
+
+    return render(request, 'store_dashboard.html', {
+        'stores': stores,
+        'products': products.order_by('-updated')[:12],
+        'store_count': stores.count(),
+        'product_count': products.count(),
+        'order_count': orders.count(),
+        'low_stock_count': low_stock_count,
+        'total_revenue': total_revenue,
     })
 
 
