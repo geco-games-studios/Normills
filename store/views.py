@@ -25,7 +25,7 @@ from django.utils.html import strip_tags
 
 from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
 from .ml import recommend_products_from_context
-from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm
+from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm, prepare_product_image
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
@@ -42,6 +42,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 MONEY_PLACES = Decimal('0.01')
+MAX_SUPPORTING_PRODUCT_IMAGES = 6
 
 
 def _money(value):
@@ -926,6 +927,36 @@ def merchant_dashboard(request):
     })
 
 
+def _supporting_image_ids_to_delete(request):
+    ids = []
+    for value in request.POST.getlist('delete_supporting_images'):
+        try:
+            ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+def _prepare_supporting_images(request, product=None):
+    delete_ids = _supporting_image_ids_to_delete(request)
+    uploaded_images = request.FILES.getlist('supporting_images')
+    current_count = 0
+    if product:
+        current_count = product.supporting_images.exclude(id__in=delete_ids).count()
+
+    if current_count + len(uploaded_images) > MAX_SUPPORTING_PRODUCT_IMAGES:
+        raise ValidationError(f'Keep each product gallery to {MAX_SUPPORTING_PRODUCT_IMAGES} supporting images.')
+
+    return delete_ids, [prepare_product_image(image) for image in uploaded_images]
+
+
+def _save_supporting_images(product, delete_ids, prepared_images):
+    if delete_ids:
+        product.supporting_images.filter(id__in=delete_ids).delete()
+    for image in prepared_images:
+        ProductImage.objects.create(product=product, image=image)
+
+
 @merchant_required
 def merchant_product_create(request):
     owner_profile = getattr(request.user, 'store_owner_profile', None)
@@ -933,10 +964,16 @@ def merchant_product_create(request):
 
     if request.method == 'POST':
         form = MerchantProductForm(request.POST, request.FILES, stores=stores)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Product published.')
-            return redirect('merchant_dashboard')
+        try:
+            delete_ids, supporting_images = _prepare_supporting_images(request)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            if form.is_valid():
+                product = form.save()
+                _save_supporting_images(product, delete_ids, supporting_images)
+                messages.success(request, 'Product published.')
+                return redirect('merchant_dashboard')
     else:
         form = MerchantProductForm(stores=stores)
 
@@ -944,6 +981,7 @@ def merchant_product_create(request):
         'form': form,
         'has_stores': stores.exists(),
         'mode': 'create',
+        'max_supporting_images': MAX_SUPPORTING_PRODUCT_IMAGES,
     })
 
 
@@ -955,10 +993,16 @@ def merchant_product_edit(request, product_id):
 
     if request.method == 'POST':
         form = MerchantProductForm(request.POST, request.FILES, stores=stores, require_image=False, instance=product)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Product updated.')
-            return redirect('merchant_dashboard')
+        try:
+            delete_ids, supporting_images = _prepare_supporting_images(request, product)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            if form.is_valid():
+                product = form.save()
+                _save_supporting_images(product, delete_ids, supporting_images)
+                messages.success(request, 'Product updated.')
+                return redirect('merchant_dashboard')
     else:
         form = MerchantProductForm(stores=stores, require_image=False, instance=product)
 
@@ -967,6 +1011,8 @@ def merchant_product_edit(request, product_id):
         'has_stores': stores.exists(),
         'mode': 'edit',
         'product': product,
+        'supporting_images': product.supporting_images.all(),
+        'max_supporting_images': MAX_SUPPORTING_PRODUCT_IMAGES,
     })
 
 

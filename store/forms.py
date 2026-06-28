@@ -19,6 +19,52 @@ PRODUCT_IMAGE_FORMATS = {
     'image/webp': ('WEBP', '.webp'),
 }
 
+
+def prepare_product_image(image):
+    content_type = getattr(image, 'content_type', '')
+    if not content_type:
+        return image
+
+    if image.size > MAX_PRODUCT_IMAGE_SIZE:
+        raise forms.ValidationError('Upload an image smaller than 8 MB.')
+
+    if content_type not in PRODUCT_IMAGE_FORMATS:
+        raise forms.ValidationError('Upload a JPG, PNG, or WebP image.')
+
+    output_format, extension = PRODUCT_IMAGE_FORMATS[content_type]
+    try:
+        image.file.seek(0)
+        source = Image.open(image.file)
+        source.load()
+    except Exception as exc:
+        raise forms.ValidationError('Upload a valid image file.') from exc
+
+    source.thumbnail(
+        (MAX_PRODUCT_IMAGE_DIMENSION, MAX_PRODUCT_IMAGE_DIMENSION),
+        Image.Resampling.LANCZOS,
+    )
+
+    if output_format == 'JPEG' and source.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', source.size, (255, 255, 255))
+        if source.mode == 'P':
+            source = source.convert('RGBA')
+        background.paste(source, mask=source.getchannel('A') if source.mode in ('RGBA', 'LA') else None)
+        source = background
+    elif output_format == 'JPEG' and source.mode != 'RGB':
+        source = source.convert('RGB')
+
+    output = BytesIO()
+    save_options = {'format': output_format}
+    if output_format == 'JPEG':
+        save_options.update({'quality': 82, 'optimize': True})
+    elif output_format in {'PNG', 'WEBP'}:
+        save_options.update({'optimize': True})
+    source.save(output, **save_options)
+
+    base_name = slugify(image.name.rsplit('.', 1)[0]) or 'product-image'
+    return ContentFile(output.getvalue(), name=f'{base_name}{extension}')
+
+
 class CustomUserCreationForm(UserCreationForm):
     username = forms.CharField(widget=forms.HiddenInput(), required=False)
     email = forms.EmailField(required=False)
@@ -149,48 +195,7 @@ class MerchantProductForm(forms.ModelForm):
         if not image:
             return image
 
-        content_type = getattr(image, 'content_type', '')
-        if not content_type:
-            return image
-
-        if image.size > MAX_PRODUCT_IMAGE_SIZE:
-            raise forms.ValidationError('Upload an image smaller than 8 MB.')
-
-        if content_type not in PRODUCT_IMAGE_FORMATS:
-            raise forms.ValidationError('Upload a JPG, PNG, or WebP image.')
-
-        output_format, extension = PRODUCT_IMAGE_FORMATS[content_type]
-        try:
-            image.file.seek(0)
-            source = Image.open(image.file)
-            source.load()
-        except Exception as exc:
-            raise forms.ValidationError('Upload a valid image file.') from exc
-
-        source.thumbnail(
-            (MAX_PRODUCT_IMAGE_DIMENSION, MAX_PRODUCT_IMAGE_DIMENSION),
-            Image.Resampling.LANCZOS,
-        )
-
-        if output_format == 'JPEG' and source.mode in ('RGBA', 'LA', 'P'):
-            background = Image.new('RGB', source.size, (255, 255, 255))
-            if source.mode == 'P':
-                source = source.convert('RGBA')
-            background.paste(source, mask=source.getchannel('A') if source.mode in ('RGBA', 'LA') else None)
-            source = background
-        elif output_format == 'JPEG' and source.mode != 'RGB':
-            source = source.convert('RGB')
-
-        output = BytesIO()
-        save_options = {'format': output_format}
-        if output_format == 'JPEG':
-            save_options.update({'quality': 82, 'optimize': True})
-        elif output_format in {'PNG', 'WEBP'}:
-            save_options.update({'optimize': True})
-        source.save(output, **save_options)
-
-        base_name = slugify(image.name.rsplit('.', 1)[0]) or 'product-image'
-        return ContentFile(output.getvalue(), name=f'{base_name}{extension}')
+        return prepare_product_image(image)
 
 
 class CheckoutForm(forms.Form):

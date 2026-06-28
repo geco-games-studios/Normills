@@ -16,7 +16,7 @@ from .payment import (
     normalize_lenco_response,
     process_lenco_payment,
 )
-from .models import Category, Order, OrderItem, Product
+from .models import Category, Order, OrderItem, Product, ProductImage
 
 
 class LencoPaymentHelperTests(SimpleTestCase):
@@ -166,17 +166,14 @@ class MerchantDashboardTests(TestCase):
         self.assertContains(response, 'Merchant Phone')
         self.assertNotContains(response, 'Other Phone')
 
-    def _uploaded_image(self):
-        image = Image.new('RGB', (320, 240), color=(40, 80, 120))
+    def _uploaded_image(self, name='product.jpg', size=(320, 240), color=(40, 80, 120)):
+        image = Image.new('RGB', size, color=color)
         buffer = BytesIO()
         image.save(buffer, format='JPEG')
-        return SimpleUploadedFile('product.jpg', buffer.getvalue(), content_type='image/jpeg')
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type='image/jpeg')
 
     def _large_uploaded_image(self):
-        image = Image.new('RGB', (2400, 1800), color=(80, 120, 40))
-        buffer = BytesIO()
-        image.save(buffer, format='JPEG')
-        return SimpleUploadedFile('large-product.jpg', buffer.getvalue(), content_type='image/jpeg')
+        return self._uploaded_image('large-product.jpg', size=(2400, 1800), color=(80, 120, 40))
 
     def test_customer_cannot_access_product_create_form(self):
         self.client.force_login(self.customer)
@@ -272,6 +269,32 @@ class MerchantDashboardTests(TestCase):
             saved_image = Image.open(image_file)
             self.assertLessEqual(max(saved_image.size), 1600)
 
+    def test_merchant_can_publish_product_with_gallery_images(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_create'), {
+            'store': self.store.id,
+            'image': self._uploaded_image('cover.jpg'),
+            'supporting_images': [
+                self._uploaded_image('angle-one.jpg', color=(120, 80, 40)),
+                self._uploaded_image('angle-two.jpg', color=(40, 120, 80)),
+            ],
+            'name': 'Gallery Product',
+            'price': '350.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '5',
+            'available': 'on',
+            'description': '',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        product = Product.objects.get(slug='gallery-product')
+        self.assertEqual(product.supporting_images.count(), 2)
+        with product.supporting_images.first().image.open('rb') as image_file:
+            saved_image = Image.open(image_file)
+            self.assertLessEqual(max(saved_image.size), 1600)
+
     def test_merchant_can_edit_own_product(self):
         self.client.force_login(self.merchant_user)
 
@@ -292,6 +315,53 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(self.product.price, Decimal('2400.00'))
         self.assertEqual(self.product.stock, 7)
         self.assertTrue(self.product.available)
+
+    def test_merchant_can_update_gallery_images(self):
+        existing_image = ProductImage.objects.create(
+            product=self.product,
+            image='products/supporting/old-angle.jpg',
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_edit', args=[self.product.id]), {
+            'store': self.store.id,
+            'supporting_images': [self._uploaded_image('new-angle.jpg', color=(90, 90, 160))],
+            'delete_supporting_images': [str(existing_image.id)],
+            'name': self.product.name,
+            'price': '2500.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '2',
+            'available': 'on',
+            'description': self.product.description,
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        self.assertFalse(ProductImage.objects.filter(id=existing_image.id).exists())
+        self.assertEqual(self.product.supporting_images.count(), 1)
+
+    def test_merchant_cannot_delete_gallery_image_from_another_product(self):
+        other_product = Product.objects.get(slug='other-phone')
+        other_image = ProductImage.objects.create(
+            product=other_product,
+            image='products/supporting/other-angle.jpg',
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_edit', args=[self.product.id]), {
+            'store': self.store.id,
+            'delete_supporting_images': [str(other_image.id)],
+            'name': self.product.name,
+            'price': '2500.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '2',
+            'available': 'on',
+            'description': self.product.description,
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        self.assertTrue(ProductImage.objects.filter(id=other_image.id).exists())
 
     def test_merchant_can_pause_own_product(self):
         self.client.force_login(self.merchant_user)

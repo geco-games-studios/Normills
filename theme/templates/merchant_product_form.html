@@ -37,6 +37,33 @@
         </label>
         {% endfor %}
 
+        <section class="border border-gray-200 bg-gray-50 p-4">
+            <label for="supporting_images" class="block text-xs font-black uppercase tracking-[.16em] text-gray-500">
+                Product gallery
+                <span class="mt-2 block">
+                    <input id="supporting_images" name="supporting_images" type="file" accept="image/jpeg,image/png,image/webp" multiple class="w-full border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-black">
+                </span>
+                <span class="mt-1 block text-xs font-normal normal-case tracking-normal text-gray-500">Add up to {{ max_supporting_images }} supporting JPG, PNG, or WebP photos.</span>
+            </label>
+
+            {% if supporting_images %}
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                {% for image in supporting_images %}
+                <label class="flex gap-3 border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                    <img src="{{ image.image.url }}" alt="{{ product.name }}" class="h-20 w-20 flex-none object-cover">
+                    <span class="min-w-0 flex-1">
+                        <span class="block font-bold text-gray-950">Gallery photo {{ forloop.counter }}</span>
+                        <span class="mt-2 flex items-center gap-2 text-xs font-black uppercase tracking-[.12em] text-red-700">
+                            <input type="checkbox" name="delete_supporting_images" value="{{ image.id }}" class="h-4 w-4 border border-gray-300 text-red-700">
+                            Remove
+                        </span>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+
         <div class="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:justify-between">
             <a href="{% url 'merchant_dashboard' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Cancel</a>
             <button type="submit" class="inline-flex items-center justify-center bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">{% if mode == "edit" %}Save changes{% else %}Publish product{% endif %}</button>
