@@ -911,7 +911,7 @@ def merchant_dashboard(request):
     owner_profile = getattr(request.user, 'store_owner_profile', None)
     stores = Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
     products = Product.objects.filter(store__in=stores).select_related('store', 'category', 'brand')
-    orders = Order.objects.filter(items__product__store__in=stores).distinct()
+    orders = Order.objects.filter(items__product__store__in=stores).prefetch_related('items__product').distinct()
 
     total_revenue = orders.filter(payment_status='completed').aggregate(total=Sum('total'))['total'] or Decimal('0')
     low_stock_count = products.filter(stock__lte=F('low_stock_threshold')).count()
@@ -919,12 +919,22 @@ def merchant_dashboard(request):
     return render(request, 'store_dashboard.html', {
         'stores': stores,
         'products': products.order_by('-updated')[:12],
+        'orders': orders.order_by('-created')[:6],
         'store_count': stores.count(),
         'product_count': products.count(),
         'order_count': orders.count(),
         'low_stock_count': low_stock_count,
         'total_revenue': total_revenue,
     })
+
+
+def _merchant_stores_for_user(user):
+    owner_profile = getattr(user, 'store_owner_profile', None)
+    return Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
+
+
+def _merchant_orders_for_stores(stores):
+    return Order.objects.filter(items__product__store__in=stores).prefetch_related('items__product').distinct()
 
 
 def _supporting_image_ids_to_delete(request):
@@ -955,6 +965,48 @@ def _save_supporting_images(product, delete_ids, prepared_images):
         product.supporting_images.filter(id__in=delete_ids).delete()
     for image in prepared_images:
         ProductImage.objects.create(product=product, image=image)
+
+
+@merchant_required
+def merchant_orders(request):
+    stores = _merchant_stores_for_user(request.user)
+    orders = _merchant_orders_for_stores(stores).order_by('-created')
+
+    return render(request, 'merchant_orders.html', {
+        'orders': orders,
+        'store_count': stores.count(),
+    })
+
+
+@merchant_required
+def merchant_order_update(request, order_id):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Order updates require POST.')
+
+    stores = _merchant_stores_for_user(request.user)
+    order = get_object_or_404(_merchant_orders_for_stores(stores), id=order_id)
+    action = request.POST.get('action')
+
+    if action == 'mark_packing':
+        if order.payment_status != 'completed' and not order.payment_confirmed:
+            messages.error(request, f'Order #{order.id} must be paid before packing.')
+        elif order.status in {'pending', 'payment_awaiting', 'paid'}:
+            order.status = 'packing'
+            order.save(update_fields=['status'])
+            messages.success(request, f'Order #{order.id} marked as packing.')
+        else:
+            messages.info(request, f'Order #{order.id} is already {order.get_status_display().lower()}.')
+    elif action == 'mark_dispatched':
+        if order.status != 'packing':
+            messages.error(request, f'Order #{order.id} must be packing before dispatch.')
+        else:
+            order.status = 'dispatched'
+            order.save(update_fields=['status'])
+            messages.success(request, f'Order #{order.id} marked as dispatched.')
+    else:
+        messages.error(request, 'Unknown order action.')
+
+    return redirect(request.POST.get('next') or 'merchant_orders')
 
 
 @merchant_required

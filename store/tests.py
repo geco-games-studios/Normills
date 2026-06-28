@@ -165,6 +165,7 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(response.context['total_revenue'], Decimal('2500'))
         self.assertContains(response, 'Merchant Phone')
         self.assertNotContains(response, 'Other Phone')
+        self.assertContains(response, f'#{self.order.id}')
 
     def _uploaded_image(self, name='product.jpg', size=(320, 240), color=(40, 80, 120)):
         image = Image.new('RGB', size, color=color)
@@ -387,3 +388,113 @@ class MerchantDashboardTests(TestCase):
         response = self.client.get(reverse('merchant_product_edit', args=[other_product.id]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_customer_cannot_access_merchant_orders(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('merchant_orders'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_can_view_own_store_orders(self):
+        other_product = Product.objects.get(slug='other-phone')
+        other_order = Order.objects.create(
+            user=self.customer,
+            first_name='Customer',
+            last_name='Two',
+            email='customer2@example.com',
+            address='Mazabuka',
+            city='Mazabuka',
+            postal_code='10101',
+            phone='260966000000',
+            status='paid',
+            subtotal=Decimal('3000.00'),
+            shipping=Decimal('0.00'),
+            tax=Decimal('0.00'),
+            total=Decimal('3000.00'),
+            payment_method='mobile_money',
+            payment_status='completed',
+        )
+        OrderItem.objects.create(
+            order=other_order,
+            product=other_product,
+            price=Decimal('3000.00'),
+            quantity=1,
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_orders'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'Order #{self.order.id}')
+        self.assertNotContains(response, f'Order #{other_order.id}')
+
+    def test_merchant_can_mark_paid_order_as_packing(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_order_update', args=[self.order.id]), {
+            'action': 'mark_packing',
+        })
+
+        self.assertRedirects(response, reverse('merchant_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'packing')
+
+    def test_merchant_can_mark_packing_order_as_dispatched(self):
+        self.order.status = 'packing'
+        self.order.save(update_fields=['status'])
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_order_update', args=[self.order.id]), {
+            'action': 'mark_dispatched',
+        })
+
+        self.assertRedirects(response, reverse('merchant_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'dispatched')
+
+    def test_merchant_cannot_dispatch_unpacked_order(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_order_update', args=[self.order.id]), {
+            'action': 'mark_dispatched',
+        })
+
+        self.assertRedirects(response, reverse('merchant_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'paid')
+
+    def test_merchant_cannot_update_another_store_order(self):
+        other_product = Product.objects.get(slug='other-phone')
+        other_order = Order.objects.create(
+            user=self.customer,
+            first_name='Customer',
+            last_name='Two',
+            email='customer2@example.com',
+            address='Mazabuka',
+            city='Mazabuka',
+            postal_code='10101',
+            phone='260966000000',
+            status='paid',
+            subtotal=Decimal('3000.00'),
+            shipping=Decimal('0.00'),
+            tax=Decimal('0.00'),
+            total=Decimal('3000.00'),
+            payment_method='mobile_money',
+            payment_status='completed',
+        )
+        OrderItem.objects.create(
+            order=other_order,
+            product=other_product,
+            price=Decimal('3000.00'),
+            quantity=1,
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_order_update', args=[other_order.id]), {
+            'action': 'mark_packing',
+        })
+
+        self.assertEqual(response.status_code, 404)
+        other_order.refresh_from_db()
+        self.assertEqual(other_order.status, 'paid')
