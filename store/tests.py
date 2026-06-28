@@ -1,9 +1,11 @@
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from PIL import Image
 
 from manager.models import Store
 from users.models import StoreOwnerProfile
@@ -165,7 +167,16 @@ class MerchantDashboardTests(TestCase):
         self.assertNotContains(response, 'Other Phone')
 
     def _uploaded_image(self):
-        return SimpleUploadedFile('product.jpg', b'product-image-bytes', content_type='image/jpeg')
+        image = Image.new('RGB', (320, 240), color=(40, 80, 120))
+        buffer = BytesIO()
+        image.save(buffer, format='JPEG')
+        return SimpleUploadedFile('product.jpg', buffer.getvalue(), content_type='image/jpeg')
+
+    def _large_uploaded_image(self):
+        image = Image.new('RGB', (2400, 1800), color=(80, 120, 40))
+        buffer = BytesIO()
+        image.save(buffer, format='JPEG')
+        return SimpleUploadedFile('large-product.jpg', buffer.getvalue(), content_type='image/jpeg')
 
     def test_customer_cannot_access_product_create_form(self):
         self.client.force_login(self.customer)
@@ -220,6 +231,46 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Product.objects.filter(name='Wrong Store Product').exists())
+
+    def test_product_create_rejects_non_image_upload(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_create'), {
+            'store': self.store.id,
+            'image': SimpleUploadedFile('not-image.txt', b'not an image', content_type='text/plain'),
+            'name': 'Bad Upload',
+            'price': '100.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '1',
+            'available': 'on',
+            'description': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Product.objects.filter(name='Bad Upload').exists())
+        self.assertContains(response, 'Upload a valid image')
+
+    def test_product_create_resizes_large_image_upload(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_create'), {
+            'store': self.store.id,
+            'image': self._large_uploaded_image(),
+            'name': 'Large Image Product',
+            'price': '150.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '3',
+            'available': 'on',
+            'description': '',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        product = Product.objects.get(slug='large-image-product')
+        with product.image.open('rb') as image_file:
+            saved_image = Image.open(image_file)
+            self.assertLessEqual(max(saved_image.size), 1600)
 
     def test_merchant_can_edit_own_product(self):
         self.client.force_login(self.merchant_user)

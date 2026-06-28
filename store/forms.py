@@ -1,11 +1,23 @@
 import re
+from io import BytesIO
 from django import forms
+from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
+from PIL import Image
 from users.models import User
 from users.phone_verification import normalize_phone
 from .models import Brand, Category, Order, Product
+
+
+MAX_PRODUCT_IMAGE_SIZE = 8 * 1024 * 1024
+MAX_PRODUCT_IMAGE_DIMENSION = 1600
+PRODUCT_IMAGE_FORMATS = {
+    'image/jpeg': ('JPEG', '.jpg'),
+    'image/png': ('PNG', '.png'),
+    'image/webp': ('WEBP', '.webp'),
+}
 
 class CustomUserCreationForm(UserCreationForm):
     username = forms.CharField(widget=forms.HiddenInput(), required=False)
@@ -88,7 +100,7 @@ class EmailOrPhoneAuthenticationForm(AuthenticationForm):
 
 
 class MerchantProductForm(forms.ModelForm):
-    image = forms.FileField(required=True)
+    image = forms.ImageField(required=True)
 
     class Meta:
         model = Product
@@ -131,6 +143,54 @@ class MerchantProductForm(forms.ModelForm):
             product.save()
             self.save_m2m()
         return product
+
+    def clean_image(self):
+        image = self.cleaned_data.get('image')
+        if not image:
+            return image
+
+        content_type = getattr(image, 'content_type', '')
+        if not content_type:
+            return image
+
+        if image.size > MAX_PRODUCT_IMAGE_SIZE:
+            raise forms.ValidationError('Upload an image smaller than 8 MB.')
+
+        if content_type not in PRODUCT_IMAGE_FORMATS:
+            raise forms.ValidationError('Upload a JPG, PNG, or WebP image.')
+
+        output_format, extension = PRODUCT_IMAGE_FORMATS[content_type]
+        try:
+            image.file.seek(0)
+            source = Image.open(image.file)
+            source.load()
+        except Exception as exc:
+            raise forms.ValidationError('Upload a valid image file.') from exc
+
+        source.thumbnail(
+            (MAX_PRODUCT_IMAGE_DIMENSION, MAX_PRODUCT_IMAGE_DIMENSION),
+            Image.Resampling.LANCZOS,
+        )
+
+        if output_format == 'JPEG' and source.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', source.size, (255, 255, 255))
+            if source.mode == 'P':
+                source = source.convert('RGBA')
+            background.paste(source, mask=source.getchannel('A') if source.mode in ('RGBA', 'LA') else None)
+            source = background
+        elif output_format == 'JPEG' and source.mode != 'RGB':
+            source = source.convert('RGB')
+
+        output = BytesIO()
+        save_options = {'format': output_format}
+        if output_format == 'JPEG':
+            save_options.update({'quality': 82, 'optimize': True})
+        elif output_format in {'PNG', 'WEBP'}:
+            save_options.update({'optimize': True})
+        source.save(output, **save_options)
+
+        base_name = slugify(image.name.rsplit('.', 1)[0]) or 'product-image'
+        return ContentFile(output.getvalue(), name=f'{base_name}{extension}')
 
 
 class CheckoutForm(forms.Form):
