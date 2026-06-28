@@ -943,6 +943,30 @@ def merchant_product_create(request):
     return render(request, 'merchant_product_form.html', {
         'form': form,
         'has_stores': stores.exists(),
+        'mode': 'create',
+    })
+
+
+@merchant_required
+def merchant_product_edit(request, product_id):
+    owner_profile = getattr(request.user, 'store_owner_profile', None)
+    stores = Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
+    product = get_object_or_404(Product, id=product_id, store__in=stores)
+
+    if request.method == 'POST':
+        form = MerchantProductForm(request.POST, request.FILES, stores=stores, require_image=False, instance=product)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Product updated.')
+            return redirect('merchant_dashboard')
+    else:
+        form = MerchantProductForm(stores=stores, require_image=False, instance=product)
+
+    return render(request, 'merchant_product_form.html', {
+        'form': form,
+        'has_stores': stores.exists(),
+        'mode': 'edit',
+        'product': product,
     })
 
 

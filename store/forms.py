@@ -92,13 +92,14 @@ class MerchantProductForm(forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = ('store', 'image', 'name', 'price', 'category', 'brand', 'stock', 'description')
+        fields = ('store', 'image', 'name', 'price', 'category', 'brand', 'stock', 'available', 'description')
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, stores=None, **kwargs):
+    def __init__(self, *args, stores=None, require_image=True, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['image'].required = require_image
         self.fields['store'].queryset = stores if stores is not None else self.fields['store'].queryset.none()
         self.fields['category'].queryset = Category.objects.order_by('name')
         self.fields['brand'].queryset = Brand.objects.order_by('name')
@@ -107,6 +108,9 @@ class MerchantProductForm(forms.ModelForm):
         self.fields['stock'].min_value = 0
 
         for field in self.fields.values():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.setdefault('class', 'h-5 w-5 border border-gray-300 text-black')
+                continue
             field.widget.attrs.setdefault(
                 'class',
                 'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
@@ -114,7 +118,7 @@ class MerchantProductForm(forms.ModelForm):
 
     def save(self, commit=True):
         product = super().save(commit=False)
-        product.available = product.stock > 0
+        product.available = product.available and product.stock > 0
         if not product.slug:
             base_slug = slugify(product.name) or f"product-{get_random_string(6)}"
             slug = base_slug

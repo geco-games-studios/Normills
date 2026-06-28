@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Add Product | Merchant Centre{% endblock %}
+{% block title %}{% if mode == "edit" %}Edit Product{% else %}Add Product{% endif %} | Merchant Centre{% endblock %}
 
 {% block content %}
 <main class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
     <div class="border-b border-gray-200 pb-6">
         <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Merchant Centre</p>
-        <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">Add product</h1>
-        <p class="mt-2 text-sm leading-6 text-gray-600">Publish the essentials first. Detailed promotion, variants, and PayGo settings can come after the product is live.</p>
+        <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">{% if mode == "edit" %}Edit product{% else %}Add product{% endif %}</h1>
+        <p class="mt-2 text-sm leading-6 text-gray-600">{% if mode == "edit" %}Update price, stock, details, or pause the listing while keeping it scoped to your store.{% else %}Publish the essentials first. Detailed promotion, variants, and PayGo settings can come after the product is live.{% endif %}</p>
     </div>
 
     {% if not has_stores %}
@@ -39,7 +39,7 @@
 
         <div class="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:justify-between">
             <a href="{% url 'merchant_dashboard' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Cancel</a>
-            <button type="submit" class="inline-flex items-center justify-center bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Publish product</button>
+            <button type="submit" class="inline-flex items-center justify-center bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">{% if mode == "edit" %}Save changes{% else %}Publish product{% endif %}</button>
         </div>
     </form>
     {% endif %}

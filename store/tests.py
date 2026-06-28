@@ -193,6 +193,7 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '4',
+            'available': 'on',
             'description': 'Warm jacket',
         })
 
@@ -219,3 +220,49 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Product.objects.filter(name='Wrong Store Product').exists())
+
+    def test_merchant_can_edit_own_product(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_edit', args=[self.product.id]), {
+            'store': self.store.id,
+            'name': 'Updated Merchant Phone',
+            'price': '2400.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '7',
+            'available': 'on',
+            'description': 'Updated description',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.name, 'Updated Merchant Phone')
+        self.assertEqual(self.product.price, Decimal('2400.00'))
+        self.assertEqual(self.product.stock, 7)
+        self.assertTrue(self.product.available)
+
+    def test_merchant_can_pause_own_product(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_edit', args=[self.product.id]), {
+            'store': self.store.id,
+            'name': self.product.name,
+            'price': '2500.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '2',
+            'description': self.product.description,
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        self.product.refresh_from_db()
+        self.assertFalse(self.product.available)
+
+    def test_merchant_cannot_edit_another_merchants_product(self):
+        other_product = Product.objects.get(slug='other-phone')
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_product_edit', args=[other_product.id]))
+
+        self.assertEqual(response.status_code, 404)

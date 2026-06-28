@@ -138,6 +138,7 @@ celerybeat.pid
 .env.*
 !.env.example
 .venv
+.codex-*-deps/
 env/
 venv/
 ENV/

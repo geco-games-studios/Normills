@@ -55,6 +55,7 @@
                             <th class="px-4 py-3">Price</th>
                             <th class="px-4 py-3">Stock</th>
                             <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
@@ -70,6 +71,9 @@
                                 {% else %}
                                 <span class="inline-flex border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-600">Paused</span>
                                 {% endif %}
+                            </td>
+                            <td class="px-4 py-4">
+                                <a href="{% url 'merchant_product_edit' product.id %}" class="inline-flex border border-gray-300 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-900">Edit</a>
                             </td>
                         </tr>
                         {% endfor %}
