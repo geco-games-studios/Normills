@@ -937,6 +937,10 @@ def _merchant_orders_for_stores(stores):
     return Order.objects.filter(items__product__store__in=stores).prefetch_related('items__product').distinct()
 
 
+def _merchant_order_items(order, stores):
+    return order.items.filter(product__store__in=stores).select_related('product')
+
+
 def _supporting_image_ids_to_delete(request):
     ids = []
     for value in request.POST.getlist('delete_supporting_images'):
@@ -970,11 +974,32 @@ def _save_supporting_images(product, delete_ids, prepared_images):
 @merchant_required
 def merchant_orders(request):
     stores = _merchant_stores_for_user(request.user)
-    orders = _merchant_orders_for_stores(stores).order_by('-created')
+    orders = list(_merchant_orders_for_stores(stores).order_by('-created'))
+    for order in orders:
+        order.merchant_items = list(_merchant_order_items(order, stores))
+        order.merchant_total = sum(item.price * item.quantity for item in order.merchant_items)
+        order.merchant_product_details = ', '.join(
+            f'{item.product.name} (x{item.quantity})'
+            for item in order.merchant_items
+        )
 
     return render(request, 'merchant_orders.html', {
         'orders': orders,
         'store_count': stores.count(),
+    })
+
+
+@merchant_required
+def merchant_order_detail(request, order_id):
+    stores = _merchant_stores_for_user(request.user)
+    order = get_object_or_404(_merchant_orders_for_stores(stores), id=order_id)
+    merchant_items = _merchant_order_items(order, stores)
+    merchant_total = sum(item.price * item.quantity for item in merchant_items)
+
+    return render(request, 'merchant_order_detail.html', {
+        'order': order,
+        'merchant_items': merchant_items,
+        'merchant_total': merchant_total,
     })
 
 
@@ -987,7 +1012,12 @@ def merchant_order_update(request, order_id):
     order = get_object_or_404(_merchant_orders_for_stores(stores), id=order_id)
     action = request.POST.get('action')
 
-    if action == 'mark_packing':
+    if action == 'save_fulfillment':
+        order.dispatch_reference = (request.POST.get('dispatch_reference') or '').strip()[:120]
+        order.fulfillment_notes = (request.POST.get('fulfillment_notes') or '').strip()
+        order.save(update_fields=['dispatch_reference', 'fulfillment_notes'])
+        messages.success(request, f'Fulfillment details saved for Order #{order.id}.')
+    elif action == 'mark_packing':
         if order.payment_status != 'completed' and not order.payment_confirmed:
             messages.error(request, f'Order #{order.id} must be paid before packing.')
         elif order.status in {'pending', 'payment_awaiting', 'paid'}:
@@ -1001,7 +1031,9 @@ def merchant_order_update(request, order_id):
             messages.error(request, f'Order #{order.id} must be packing before dispatch.')
         else:
             order.status = 'dispatched'
-            order.save(update_fields=['status'])
+            order.dispatch_reference = (request.POST.get('dispatch_reference') or order.dispatch_reference or '').strip()[:120]
+            order.fulfillment_notes = (request.POST.get('fulfillment_notes') or order.fulfillment_notes or '').strip()
+            order.save(update_fields=['status', 'dispatch_reference', 'fulfillment_notes'])
             messages.success(request, f'Order #{order.id} marked as dispatched.')
     else:
         messages.error(request, 'Unknown order action.')

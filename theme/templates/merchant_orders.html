@@ -31,8 +31,8 @@
                         </span>
                     </div>
                     <p class="mt-2 text-sm text-gray-600">{{ order.created|date:"M j, Y H:i" }}</p>
-                    <p class="mt-3 text-sm leading-6 text-gray-700">{{ order.product_details }}</p>
-                    <p class="mt-2 text-sm font-bold text-gray-950">K{{ order.total|floatformat:2 }}</p>
+                    <p class="mt-3 text-sm leading-6 text-gray-700">{{ order.merchant_product_details }}</p>
+                    <p class="mt-2 text-sm font-bold text-gray-950">K{{ order.merchant_total|floatformat:2 }}</p>
                 </div>
 
                 <div class="flex flex-col gap-2 sm:flex-row lg:flex-col">
@@ -53,12 +53,12 @@
                         </form>
                         {% endif %}
                     {% endif %}
-                    <a href="{% url 'order_confirmation' order.id %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">View order</a>
+                    <a href="{% url 'merchant_order_detail' order.id %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">View order</a>
                 </div>
             </div>
 
             <div class="mt-4 grid gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-                {% for item in order.items.all %}
+                {% for item in order.merchant_items %}
                 <div class="flex gap-3">
                     {% if item.product.image %}
                     <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="h-16 w-16 flex-none object-cover">

@@ -427,7 +427,63 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'Order #{self.order.id}')
+        self.assertContains(response, reverse('merchant_order_detail', args=[self.order.id]))
         self.assertNotContains(response, f'Order #{other_order.id}')
+
+    def test_merchant_can_view_own_order_detail(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_order_detail', args=[self.order.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Customer One')
+        self.assertContains(response, 'Merchant Phone')
+        self.assertContains(response, '260977000000')
+
+    def test_merchant_cannot_view_another_store_order_detail(self):
+        other_product = Product.objects.get(slug='other-phone')
+        other_order = Order.objects.create(
+            user=self.customer,
+            first_name='Customer',
+            last_name='Two',
+            email='customer2@example.com',
+            address='Mazabuka',
+            city='Mazabuka',
+            postal_code='10101',
+            phone='260966000000',
+            status='paid',
+            subtotal=Decimal('3000.00'),
+            shipping=Decimal('0.00'),
+            tax=Decimal('0.00'),
+            total=Decimal('3000.00'),
+            payment_method='mobile_money',
+            payment_status='completed',
+        )
+        OrderItem.objects.create(
+            order=other_order,
+            product=other_product,
+            price=Decimal('3000.00'),
+            quantity=1,
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_order_detail', args=[other_order.id]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_merchant_can_save_order_fulfillment_notes(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_order_update', args=[self.order.id]), {
+            'action': 'save_fulfillment',
+            'dispatch_reference': 'Courier-123',
+            'fulfillment_notes': 'Packed in a sealed bag.',
+        })
+
+        self.assertRedirects(response, reverse('merchant_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.dispatch_reference, 'Courier-123')
+        self.assertEqual(self.order.fulfillment_notes, 'Packed in a sealed bag.')
 
     def test_merchant_can_mark_paid_order_as_packing(self):
         self.client.force_login(self.merchant_user)
@@ -442,7 +498,8 @@ class MerchantDashboardTests(TestCase):
 
     def test_merchant_can_mark_packing_order_as_dispatched(self):
         self.order.status = 'packing'
-        self.order.save(update_fields=['status'])
+        self.order.dispatch_reference = 'Courier-123'
+        self.order.save(update_fields=['status', 'dispatch_reference'])
         self.client.force_login(self.merchant_user)
 
         response = self.client.post(reverse('merchant_order_update', args=[self.order.id]), {
@@ -452,6 +509,7 @@ class MerchantDashboardTests(TestCase):
         self.assertRedirects(response, reverse('merchant_orders'))
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, 'dispatched')
+        self.assertEqual(self.order.dispatch_reference, 'Courier-123')
 
     def test_merchant_cannot_dispatch_unpacked_order(self):
         self.client.force_login(self.merchant_user)

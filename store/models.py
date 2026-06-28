@@ -344,6 +344,8 @@ class Order(models.Model):
     payment_confirmed = models.BooleanField(default=False)  # Whether payment is confirmed
     transaction_id = models.CharField(max_length=100, unique=True, blank=True, null=True)  # Unique transaction ID
     stock_deducted_at = models.DateTimeField(null=True, blank=True)
+    dispatch_reference = models.CharField(max_length=120, blank=True)
+    fulfillment_notes = models.TextField(blank=True)
 
     class Meta:
         ordering = ['-created']
