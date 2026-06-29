@@ -163,6 +163,15 @@
             {% endif %}
             <p class="text-sm text-gray-500">{{ user.get_full_name|default:user.username }}</p>
             <div class="mt-5 grid gap-3">
+                {% if user.can_access_merchant_centre %}
+                <a href="{% url 'merchant_dashboard' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Merchant Centre</a>
+                {% endif %}
+                {% if user.can_access_finance_admin %}
+                <a href="{% url 'finance_payouts' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Finance Payouts</a>
+                {% endif %}
+                {% if user.can_access_platform_admin %}
+                <a href="{% url 'admin_dashboard' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Admin Dashboard</a>
+                {% endif %}
                 <a href="{% url 'profile' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Edit Account</a>
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
