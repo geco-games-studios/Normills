@@ -202,6 +202,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '4',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'available': 'on',
             'description': 'Warm jacket',
         })
@@ -212,6 +214,32 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(product.price, Decimal('650.00'))
         self.assertEqual(product.stock, 4)
         self.assertTrue(product.available)
+        self.assertEqual(product.publication_status, 'published')
+
+    def test_merchant_can_save_product_as_draft(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_create'), {
+            'store': self.store.id,
+            'image': self._uploaded_image(),
+            'name': 'Draft Jacket',
+            'price': '450.00',
+            'category': self.category.id,
+            'brand': '',
+            'stock': '4',
+            'offline_stock': '2',
+            'low_stock_threshold': '1',
+            'available': 'on',
+            'description': 'Draft product',
+            'submit_action': 'draft',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        product = Product.objects.get(slug='draft-jacket')
+        self.assertEqual(product.publication_status, 'draft')
+        self.assertFalse(product.available)
+        self.assertEqual(product.offline_stock, 2)
+        self.assertEqual(product.low_stock_threshold, 1)
 
     def test_merchant_cannot_publish_product_to_another_merchants_store(self):
         self.client.force_login(self.merchant_user)
@@ -224,6 +252,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '1',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'description': '',
         })
 
@@ -241,6 +271,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '1',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'available': 'on',
             'description': '',
         })
@@ -260,6 +292,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '3',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'available': 'on',
             'description': '',
         })
@@ -285,6 +319,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '5',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'available': 'on',
             'description': '',
         })
@@ -306,6 +342,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '7',
+            'offline_stock': '1',
+            'low_stock_threshold': '2',
             'available': 'on',
             'description': 'Updated description',
         })
@@ -315,7 +353,70 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(self.product.name, 'Updated Merchant Phone')
         self.assertEqual(self.product.price, Decimal('2400.00'))
         self.assertEqual(self.product.stock, 7)
+        self.assertEqual(self.product.offline_stock, 1)
+        self.assertEqual(self.product.low_stock_threshold, 2)
         self.assertTrue(self.product.available)
+
+    def test_merchant_can_duplicate_product_as_draft(self):
+        ProductImage.objects.create(
+            product=self.product,
+            image='products/supporting/old-angle.jpg',
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_duplicate', args=[self.product.id]))
+
+        duplicate = Product.objects.get(name='Merchant Phone Copy')
+        self.assertRedirects(response, reverse('merchant_product_edit', args=[duplicate.id]))
+        self.assertEqual(duplicate.store, self.store)
+        self.assertEqual(duplicate.publication_status, 'draft')
+        self.assertFalse(duplicate.available)
+        self.assertEqual(duplicate.stock, 0)
+        self.assertEqual(duplicate.supporting_images.count(), 1)
+
+    def test_merchant_cannot_duplicate_another_merchants_product(self):
+        other_product = Product.objects.get(slug='other-phone')
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_duplicate', args=[other_product.id]))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Product.objects.filter(name='Other Phone Copy').exists())
+
+    def test_merchant_can_update_product_inventory_from_dashboard(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_inventory_update', args=[self.product.id]), {
+            'stock': '9',
+            'offline_stock': '4',
+            'low_stock_threshold': '2',
+            'available': 'on',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 9)
+        self.assertEqual(self.product.offline_stock, 4)
+        self.assertEqual(self.product.low_stock_threshold, 2)
+        self.assertTrue(self.product.available)
+
+    def test_inventory_update_keeps_drafts_not_live(self):
+        self.product.publication_status = 'draft'
+        self.product.available = False
+        self.product.save(update_fields=['publication_status', 'available'])
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_inventory_update', args=[self.product.id]), {
+            'stock': '9',
+            'offline_stock': '4',
+            'low_stock_threshold': '2',
+            'available': 'on',
+        })
+
+        self.assertRedirects(response, reverse('merchant_dashboard'))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 9)
+        self.assertFalse(self.product.available)
 
     def test_merchant_can_update_gallery_images(self):
         existing_image = ProductImage.objects.create(
@@ -333,6 +434,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '2',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'available': 'on',
             'description': self.product.description,
         })
@@ -357,6 +460,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '2',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'available': 'on',
             'description': self.product.description,
         })
@@ -374,6 +479,8 @@ class MerchantDashboardTests(TestCase):
             'category': self.category.id,
             'brand': '',
             'stock': '2',
+            'offline_stock': '0',
+            'low_stock_threshold': '5',
             'description': self.product.description,
         })
 

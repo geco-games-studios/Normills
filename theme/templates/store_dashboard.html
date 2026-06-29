@@ -90,7 +90,7 @@
                             <th class="px-4 py-3">Product</th>
                             <th class="px-4 py-3">Store</th>
                             <th class="px-4 py-3">Price</th>
-                            <th class="px-4 py-3">Stock</th>
+                            <th class="px-4 py-3">Inventory</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3">Action</th>
                         </tr>
@@ -101,16 +101,47 @@
                             <td class="px-4 py-4 font-bold text-gray-950">{{ product.name }}</td>
                             <td class="px-4 py-4 text-gray-600">{{ product.store.name }}</td>
                             <td class="px-4 py-4 text-gray-900">K{{ product.price|floatformat:2 }}</td>
-                            <td class="px-4 py-4 text-gray-900">{{ product.stock }}</td>
+                            <td class="px-4 py-4 text-gray-900">
+                                <form method="post" action="{% url 'merchant_product_inventory_update' product.id %}" class="grid min-w-72 gap-2 sm:grid-cols-4">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{% url 'merchant_dashboard' %}">
+                                    <label class="text-xs font-bold text-gray-500">
+                                        Online
+                                        <input name="stock" type="number" min="0" value="{{ product.stock }}" class="mt-1 w-full border border-gray-300 px-2 py-1 text-sm text-gray-950">
+                                    </label>
+                                    <label class="text-xs font-bold text-gray-500">
+                                        Offline
+                                        <input name="offline_stock" type="number" min="0" value="{{ product.offline_stock }}" class="mt-1 w-full border border-gray-300 px-2 py-1 text-sm text-gray-950">
+                                    </label>
+                                    <label class="text-xs font-bold text-gray-500">
+                                        Alert
+                                        <input name="low_stock_threshold" type="number" min="0" value="{{ product.low_stock_threshold }}" class="mt-1 w-full border border-gray-300 px-2 py-1 text-sm text-gray-950">
+                                    </label>
+                                    <label class="flex items-end gap-2 pb-1 text-xs font-bold text-gray-500">
+                                        <input name="available" type="checkbox" {% if product.available %}checked{% endif %} class="h-4 w-4 border border-gray-300">
+                                        Live
+                                    </label>
+                                    <button type="submit" class="sm:col-span-4 border border-gray-300 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-900">Update inventory</button>
+                                </form>
+                            </td>
                             <td class="px-4 py-4">
-                                {% if product.available %}
-                                <span class="inline-flex border border-green-200 bg-green-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-green-700">Live</span>
+                                {% if product.publication_status == 'draft' %}
+                                <span class="inline-flex border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-yellow-700">Draft</span>
+                                {% elif product.available %}
+                                <span class="inline-flex border border-green-200 bg-green-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-green-700">Published</span>
                                 {% else %}
                                 <span class="inline-flex border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-600">Paused</span>
                                 {% endif %}
+                                {% if product.is_low_stock %}
+                                <span class="mt-2 inline-flex border border-red-200 bg-red-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-red-700">Low stock</span>
+                                {% endif %}
                             </td>
-                            <td class="px-4 py-4">
+                            <td class="space-y-2 px-4 py-4">
                                 <a href="{% url 'merchant_product_edit' product.id %}" class="inline-flex border border-gray-300 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-900">Edit</a>
+                                <form method="post" action="{% url 'merchant_product_duplicate' product.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="inline-flex border border-gray-300 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-900">Duplicate</button>
+                                </form>
                             </td>
                         </tr>
                         {% endfor %}

@@ -36,6 +36,11 @@ class Brand(models.Model):
 
 # Move Product to top-level
 class Product(models.Model):
+    PUBLICATION_STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+    ]
+
     SEASON_CHOICES = [
         ('spring', 'Spring'),
         ('summer', 'Summer'),
@@ -81,6 +86,7 @@ class Product(models.Model):
     stock = models.PositiveIntegerField(default=1)
     offline_stock = models.PositiveIntegerField(default=0)
     low_stock_threshold = models.PositiveIntegerField(default=5)
+    publication_status = models.CharField(max_length=20, choices=PUBLICATION_STATUS_CHOICES, default='published')
     available = models.BooleanField(default=True)
     show_selling_fast = models.BooleanField(default=False)
     season = models.CharField(max_length=20, choices=SEASON_CHOICES, blank=True, null=True)
@@ -103,6 +109,10 @@ class Product(models.Model):
     @property
     def is_low_stock(self):
         return self.stock <= self.low_stock_threshold
+
+    @property
+    def is_published(self):
+        return self.publication_status == 'published'
 
 
 class ProductImage(models.Model):

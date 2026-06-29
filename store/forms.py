@@ -150,7 +150,19 @@ class MerchantProductForm(forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = ('store', 'image', 'name', 'price', 'category', 'brand', 'stock', 'available', 'description')
+        fields = (
+            'store',
+            'image',
+            'name',
+            'price',
+            'category',
+            'brand',
+            'stock',
+            'offline_stock',
+            'low_stock_threshold',
+            'available',
+            'description',
+        )
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
@@ -164,6 +176,8 @@ class MerchantProductForm(forms.ModelForm):
         self.fields['brand'].required = False
         self.fields['description'].required = False
         self.fields['stock'].min_value = 0
+        self.fields['offline_stock'].min_value = 0
+        self.fields['low_stock_threshold'].min_value = 0
 
         for field in self.fields.values():
             if isinstance(field.widget, forms.CheckboxInput):
@@ -176,7 +190,6 @@ class MerchantProductForm(forms.ModelForm):
 
     def save(self, commit=True):
         product = super().save(commit=False)
-        product.available = product.available and product.stock > 0
         if not product.slug:
             base_slug = slugify(product.name) or f"product-{get_random_string(6)}"
             slug = base_slug

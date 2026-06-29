@@ -971,6 +971,33 @@ def _save_supporting_images(product, delete_ids, prepared_images):
         ProductImage.objects.create(product=product, image=image)
 
 
+def _product_submit_state(request):
+    return request.POST.get('submit_action') or 'publish'
+
+
+def _apply_product_publication_state(product, submit_state):
+    if submit_state == 'draft':
+        product.publication_status = 'draft'
+        product.available = False
+    else:
+        product.publication_status = 'published'
+        product.available = product.available and product.stock > 0
+    return product
+
+
+def _unique_product_slug(name, current_product=None):
+    base_slug = slugify(name) or f"product-{get_random_string(6)}"
+    slug = base_slug
+    suffix = 2
+    queryset = Product.objects.all()
+    if current_product:
+        queryset = queryset.exclude(pk=current_product.pk)
+    while queryset.filter(slug=slug).exists():
+        slug = f"{base_slug}-{suffix}"
+        suffix += 1
+    return slug
+
+
 @merchant_required
 def merchant_orders(request):
     stores = _merchant_stores_for_user(request.user)
@@ -1054,9 +1081,15 @@ def merchant_product_create(request):
             form.add_error(None, exc)
         else:
             if form.is_valid():
-                product = form.save()
+                product = form.save(commit=False)
+                _apply_product_publication_state(product, _product_submit_state(request))
+                product.save()
+                form.save_m2m()
                 _save_supporting_images(product, delete_ids, supporting_images)
-                messages.success(request, 'Product published.')
+                if product.is_published:
+                    messages.success(request, 'Product published.')
+                else:
+                    messages.success(request, 'Product saved as a draft.')
                 return redirect('merchant_dashboard')
     else:
         form = MerchantProductForm(stores=stores)
@@ -1083,9 +1116,15 @@ def merchant_product_edit(request, product_id):
             form.add_error(None, exc)
         else:
             if form.is_valid():
-                product = form.save()
+                product = form.save(commit=False)
+                _apply_product_publication_state(product, _product_submit_state(request))
+                product.save()
+                form.save_m2m()
                 _save_supporting_images(product, delete_ids, supporting_images)
-                messages.success(request, 'Product updated.')
+                if product.is_published:
+                    messages.success(request, 'Product updated.')
+                else:
+                    messages.success(request, 'Product saved as a draft.')
                 return redirect('merchant_dashboard')
     else:
         form = MerchantProductForm(stores=stores, require_image=False, instance=product)
@@ -1098,6 +1137,59 @@ def merchant_product_edit(request, product_id):
         'supporting_images': product.supporting_images.all(),
         'max_supporting_images': MAX_SUPPORTING_PRODUCT_IMAGES,
     })
+
+
+@merchant_required
+def merchant_product_duplicate(request, product_id):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Product duplication requires POST.')
+
+    stores = _merchant_stores_for_user(request.user)
+    source = get_object_or_404(Product.objects.select_related('store', 'category', 'brand'), id=product_id, store__in=stores)
+    duplicate = Product.objects.create(
+        name=f'{source.name} Copy',
+        slug=_unique_product_slug(f'{source.name} Copy'),
+        category=source.category,
+        store=source.store,
+        brand=source.brand,
+        description=source.description,
+        subcategory=source.subcategory,
+        price=source.price,
+        image=source.image,
+        stock=0,
+        offline_stock=source.offline_stock,
+        low_stock_threshold=source.low_stock_threshold,
+        publication_status='draft',
+        available=False,
+        show_selling_fast=False,
+        season=source.season,
+        fabric=source.fabric,
+        color=source.color,
+        cost_range=source.cost_range,
+    )
+    for image in source.supporting_images.all():
+        ProductImage.objects.create(product=duplicate, image=image.image)
+    messages.success(request, f'Draft duplicate created for {source.name}.')
+    return redirect('merchant_product_edit', product_id=duplicate.id)
+
+
+@merchant_required
+def merchant_product_inventory_update(request, product_id):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Inventory updates require POST.')
+
+    stores = _merchant_stores_for_user(request.user)
+    product = get_object_or_404(Product, id=product_id, store__in=stores)
+    product.stock = _parse_positive_int(request.POST.get('stock'), product.stock, minimum=0)
+    product.offline_stock = _parse_positive_int(request.POST.get('offline_stock'), product.offline_stock, minimum=0)
+    product.low_stock_threshold = _parse_positive_int(request.POST.get('low_stock_threshold'), product.low_stock_threshold, minimum=0)
+    if product.publication_status == 'published':
+        product.available = product.stock > 0 and request.POST.get('available') == 'on'
+    else:
+        product.available = False
+    product.save(update_fields=['stock', 'offline_stock', 'low_stock_threshold', 'available', 'updated'])
+    messages.success(request, f'Inventory updated for {product.name}.')
+    return redirect(request.POST.get('next') or 'merchant_dashboard')
 
 
 @platform_admin_required
