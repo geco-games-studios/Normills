@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.db import close_old_connections, transaction
 from django.db.models import F, Q, Min, Max, Sum
@@ -34,10 +34,11 @@ from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
 from users.models import ClientProfile
-from users.permissions import merchant_required, platform_admin_required
+from users.permissions import finance_admin_required, merchant_required, platform_admin_required
 from users.phone_verification import normalize_phone as normalize_account_phone, send_phone_verification_code
 
 import logging
+import csv
 
 logger = logging.getLogger(__name__)
 
@@ -982,6 +983,132 @@ def _sync_merchant_payouts(stores):
         )
         payout.refresh_from_order()
     return _merchant_payout_queryset(stores)
+
+
+def _finance_payout_queryset():
+    return MerchantPayout.objects.select_related(
+        'store',
+        'order_item__order',
+        'order_item__product',
+    ).order_by('-created_at')
+
+
+def _sync_all_payouts():
+    stores = Store.objects.all()
+    _sync_merchant_payouts(stores)
+    return _finance_payout_queryset()
+
+
+def _filtered_finance_payouts(request):
+    payouts = _sync_all_payouts()
+    status_filter = request.GET.get('status') or ''
+    store_filter = request.GET.get('store') or ''
+    query = (request.GET.get('q') or '').strip()
+
+    if status_filter:
+        payouts = payouts.filter(status=status_filter)
+    if store_filter and store_filter.isdigit():
+        payouts = payouts.filter(store_id=store_filter)
+    if query:
+        payout_filters = (
+            Q(store__name__icontains=query) |
+            Q(order_item__product__name__icontains=query) |
+            Q(order_item__order__first_name__icontains=query) |
+            Q(order_item__order__last_name__icontains=query) |
+            Q(order_item__order__email__icontains=query) |
+            Q(order_item__order__payment_reference__icontains=query)
+        )
+        if query.isdigit():
+            payout_filters |= Q(order_item__order__id=int(query))
+        payouts = payouts.filter(payout_filters)
+
+    return payouts, {
+        'status': status_filter,
+        'store': store_filter,
+        'q': query,
+    }
+
+
+def _payout_csv_response(payouts):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="merchant-payouts.csv"'
+    writer = csv.writer(response)
+    writer.writerow([
+        'Payout ID',
+        'Store',
+        'Order',
+        'Product',
+        'Quantity',
+        'Amount',
+        'Status',
+        'Paid At',
+        'Payment Reference',
+        'Customer Email',
+    ])
+    for payout in payouts:
+        order = payout.order_item.order
+        writer.writerow([
+            payout.id,
+            payout.store.name,
+            order.id,
+            payout.order_item.product.name,
+            payout.order_item.quantity,
+            f'{payout.amount:.2f}',
+            payout.get_status_display(),
+            payout.paid_at.isoformat() if payout.paid_at else '',
+            order.payment_reference or '',
+            order.email,
+        ])
+    return response
+
+
+@finance_admin_required
+def finance_payouts(request):
+    payouts, filters = _filtered_finance_payouts(request)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        selected_ids = request.POST.getlist('payout_ids')
+        selected = _finance_payout_queryset().filter(id__in=selected_ids)
+
+        if not selected_ids:
+            messages.error(request, 'Select at least one payout record.')
+            return redirect('finance_payouts')
+
+        if action == 'mark_paid':
+            updated = selected.filter(status__in=['ready', 'held']).update(status='paid', paid_at=timezone.now())
+            messages.success(request, f'Marked {updated} payout record(s) as paid.')
+        elif action == 'hold':
+            updated = selected.exclude(status='paid').update(status='held', paid_at=None)
+            messages.success(request, f'Held {updated} payout record(s) for review.')
+        elif action == 'refresh':
+            updated = 0
+            for payout in selected:
+                payout.refresh_from_order()
+                updated += 1
+            messages.success(request, f'Refreshed {updated} payout record(s).')
+        else:
+            messages.error(request, 'Choose a valid payout action.')
+        return redirect('finance_payouts')
+
+    if request.GET.get('export') == 'csv':
+        return _payout_csv_response(payouts)
+
+    payout_list = list(payouts[:200])
+    all_payouts = list(_sync_all_payouts())
+
+    return render(request, 'finance_payouts.html', {
+        'payouts': payout_list,
+        'stores': Store.objects.order_by('name'),
+        'filters': filters,
+        'status_choices': MerchantPayout.STATUS_CHOICES,
+        'gross_total': _merchant_payout_total(all_payouts),
+        'ready_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'ready'),
+        'pending_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'pending'),
+        'paid_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'paid'),
+        'held_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'held'),
+        'filtered_total': _merchant_payout_total(payout_list),
+    })
 
 
 def _supporting_image_ids_to_delete(request):

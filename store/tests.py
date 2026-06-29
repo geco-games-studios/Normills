@@ -81,6 +81,11 @@ class MerchantDashboardTests(TestCase):
             role=User.Role.MERCHANT,
             is_store_owner=True,
         )
+        self.finance_user = User.objects.create_user(
+            username='finance',
+            password='password',
+            role=User.Role.FINANCE_ADMINISTRATOR,
+        )
         self.owner_profile = self.merchant_user.store_owner_profile
         self.owner_profile.store_name = 'Merchant Store'
         self.owner_profile.phone_number = '260977123456'
@@ -533,6 +538,20 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_customer_cannot_access_finance_payouts(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('finance_payouts'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_cannot_access_finance_payouts(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('finance_payouts'))
+
+        self.assertEqual(response.status_code, 403)
+
     def test_merchant_can_view_payout_summary_for_own_items(self):
         other_product = Product.objects.get(slug='other-phone')
         mixed_order = Order.objects.create(
@@ -603,6 +622,66 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(payout.status, 'paid')
         self.assertEqual(response.context['ready_for_payout'], Decimal('0'))
         self.assertEqual(response.context['paid_out_total'], Decimal('2500.00'))
+
+    def test_finance_can_view_and_export_payout_reconciliation(self):
+        self.order.status = 'delivered'
+        self.order.save(update_fields=['status'])
+        self.client.force_login(self.finance_user)
+
+        response = self.client.get(reverse('finance_payouts'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['ready_total'], Decimal('2500.00'))
+        self.assertContains(response, 'Merchant payout reconciliation')
+        self.assertContains(response, 'Merchant Store')
+        self.assertContains(response, 'Merchant Phone')
+
+        export_response = self.client.get(reverse('finance_payouts'), {'export': 'csv'})
+        csv_body = export_response.content.decode()
+
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response['Content-Type'], 'text/csv')
+        self.assertIn('Payout ID,Store,Order,Product', csv_body)
+        self.assertIn('Merchant Store', csv_body)
+        self.assertIn('Merchant Phone', csv_body)
+
+    def test_finance_can_hold_refresh_and_mark_payouts_paid(self):
+        self.client.force_login(self.finance_user)
+        self.client.get(reverse('finance_payouts'))
+        pending_payout = MerchantPayout.objects.get(order_item__order=self.order)
+
+        response = self.client.post(reverse('finance_payouts'), {
+            'action': 'hold',
+            'payout_ids': [str(pending_payout.id)],
+        })
+
+        self.assertRedirects(response, reverse('finance_payouts'))
+        pending_payout.refresh_from_db()
+        self.assertEqual(pending_payout.status, 'held')
+
+        response = self.client.post(reverse('finance_payouts'), {
+            'action': 'refresh',
+            'payout_ids': [str(pending_payout.id)],
+        })
+
+        self.assertRedirects(response, reverse('finance_payouts'))
+        pending_payout.refresh_from_db()
+        self.assertEqual(pending_payout.status, 'held')
+
+        self.order.status = 'delivered'
+        self.order.save(update_fields=['status'])
+        pending_payout.status = 'ready'
+        pending_payout.save(update_fields=['status'])
+
+        response = self.client.post(reverse('finance_payouts'), {
+            'action': 'mark_paid',
+            'payout_ids': [str(pending_payout.id)],
+        })
+
+        self.assertRedirects(response, reverse('finance_payouts'))
+        pending_payout.refresh_from_db()
+        self.assertEqual(pending_payout.status, 'paid')
+        self.assertIsNotNone(pending_payout.paid_at)
 
     def test_merchant_can_view_own_store_orders(self):
         other_product = Product.objects.get(slug='other-phone')

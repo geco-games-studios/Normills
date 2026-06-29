@@ -31,6 +31,7 @@ urlpatterns = [
     path('merchant/products/<int:product_id>/duplicate/', views.merchant_product_duplicate, name='merchant_product_duplicate'),
     path('merchant/products/<int:product_id>/inventory/', views.merchant_product_inventory_update, name='merchant_product_inventory_update'),
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('finance/payouts/', views.finance_payouts, name='finance_payouts'),
     path('wishlist/', views.wishlist, name='wishlist'),
     path('wishlist/add/', views.add_to_wishlist, name='add_to_wishlist'),
     path('wishlist/remove/', views.remove_from_wishlist, name='remove_from_wishlist'),
