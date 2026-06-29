@@ -525,6 +525,55 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_customer_cannot_access_merchant_payouts(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('merchant_payouts'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_merchant_can_view_payout_summary_for_own_items(self):
+        other_product = Product.objects.get(slug='other-phone')
+        mixed_order = Order.objects.create(
+            user=self.customer,
+            first_name='Customer',
+            last_name='Mixed',
+            email='mixed@example.com',
+            address='Mazabuka',
+            city='Mazabuka',
+            postal_code='10101',
+            phone='260977111111',
+            status='delivered',
+            subtotal=Decimal('5500.00'),
+            shipping=Decimal('0.00'),
+            tax=Decimal('0.00'),
+            total=Decimal('5500.00'),
+            payment_method='mobile_money',
+            payment_status='completed',
+        )
+        OrderItem.objects.create(
+            order=mixed_order,
+            product=self.product,
+            price=Decimal('2500.00'),
+            quantity=1,
+        )
+        OrderItem.objects.create(
+            order=mixed_order,
+            product=other_product,
+            price=Decimal('3000.00'),
+            quantity=1,
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_payouts'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['gross_paid_total'], Decimal('5000.00'))
+        self.assertEqual(response.context['ready_for_payout'], Decimal('2500.00'))
+        self.assertEqual(response.context['pending_fulfillment_total'], Decimal('2500.00'))
+        self.assertContains(response, 'Merchant Phone')
+        self.assertNotContains(response, 'Other Phone')
+
     def test_merchant_can_view_own_store_orders(self):
         other_product = Product.objects.get(slug='other-phone')
         other_order = Order.objects.create(

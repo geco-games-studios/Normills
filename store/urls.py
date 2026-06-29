@@ -23,6 +23,7 @@ urlpatterns = [
     path('shopping-bot/', views.shopping_bot, name='shopping_bot'),
     path('merchant/', views.merchant_dashboard, name='merchant_dashboard'),
     path('merchant/orders/', views.merchant_orders, name='merchant_orders'),
+    path('merchant/payouts/', views.merchant_payouts, name='merchant_payouts'),
     path('merchant/orders/<int:order_id>/', views.merchant_order_detail, name='merchant_order_detail'),
     path('merchant/orders/<int:order_id>/update/', views.merchant_order_update, name='merchant_order_update'),
     path('merchant/products/new/', views.merchant_product_create, name='merchant_product_create'),

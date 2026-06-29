@@ -912,8 +912,13 @@ def merchant_dashboard(request):
     stores = Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
     products = Product.objects.filter(store__in=stores).select_related('store', 'category', 'brand')
     orders = Order.objects.filter(items__product__store__in=stores).prefetch_related('items__product').distinct()
+    paid_items = list(_merchant_paid_order_items(stores))
 
-    total_revenue = orders.filter(payment_status='completed').aggregate(total=Sum('total'))['total'] or Decimal('0')
+    total_revenue = _merchant_item_total(paid_items)
+    ready_for_payout = _merchant_item_total(
+        item for item in paid_items
+        if item.order.status in {'delivered', 'cleared'}
+    )
     low_stock_count = products.filter(stock__lte=F('low_stock_threshold')).count()
 
     return render(request, 'store_dashboard.html', {
@@ -925,6 +930,7 @@ def merchant_dashboard(request):
         'order_count': orders.count(),
         'low_stock_count': low_stock_count,
         'total_revenue': total_revenue,
+        'ready_for_payout': ready_for_payout,
     })
 
 
@@ -939,6 +945,17 @@ def _merchant_orders_for_stores(stores):
 
 def _merchant_order_items(order, stores):
     return order.items.filter(product__store__in=stores).select_related('product')
+
+
+def _merchant_paid_order_items(stores):
+    return OrderItem.objects.filter(
+        product__store__in=stores,
+        order__payment_status='completed',
+    ).select_related('order', 'product', 'product__store').order_by('-order__created')
+
+
+def _merchant_item_total(items):
+    return sum(item.price * item.quantity for item in items)
 
 
 def _supporting_image_ids_to_delete(request):
@@ -1013,6 +1030,28 @@ def merchant_orders(request):
     return render(request, 'merchant_orders.html', {
         'orders': orders,
         'store_count': stores.count(),
+    })
+
+
+@merchant_required
+def merchant_payouts(request):
+    stores = _merchant_stores_for_user(request.user)
+    paid_items = list(_merchant_paid_order_items(stores))
+    ready_items = [
+        item for item in paid_items
+        if item.order.status in {'delivered', 'cleared'}
+    ]
+    pending_items = [
+        item for item in paid_items
+        if item.order.status not in {'delivered', 'cleared', 'cancelled', 'refunded'}
+    ]
+
+    return render(request, 'merchant_payouts.html', {
+        'store_count': stores.count(),
+        'paid_items': paid_items,
+        'gross_paid_total': _merchant_item_total(paid_items),
+        'ready_for_payout': _merchant_item_total(ready_items),
+        'pending_fulfillment_total': _merchant_item_total(pending_items),
     })
 
 
