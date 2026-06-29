@@ -1189,6 +1189,21 @@ def merchant_product_inventory_update(request, product_id):
         product.available = False
     product.save(update_fields=['stock', 'offline_stock', 'low_stock_threshold', 'available', 'updated'])
     messages.success(request, f'Inventory updated for {product.name}.')
+    if _wants_json(request):
+        return JsonResponse({
+            'status': True,
+            'message': f'Inventory updated for {product.name}.',
+            'product': {
+                'id': product.id,
+                'stock': product.stock,
+                'offline_stock': product.offline_stock,
+                'low_stock_threshold': product.low_stock_threshold,
+                'available': product.available,
+                'publication_status': product.publication_status,
+                'publication_label': product.get_publication_status_display(),
+                'is_low_stock': product.is_low_stock,
+            },
+        })
     return redirect(request.POST.get('next') or 'merchant_dashboard')
 
 

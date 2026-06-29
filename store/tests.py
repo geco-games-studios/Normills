@@ -400,6 +400,28 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(self.product.low_stock_threshold, 2)
         self.assertTrue(self.product.available)
 
+    def test_inventory_update_can_return_json_for_inline_dashboard_update(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(
+            reverse('merchant_product_inventory_update', args=[self.product.id]),
+            {
+                'stock': '1',
+                'offline_stock': '4',
+                'low_stock_threshold': '2',
+                'available': 'on',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+            HTTP_ACCEPT='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['status'])
+        self.assertEqual(payload['product']['stock'], 1)
+        self.assertEqual(payload['product']['offline_stock'], 4)
+        self.assertTrue(payload['product']['is_low_stock'])
+
     def test_inventory_update_keeps_drafts_not_live(self):
         self.product.publication_status = 'draft'
         self.product.available = False

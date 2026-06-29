@@ -97,12 +97,12 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
                         {% for product in products %}
-                        <tr>
+                        <tr data-product-row="{{ product.id }}">
                             <td class="px-4 py-4 font-bold text-gray-950">{{ product.name }}</td>
                             <td class="px-4 py-4 text-gray-600">{{ product.store.name }}</td>
                             <td class="px-4 py-4 text-gray-900">K{{ product.price|floatformat:2 }}</td>
                             <td class="px-4 py-4 text-gray-900">
-                                <form method="post" action="{% url 'merchant_product_inventory_update' product.id %}" class="grid min-w-72 gap-2 sm:grid-cols-4">
+                                <form method="post" action="{% url 'merchant_product_inventory_update' product.id %}" data-inventory-form class="grid min-w-72 gap-2 sm:grid-cols-4">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{% url 'merchant_dashboard' %}">
                                     <label class="text-xs font-bold text-gray-500">
@@ -122,9 +122,10 @@
                                         Live
                                     </label>
                                     <button type="submit" class="sm:col-span-4 border border-gray-300 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-900">Update inventory</button>
+                                    <p data-inventory-message class="hidden sm:col-span-4 text-xs font-bold text-green-700"></p>
                                 </form>
                             </td>
-                            <td class="px-4 py-4">
+                            <td class="px-4 py-4" data-product-status>
                                 {% if product.publication_status == 'draft' %}
                                 <span class="inline-flex border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-yellow-700">Draft</span>
                                 {% elif product.available %}
@@ -172,4 +173,71 @@
         </aside>
     </section>
 </main>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        function statusHtml(product) {
+            let badge = '';
+            if (product.publication_status === 'draft') {
+                badge = '<span class="inline-flex border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-yellow-700">Draft</span>';
+            } else if (product.available) {
+                badge = '<span class="inline-flex border border-green-200 bg-green-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-green-700">Published</span>';
+            } else {
+                badge = '<span class="inline-flex border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-600">Paused</span>';
+            }
+            if (product.is_low_stock) {
+                badge += '<span class="mt-2 inline-flex border border-red-200 bg-red-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-red-700">Low stock</span>';
+            }
+            return badge;
+        }
+
+        document.querySelectorAll('[data-inventory-form]').forEach(function(form) {
+            form.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const button = form.querySelector('button[type="submit"]');
+                const message = form.querySelector('[data-inventory-message]');
+                const row = form.closest('[data-product-row]');
+                const statusCell = row ? row.querySelector('[data-product-status]') : null;
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.textContent = 'Updating...';
+                if (message) {
+                    message.classList.add('hidden');
+                    message.classList.remove('text-red-700', 'text-green-700');
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.status) {
+                        throw new Error(data.message || 'Inventory update failed.');
+                    }
+                    if (statusCell) {
+                        statusCell.innerHTML = statusHtml(data.product);
+                    }
+                    if (message) {
+                        message.textContent = data.message || 'Inventory updated.';
+                        message.classList.remove('hidden');
+                        message.classList.add('text-green-700');
+                    }
+                } catch (error) {
+                    if (message) {
+                        message.textContent = error.message || 'Inventory update failed.';
+                        message.classList.remove('hidden');
+                        message.classList.add('text-red-700');
+                    }
+                } finally {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}
