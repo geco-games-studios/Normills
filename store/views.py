@@ -917,7 +917,7 @@ def merchant_dashboard(request):
     payouts = list(_sync_merchant_payouts(stores))
 
     total_revenue = _merchant_item_total(paid_items)
-    ready_for_payout = _merchant_payout_total(
+    ready_for_payout = _merchant_net_payout_total(
         payout for payout in payouts
         if payout.status == 'ready'
     )
@@ -964,6 +964,14 @@ def _merchant_payout_total(payouts):
     return sum(payout.amount for payout in payouts)
 
 
+def _merchant_net_payout_total(payouts):
+    return sum(payout.net_amount for payout in payouts)
+
+
+def _merchant_platform_fee_total(payouts):
+    return sum(payout.platform_fee for payout in payouts)
+
+
 def _merchant_payout_queryset(stores):
     return MerchantPayout.objects.filter(store__in=stores).select_related(
         'store',
@@ -979,6 +987,7 @@ def _sync_merchant_payouts(stores):
             defaults={
                 'store': item.product.store,
                 'amount': item.subtotal,
+                'net_amount': item.subtotal,
             },
         )
         payout.refresh_from_order()
@@ -1039,7 +1048,9 @@ def _payout_csv_response(payouts):
         'Order',
         'Product',
         'Quantity',
-        'Amount',
+        'Gross Amount',
+        'Platform Fee',
+        'Net Payout',
         'Status',
         'Paid At',
         'Payment Reference',
@@ -1054,6 +1065,8 @@ def _payout_csv_response(payouts):
             payout.order_item.product.name,
             payout.order_item.quantity,
             f'{payout.amount:.2f}',
+            f'{payout.platform_fee:.2f}',
+            f'{payout.net_amount:.2f}',
             payout.get_status_display(),
             payout.paid_at.isoformat() if payout.paid_at else '',
             order.payment_reference or '',
@@ -1103,11 +1116,12 @@ def finance_payouts(request):
         'filters': filters,
         'status_choices': MerchantPayout.STATUS_CHOICES,
         'gross_total': _merchant_payout_total(all_payouts),
-        'ready_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'ready'),
-        'pending_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'pending'),
-        'paid_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'paid'),
-        'held_total': _merchant_payout_total(payout for payout in all_payouts if payout.status == 'held'),
-        'filtered_total': _merchant_payout_total(payout_list),
+        'platform_fee_total': _merchant_platform_fee_total(all_payouts),
+        'ready_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'ready'),
+        'pending_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'pending'),
+        'paid_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'paid'),
+        'held_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'held'),
+        'filtered_total': _merchant_net_payout_total(payout_list),
     })
 
 
@@ -1195,10 +1209,11 @@ def merchant_payouts(request):
         'store_count': stores.count(),
         'payouts': payouts,
         'gross_paid_total': _merchant_payout_total(payouts),
-        'ready_for_payout': _merchant_payout_total(payout for payout in payouts if payout.status == 'ready'),
-        'pending_fulfillment_total': _merchant_payout_total(payout for payout in payouts if payout.status == 'pending'),
-        'paid_out_total': _merchant_payout_total(payout for payout in payouts if payout.status == 'paid'),
-        'held_total': _merchant_payout_total(payout for payout in payouts if payout.status == 'held'),
+        'platform_fee_total': _merchant_platform_fee_total(payouts),
+        'ready_for_payout': _merchant_net_payout_total(payout for payout in payouts if payout.status == 'ready'),
+        'pending_fulfillment_total': _merchant_net_payout_total(payout for payout in payouts if payout.status == 'pending'),
+        'paid_out_total': _merchant_net_payout_total(payout for payout in payouts if payout.status == 'paid'),
+        'held_total': _merchant_net_payout_total(payout for payout in payouts if payout.status == 'held'),
     })
 
 

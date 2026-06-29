@@ -238,13 +238,15 @@ class MerchantPayoutAdmin(admin.ModelAdmin):
         'order_number',
         'product_name',
         'amount',
+        'platform_fee',
+        'net_amount',
         'status',
         'paid_at',
         'created_at',
     ]
     list_filter = ['status', 'store', 'created_at', 'paid_at']
     search_fields = ['store__name', 'order_item__product__name', 'order_item__order__id']
-    readonly_fields = ['store', 'order_item', 'amount', 'created_at', 'updated_at']
+    readonly_fields = ['store', 'order_item', 'amount', 'platform_fee', 'net_amount', 'fee_rate', 'created_at', 'updated_at']
     actions = ['refresh_status_from_orders', 'mark_as_paid', 'hold_for_review']
 
     @admin.display(description='Order', ordering='order_item__order__id')

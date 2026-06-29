@@ -1,7 +1,9 @@
 import json
 import logging
+from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import quote
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from manager.models import Store
@@ -9,6 +11,7 @@ from users.models import User
 from .sms_client import SMSClient
 
 logger = logging.getLogger(__name__)
+MONEY_PLACES = Decimal('0.01')
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -551,6 +554,9 @@ class MerchantPayout(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='merchant_payouts')
     order_item = models.OneToOneField(OrderItem, on_delete=models.CASCADE, related_name='merchant_payout')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    net_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    fee_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     note = models.TextField(blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
@@ -576,11 +582,23 @@ class MerchantPayout(models.Model):
     def refresh_from_order(self, save=True):
         self.store = self.order_item.product.store
         self.amount = self.order_item.subtotal
+        self.fee_rate = Decimal(str(getattr(settings, 'MERCHANT_PAYOUT_FEE_RATE', '0.00')))
+        self.platform_fee = (self.amount * self.fee_rate).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+        self.net_amount = self.amount - self.platform_fee
         self.status = self.calculated_status()
         if self.status != 'paid':
             self.paid_at = None
         if save:
-            self.save(update_fields=['store', 'amount', 'status', 'paid_at', 'updated_at'])
+            self.save(update_fields=[
+                'store',
+                'amount',
+                'platform_fee',
+                'net_amount',
+                'fee_rate',
+                'status',
+                'paid_at',
+                'updated_at',
+            ])
 
 
 class StockAdjustment(models.Model):

@@ -604,6 +604,8 @@ class MerchantDashboardTests(TestCase):
         payout = MerchantPayout.objects.get(order_item=order_item)
         self.assertEqual(payout.status, 'pending')
         self.assertEqual(payout.amount, Decimal('2500.00'))
+        self.assertEqual(payout.platform_fee, Decimal('0.00'))
+        self.assertEqual(payout.net_amount, Decimal('2500.00'))
 
         self.order.status = 'delivered'
         self.order.save(update_fields=['status'])
@@ -623,6 +625,20 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(response.context['ready_for_payout'], Decimal('0'))
         self.assertEqual(response.context['paid_out_total'], Decimal('2500.00'))
 
+    @override_settings(MERCHANT_PAYOUT_FEE_RATE='0.10')
+    def test_merchant_payouts_calculate_platform_fee_and_net_amount(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_payouts'))
+
+        payout = MerchantPayout.objects.get(order_item__order=self.order)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payout.amount, Decimal('2500.00'))
+        self.assertEqual(payout.platform_fee, Decimal('250.00'))
+        self.assertEqual(payout.net_amount, Decimal('2250.00'))
+        self.assertEqual(response.context['platform_fee_total'], Decimal('250.00'))
+        self.assertEqual(response.context['pending_fulfillment_total'], Decimal('2250.00'))
+
     def test_finance_can_view_and_export_payout_reconciliation(self):
         self.order.status = 'delivered'
         self.order.save(update_fields=['status'])
@@ -632,6 +648,7 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['ready_total'], Decimal('2500.00'))
+        self.assertEqual(response.context['platform_fee_total'], Decimal('0.00'))
         self.assertContains(response, 'Merchant payout reconciliation')
         self.assertContains(response, 'Merchant Store')
         self.assertContains(response, 'Merchant Phone')
@@ -642,6 +659,7 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response['Content-Type'], 'text/csv')
         self.assertIn('Payout ID,Store,Order,Product', csv_body)
+        self.assertIn('Gross Amount,Platform Fee,Net Payout', csv_body)
         self.assertIn('Merchant Store', csv_body)
         self.assertIn('Merchant Phone', csv_body)
 
