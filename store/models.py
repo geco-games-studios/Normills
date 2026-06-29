@@ -539,6 +539,50 @@ class OrderItem(models.Model):
         return self.price * self.quantity
 
 
+class MerchantPayout(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending fulfillment'),
+        ('ready', 'Ready for payout'),
+        ('paid', 'Paid out'),
+        ('held', 'Held for review'),
+        ('blocked', 'Blocked'),
+    )
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='merchant_payouts')
+    order_item = models.OneToOneField(OrderItem, on_delete=models.CASCADE, related_name='merchant_payout')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    note = models.TextField(blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.store.name} payout for order #{self.order_item.order_id}"
+
+    def calculated_status(self):
+        order = self.order_item.order
+        if order.payment_status != 'completed' or order.status in ('cancelled', 'refunded'):
+            return 'blocked'
+        if self.status in ('paid', 'held'):
+            return self.status
+        if order.status in ('delivered', 'cleared'):
+            return 'ready'
+        return 'pending'
+
+    def refresh_from_order(self, save=True):
+        self.store = self.order_item.product.store
+        self.amount = self.order_item.subtotal
+        self.status = self.calculated_status()
+        if self.status != 'paid':
+            self.paid_at = None
+        if save:
+            self.save(update_fields=['store', 'amount', 'status', 'paid_at', 'updated_at'])
+
+
 class StockAdjustment(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_adjustments')
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)

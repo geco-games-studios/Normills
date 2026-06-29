@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from manager.models import Store
@@ -16,7 +17,7 @@ from .payment import (
     normalize_lenco_response,
     process_lenco_payment,
 )
-from .models import Category, Order, OrderItem, Product, ProductImage
+from .models import Category, MerchantPayout, Order, OrderItem, Product, ProductImage
 
 
 class LencoPaymentHelperTests(SimpleTestCase):
@@ -573,6 +574,35 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(response.context['pending_fulfillment_total'], Decimal('2500.00'))
         self.assertContains(response, 'Merchant Phone')
         self.assertNotContains(response, 'Other Phone')
+
+    def test_merchant_payouts_sync_records_and_preserve_paid_status(self):
+        order_item = self.order.items.get(product=self.product)
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_payouts'))
+
+        self.assertEqual(response.status_code, 200)
+        payout = MerchantPayout.objects.get(order_item=order_item)
+        self.assertEqual(payout.status, 'pending')
+        self.assertEqual(payout.amount, Decimal('2500.00'))
+
+        self.order.status = 'delivered'
+        self.order.save(update_fields=['status'])
+        self.client.get(reverse('merchant_payouts'))
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, 'ready')
+
+        payout.status = 'paid'
+        payout.paid_at = timezone.now()
+        payout.save(update_fields=['status', 'paid_at'])
+        self.order.status = 'cleared'
+        self.order.save(update_fields=['status'])
+
+        response = self.client.get(reverse('merchant_payouts'))
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, 'paid')
+        self.assertEqual(response.context['ready_for_payout'], Decimal('0'))
+        self.assertEqual(response.context['paid_out_total'], Decimal('2500.00'))
 
     def test_merchant_can_view_own_store_orders(self):
         other_product = Product.objects.get(slug='other-phone')

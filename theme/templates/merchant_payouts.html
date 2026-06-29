@@ -18,7 +18,7 @@
         Your account does not have a store attached yet. Ask an administrator to attach a store before reviewing payouts.
     </div>
     {% else %}
-    <section class="mt-6 grid gap-3 sm:grid-cols-3">
+    <section class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div class="border border-gray-200 bg-white p-4">
             <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Paid sales</p>
             <p class="mt-3 text-3xl font-black text-gray-950">K{{ gross_paid_total|floatformat:2 }}</p>
@@ -31,6 +31,14 @@
             <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Pending fulfillment</p>
             <p class="mt-3 text-3xl font-black text-gray-950">K{{ pending_fulfillment_total|floatformat:2 }}</p>
         </div>
+        <div class="border border-gray-200 bg-white p-4">
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Paid out</p>
+            <p class="mt-3 text-3xl font-black text-gray-950">K{{ paid_out_total|floatformat:2 }}</p>
+        </div>
+        <div class="border border-gray-200 bg-white p-4">
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Held</p>
+            <p class="mt-3 text-3xl font-black text-gray-950">K{{ held_total|floatformat:2 }}</p>
+        </div>
     </section>
 
     <section class="mt-8">
@@ -38,7 +46,7 @@
             <h2 class="text-lg font-black uppercase tracking-[.12em] text-gray-950">Paid order lines</h2>
         </div>
 
-        {% if paid_items %}
+        {% if payouts %}
         <div class="mt-4 overflow-x-auto border border-gray-200">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50 text-left text-xs font-black uppercase tracking-[.14em] text-gray-500">
@@ -52,17 +60,21 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
-                    {% for item in paid_items %}
+                    {% for payout in payouts %}
                     <tr>
-                        <td class="px-4 py-4 font-bold text-gray-950">#{{ item.order.id }}</td>
-                        <td class="px-4 py-4 text-gray-900">{{ item.product.name }}</td>
-                        <td class="px-4 py-4 text-gray-600">{{ item.quantity }}</td>
-                        <td class="px-4 py-4 text-gray-900">K{{ item.subtotal|floatformat:2 }}</td>
-                        <td class="px-4 py-4 text-gray-600">{{ item.order.get_status_display }}</td>
+                        <td class="px-4 py-4 font-bold text-gray-950">#{{ payout.order_item.order.id }}</td>
+                        <td class="px-4 py-4 text-gray-900">{{ payout.order_item.product.name }}</td>
+                        <td class="px-4 py-4 text-gray-600">{{ payout.order_item.quantity }}</td>
+                        <td class="px-4 py-4 text-gray-900">K{{ payout.amount|floatformat:2 }}</td>
+                        <td class="px-4 py-4 text-gray-600">{{ payout.order_item.order.get_status_display }}</td>
                         <td class="px-4 py-4">
-                            {% if item.order.status == 'delivered' or item.order.status == 'cleared' %}
+                            {% if payout.status == 'ready' %}
                             <span class="inline-flex border border-green-200 bg-green-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-green-700">Ready</span>
-                            {% elif item.order.status == 'cancelled' or item.order.status == 'refunded' %}
+                            {% elif payout.status == 'paid' %}
+                            <span class="inline-flex border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-blue-700">Paid</span>
+                            {% elif payout.status == 'held' %}
+                            <span class="inline-flex border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-orange-700">Held</span>
+                            {% elif payout.status == 'blocked' %}
                             <span class="inline-flex border border-red-200 bg-red-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-red-700">Blocked</span>
                             {% else %}
                             <span class="inline-flex border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-yellow-700">Pending</span>

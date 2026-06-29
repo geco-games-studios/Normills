@@ -23,7 +23,7 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm, prepare_product_image
 from store.sms_client import SMSClient
@@ -909,23 +909,24 @@ def product_detail(request, slug):
 @merchant_required
 def merchant_dashboard(request):
     owner_profile = getattr(request.user, 'store_owner_profile', None)
-    stores = Store.objects.filter(owner=owner_profile) if owner_profile else Store.objects.none()
+    stores = list(Store.objects.filter(owner=owner_profile)) if owner_profile else []
     products = Product.objects.filter(store__in=stores).select_related('store', 'category', 'brand')
     orders = Order.objects.filter(items__product__store__in=stores).prefetch_related('items__product').distinct()
     paid_items = list(_merchant_paid_order_items(stores))
+    payouts = list(_sync_merchant_payouts(stores))
 
     total_revenue = _merchant_item_total(paid_items)
-    ready_for_payout = _merchant_item_total(
-        item for item in paid_items
-        if item.order.status in {'delivered', 'cleared'}
+    ready_for_payout = _merchant_payout_total(
+        payout for payout in payouts
+        if payout.status == 'ready'
     )
     low_stock_count = products.filter(stock__lte=F('low_stock_threshold')).count()
 
     return render(request, 'store_dashboard.html', {
         'stores': stores,
-        'products': products.order_by('-updated')[:12],
-        'orders': orders.order_by('-created')[:6],
-        'store_count': stores.count(),
+        'products': list(products.order_by('-updated')[:12]),
+        'orders': list(orders.order_by('-created')[:6]),
+        'store_count': len(stores),
         'product_count': products.count(),
         'order_count': orders.count(),
         'low_stock_count': low_stock_count,
@@ -956,6 +957,31 @@ def _merchant_paid_order_items(stores):
 
 def _merchant_item_total(items):
     return sum(item.price * item.quantity for item in items)
+
+
+def _merchant_payout_total(payouts):
+    return sum(payout.amount for payout in payouts)
+
+
+def _merchant_payout_queryset(stores):
+    return MerchantPayout.objects.filter(store__in=stores).select_related(
+        'store',
+        'order_item__order',
+        'order_item__product',
+    ).order_by('-created_at')
+
+
+def _sync_merchant_payouts(stores):
+    for item in _merchant_paid_order_items(stores):
+        payout, _created = MerchantPayout.objects.get_or_create(
+            order_item=item,
+            defaults={
+                'store': item.product.store,
+                'amount': item.subtotal,
+            },
+        )
+        payout.refresh_from_order()
+    return _merchant_payout_queryset(stores)
 
 
 def _supporting_image_ids_to_delete(request):
@@ -1036,22 +1062,16 @@ def merchant_orders(request):
 @merchant_required
 def merchant_payouts(request):
     stores = _merchant_stores_for_user(request.user)
-    paid_items = list(_merchant_paid_order_items(stores))
-    ready_items = [
-        item for item in paid_items
-        if item.order.status in {'delivered', 'cleared'}
-    ]
-    pending_items = [
-        item for item in paid_items
-        if item.order.status not in {'delivered', 'cleared', 'cancelled', 'refunded'}
-    ]
+    payouts = list(_sync_merchant_payouts(stores))
 
     return render(request, 'merchant_payouts.html', {
         'store_count': stores.count(),
-        'paid_items': paid_items,
-        'gross_paid_total': _merchant_item_total(paid_items),
-        'ready_for_payout': _merchant_item_total(ready_items),
-        'pending_fulfillment_total': _merchant_item_total(pending_items),
+        'payouts': payouts,
+        'gross_paid_total': _merchant_payout_total(payouts),
+        'ready_for_payout': _merchant_payout_total(payout for payout in payouts if payout.status == 'ready'),
+        'pending_fulfillment_total': _merchant_payout_total(payout for payout in payouts if payout.status == 'pending'),
+        'paid_out_total': _merchant_payout_total(payout for payout in payouts if payout.status == 'paid'),
+        'held_total': _merchant_payout_total(payout for payout in payouts if payout.status == 'held'),
     })
 
 

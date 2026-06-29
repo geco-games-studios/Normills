@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment
+from django.utils import timezone
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -227,6 +228,48 @@ class OrderAdmin(admin.ModelAdmin):
             request,
             f'Refreshed {updated} order(s) from Lenco. {failed} order(s) could not be refreshed.'
         )
+
+
+@admin.register(MerchantPayout)
+class MerchantPayoutAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'store',
+        'order_number',
+        'product_name',
+        'amount',
+        'status',
+        'paid_at',
+        'created_at',
+    ]
+    list_filter = ['status', 'store', 'created_at', 'paid_at']
+    search_fields = ['store__name', 'order_item__product__name', 'order_item__order__id']
+    readonly_fields = ['store', 'order_item', 'amount', 'created_at', 'updated_at']
+    actions = ['refresh_status_from_orders', 'mark_as_paid', 'hold_for_review']
+
+    @admin.display(description='Order', ordering='order_item__order__id')
+    def order_number(self, obj):
+        return f"#{obj.order_item.order_id}"
+
+    @admin.display(description='Product', ordering='order_item__product__name')
+    def product_name(self, obj):
+        return obj.order_item.product.name
+
+    @admin.action(description='Refresh payout status from order fulfillment')
+    def refresh_status_from_orders(self, request, queryset):
+        for payout in queryset.select_related('order_item__order', 'order_item__product__store'):
+            payout.refresh_from_order()
+        self.message_user(request, f'Refreshed {queryset.count()} payout record(s).')
+
+    @admin.action(description='Mark selected payouts as paid')
+    def mark_as_paid(self, request, queryset):
+        updated = queryset.filter(status__in=['ready', 'held']).update(status='paid', paid_at=timezone.now())
+        self.message_user(request, f'Marked {updated} payout record(s) as paid.')
+
+    @admin.action(description='Hold selected payouts for review')
+    def hold_for_review(self, request, queryset):
+        updated = queryset.exclude(status='paid').update(status='held', paid_at=None)
+        self.message_user(request, f'Held {updated} payout record(s) for review.')
 
 
 @admin.register(StockAdjustment)
