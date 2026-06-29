@@ -557,6 +557,7 @@ class MerchantPayout(models.Model):
     platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     net_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     fee_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    batch = models.ForeignKey('PayoutBatch', on_delete=models.SET_NULL, null=True, blank=True, related_name='payouts')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     note = models.TextField(blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
@@ -588,6 +589,7 @@ class MerchantPayout(models.Model):
         self.status = self.calculated_status()
         if self.status != 'paid':
             self.paid_at = None
+            self.batch = None
         if save:
             self.save(update_fields=[
                 'store',
@@ -595,10 +597,28 @@ class MerchantPayout(models.Model):
                 'platform_fee',
                 'net_amount',
                 'fee_rate',
+                'batch',
                 'status',
                 'paid_at',
                 'updated_at',
             ])
+
+
+class PayoutBatch(models.Model):
+    reference = models.CharField(max_length=120, unique=True)
+    processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payout_batches')
+    gross_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    platform_fee_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    net_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    note = models.TextField(blank=True)
+    paid_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-paid_at', '-created_at']
+
+    def __str__(self):
+        return f"Payout batch {self.reference}"
 
 
 class StockAdjustment(models.Model):

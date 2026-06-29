@@ -73,8 +73,18 @@
             <div class="flex flex-wrap gap-2">
                 <button name="action" value="refresh" type="submit" class="border border-gray-300 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-gray-900">Refresh selected</button>
                 <button name="action" value="hold" type="submit" class="border border-orange-300 bg-orange-50 px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-orange-800">Hold selected</button>
-                <button name="action" value="mark_paid" type="submit" class="bg-black px-3 py-2 text-xs font-black uppercase tracking-[.12em] text-white">Mark paid</button>
             </div>
+        </div>
+        <div class="mt-4 grid gap-3 border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[14rem_1fr_auto]">
+            <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">
+                Batch reference
+                <input name="batch_reference" placeholder="Bank ref or batch id" class="mt-2 w-full border border-gray-300 bg-white px-3 py-2 text-sm font-bold normal-case tracking-normal text-gray-950">
+            </label>
+            <label class="text-xs font-black uppercase tracking-[.14em] text-gray-500">
+                Batch note
+                <input name="batch_note" placeholder="Payment method, account, or internal note" class="mt-2 w-full border border-gray-300 bg-white px-3 py-2 text-sm font-bold normal-case tracking-normal text-gray-950">
+            </label>
+            <button name="action" value="mark_paid" type="submit" class="self-end bg-black px-4 py-3 text-xs font-black uppercase tracking-[.12em] text-white">Create paid batch</button>
         </div>
 
         {% if payouts %}
@@ -91,6 +101,7 @@
                         <th class="px-4 py-3">Net payout</th>
                         <th class="px-4 py-3">Fulfillment</th>
                         <th class="px-4 py-3">Payout</th>
+                        <th class="px-4 py-3">Batch</th>
                         <th class="px-4 py-3">Paid at</th>
                     </tr>
                 </thead>
@@ -108,6 +119,7 @@
                         <td class="px-4 py-4">
                             <span class="inline-flex border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ payout.get_status_display }}</span>
                         </td>
+                        <td class="px-4 py-4 text-gray-600">{{ payout.batch.reference|default:"-" }}</td>
                         <td class="px-4 py-4 text-gray-600">{{ payout.paid_at|date:"Y-m-d H:i"|default:"-" }}</td>
                     </tr>
                     {% endfor %}
@@ -120,5 +132,41 @@
         </div>
         {% endif %}
     </form>
+
+    <section class="mt-10">
+        <h2 class="text-lg font-black uppercase tracking-[.12em] text-gray-950">Recent payout batches</h2>
+        {% if recent_batches %}
+        <div class="mt-4 overflow-x-auto border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50 text-left text-xs font-black uppercase tracking-[.14em] text-gray-500">
+                    <tr>
+                        <th class="px-4 py-3">Reference</th>
+                        <th class="px-4 py-3">Gross</th>
+                        <th class="px-4 py-3">Fee</th>
+                        <th class="px-4 py-3">Net paid</th>
+                        <th class="px-4 py-3">Processed by</th>
+                        <th class="px-4 py-3">Paid at</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for batch in recent_batches %}
+                    <tr>
+                        <td class="px-4 py-4 font-bold text-gray-950">{{ batch.reference }}</td>
+                        <td class="px-4 py-4 text-gray-900">K{{ batch.gross_total|floatformat:2 }}</td>
+                        <td class="px-4 py-4 text-gray-600">K{{ batch.platform_fee_total|floatformat:2 }}</td>
+                        <td class="px-4 py-4 font-bold text-gray-950">K{{ batch.net_total|floatformat:2 }}</td>
+                        <td class="px-4 py-4 text-gray-600">{{ batch.processed_by.username|default:"-" }}</td>
+                        <td class="px-4 py-4 text-gray-600">{{ batch.paid_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="mt-4 border border-dashed border-gray-300 p-6 text-center">
+            <p class="text-sm font-bold text-gray-700">No payout batches have been created yet.</p>
+        </div>
+        {% endif %}
+    </section>
 </main>
 {% endblock %}

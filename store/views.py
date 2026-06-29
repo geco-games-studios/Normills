@@ -23,7 +23,7 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm, prepare_product_image
 from store.sms_client import SMSClient
@@ -975,6 +975,7 @@ def _merchant_platform_fee_total(payouts):
 def _merchant_payout_queryset(stores):
     return MerchantPayout.objects.filter(store__in=stores).select_related(
         'store',
+        'batch',
         'order_item__order',
         'order_item__product',
     ).order_by('-created_at')
@@ -997,6 +998,7 @@ def _sync_merchant_payouts(stores):
 def _finance_payout_queryset():
     return MerchantPayout.objects.select_related(
         'store',
+        'batch',
         'order_item__order',
         'order_item__product',
     ).order_by('-created_at')
@@ -1052,6 +1054,7 @@ def _payout_csv_response(payouts):
         'Platform Fee',
         'Net Payout',
         'Status',
+        'Payout Batch',
         'Paid At',
         'Payment Reference',
         'Customer Email',
@@ -1068,11 +1071,35 @@ def _payout_csv_response(payouts):
             f'{payout.platform_fee:.2f}',
             f'{payout.net_amount:.2f}',
             payout.get_status_display(),
+            payout.batch.reference if payout.batch else '',
             payout.paid_at.isoformat() if payout.paid_at else '',
             order.payment_reference or '',
             order.email,
         ])
     return response
+
+
+def _create_payout_batch(selected, user, reference, note):
+    payable = list(selected.filter(status__in=['ready', 'held']).select_related('order_item__order', 'order_item__product', 'store'))
+    if not payable:
+        return None
+
+    paid_at = timezone.now()
+    batch = PayoutBatch.objects.create(
+        reference=reference,
+        processed_by=user,
+        gross_total=_merchant_payout_total(payable),
+        platform_fee_total=_merchant_platform_fee_total(payable),
+        net_total=_merchant_net_payout_total(payable),
+        note=note,
+        paid_at=paid_at,
+    )
+    for payout in payable:
+        payout.status = 'paid'
+        payout.paid_at = paid_at
+        payout.batch = batch
+        payout.save(update_fields=['status', 'paid_at', 'batch', 'updated_at'])
+    return batch
 
 
 @finance_admin_required
@@ -1089,8 +1116,19 @@ def finance_payouts(request):
             return redirect('finance_payouts')
 
         if action == 'mark_paid':
-            updated = selected.filter(status__in=['ready', 'held']).update(status='paid', paid_at=timezone.now())
-            messages.success(request, f'Marked {updated} payout record(s) as paid.')
+            reference = (request.POST.get('batch_reference') or '').strip()
+            note = (request.POST.get('batch_note') or '').strip()
+            if not reference:
+                messages.error(request, 'Enter a payout batch reference before marking payouts paid.')
+                return redirect('finance_payouts')
+            if PayoutBatch.objects.filter(reference=reference).exists():
+                messages.error(request, 'That payout batch reference already exists.')
+                return redirect('finance_payouts')
+            batch = _create_payout_batch(selected, request.user, reference, note)
+            if not batch:
+                messages.error(request, 'Only ready or held payout records can be batched as paid.')
+                return redirect('finance_payouts')
+            messages.success(request, f'Created payout batch {batch.reference} for K{batch.net_total:.2f}.')
         elif action == 'hold':
             updated = selected.exclude(status='paid').update(status='held', paid_at=None)
             messages.success(request, f'Held {updated} payout record(s) for review.')
@@ -1122,6 +1160,7 @@ def finance_payouts(request):
         'paid_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'paid'),
         'held_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'held'),
         'filtered_total': _merchant_net_payout_total(payout_list),
+        'recent_batches': PayoutBatch.objects.select_related('processed_by')[:8],
     })
 
 

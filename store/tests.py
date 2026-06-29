@@ -17,7 +17,7 @@ from .payment import (
     normalize_lenco_response,
     process_lenco_payment,
 )
-from .models import Category, MerchantPayout, Order, OrderItem, Product, ProductImage
+from .models import Category, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductImage
 
 
 class LencoPaymentHelperTests(SimpleTestCase):
@@ -663,7 +663,7 @@ class MerchantDashboardTests(TestCase):
         self.assertIn('Merchant Store', csv_body)
         self.assertIn('Merchant Phone', csv_body)
 
-    def test_finance_can_hold_refresh_and_mark_payouts_paid(self):
+    def test_finance_can_hold_refresh_and_create_paid_payout_batch(self):
         self.client.force_login(self.finance_user)
         self.client.get(reverse('finance_payouts'))
         pending_payout = MerchantPayout.objects.get(order_item__order=self.order)
@@ -694,12 +694,57 @@ class MerchantDashboardTests(TestCase):
         response = self.client.post(reverse('finance_payouts'), {
             'action': 'mark_paid',
             'payout_ids': [str(pending_payout.id)],
+            'batch_reference': 'BANK-001',
+            'batch_note': 'Mobile money merchant payout',
         })
 
         self.assertRedirects(response, reverse('finance_payouts'))
         pending_payout.refresh_from_db()
         self.assertEqual(pending_payout.status, 'paid')
         self.assertIsNotNone(pending_payout.paid_at)
+        batch = PayoutBatch.objects.get(reference='BANK-001')
+        self.assertEqual(pending_payout.batch, batch)
+        self.assertEqual(batch.gross_total, Decimal('2500.00'))
+        self.assertEqual(batch.platform_fee_total, Decimal('0.00'))
+        self.assertEqual(batch.net_total, Decimal('2500.00'))
+        self.assertEqual(batch.processed_by, self.finance_user)
+        self.assertEqual(batch.note, 'Mobile money merchant payout')
+
+    def test_finance_paid_batch_requires_unique_reference(self):
+        self.order.status = 'delivered'
+        self.order.save(update_fields=['status'])
+        self.client.force_login(self.finance_user)
+        self.client.get(reverse('finance_payouts'))
+        payout = MerchantPayout.objects.get(order_item__order=self.order)
+
+        response = self.client.post(reverse('finance_payouts'), {
+            'action': 'mark_paid',
+            'payout_ids': [str(payout.id)],
+        })
+
+        self.assertRedirects(response, reverse('finance_payouts'))
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, 'ready')
+        self.assertFalse(PayoutBatch.objects.exists())
+
+        PayoutBatch.objects.create(
+            reference='DUPLICATE',
+            processed_by=self.finance_user,
+            gross_total=Decimal('0.00'),
+            platform_fee_total=Decimal('0.00'),
+            net_total=Decimal('0.00'),
+            paid_at=timezone.now(),
+        )
+        response = self.client.post(reverse('finance_payouts'), {
+            'action': 'mark_paid',
+            'payout_ids': [str(payout.id)],
+            'batch_reference': 'DUPLICATE',
+        })
+
+        self.assertRedirects(response, reverse('finance_payouts'))
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, 'ready')
+        self.assertEqual(PayoutBatch.objects.count(), 1)
 
     def test_merchant_can_view_own_store_orders(self):
         other_product = Product.objects.get(slug='other-phone')

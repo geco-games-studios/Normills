@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -240,13 +240,14 @@ class MerchantPayoutAdmin(admin.ModelAdmin):
         'amount',
         'platform_fee',
         'net_amount',
+        'batch',
         'status',
         'paid_at',
         'created_at',
     ]
     list_filter = ['status', 'store', 'created_at', 'paid_at']
     search_fields = ['store__name', 'order_item__product__name', 'order_item__order__id']
-    readonly_fields = ['store', 'order_item', 'amount', 'platform_fee', 'net_amount', 'fee_rate', 'created_at', 'updated_at']
+    readonly_fields = ['store', 'order_item', 'amount', 'platform_fee', 'net_amount', 'fee_rate', 'batch', 'created_at', 'updated_at']
     actions = ['refresh_status_from_orders', 'mark_as_paid', 'hold_for_review']
 
     @admin.display(description='Order', ordering='order_item__order__id')
@@ -272,6 +273,14 @@ class MerchantPayoutAdmin(admin.ModelAdmin):
     def hold_for_review(self, request, queryset):
         updated = queryset.exclude(status='paid').update(status='held', paid_at=None)
         self.message_user(request, f'Held {updated} payout record(s) for review.')
+
+
+@admin.register(PayoutBatch)
+class PayoutBatchAdmin(admin.ModelAdmin):
+    list_display = ['reference', 'processed_by', 'gross_total', 'platform_fee_total', 'net_total', 'paid_at', 'created_at']
+    list_filter = ['paid_at', 'created_at', 'processed_by']
+    search_fields = ['reference', 'note', 'processed_by__username']
+    readonly_fields = ['reference', 'processed_by', 'gross_total', 'platform_fee_total', 'net_total', 'note', 'paid_at', 'created_at']
 
 
 @admin.register(StockAdjustment)
