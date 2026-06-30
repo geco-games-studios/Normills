@@ -119,7 +119,13 @@
                         <td class="px-4 py-4">
                             <span class="inline-flex border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ payout.get_status_display }}</span>
                         </td>
-                        <td class="px-4 py-4 text-gray-600">{{ payout.batch.reference|default:"-" }}</td>
+                        <td class="px-4 py-4 text-gray-600">
+                            {% if payout.batch %}
+                            <a href="{% url 'finance_payout_batch_detail' payout.batch.id %}" class="font-bold text-black underline">{{ payout.batch.reference }}</a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-4 text-gray-600">{{ payout.paid_at|date:"Y-m-d H:i"|default:"-" }}</td>
                     </tr>
                     {% endfor %}
@@ -151,7 +157,9 @@
                 <tbody class="divide-y divide-gray-100 bg-white">
                     {% for batch in recent_batches %}
                     <tr>
-                        <td class="px-4 py-4 font-bold text-gray-950">{{ batch.reference }}</td>
+                        <td class="px-4 py-4 font-bold text-gray-950">
+                            <a href="{% url 'finance_payout_batch_detail' batch.id %}" class="underline">{{ batch.reference }}</a>
+                        </td>
                         <td class="px-4 py-4 text-gray-900">K{{ batch.gross_total|floatformat:2 }}</td>
                         <td class="px-4 py-4 text-gray-600">K{{ batch.platform_fee_total|floatformat:2 }}</td>
                         <td class="px-4 py-4 font-bold text-gray-950">K{{ batch.net_total|floatformat:2 }}</td>

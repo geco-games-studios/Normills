@@ -746,6 +746,41 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(payout.status, 'ready')
         self.assertEqual(PayoutBatch.objects.count(), 1)
 
+    def test_finance_can_view_and_export_payout_batch_detail(self):
+        self.order.status = 'delivered'
+        self.order.save(update_fields=['status'])
+        self.client.force_login(self.finance_user)
+        self.client.get(reverse('finance_payouts'))
+        payout = MerchantPayout.objects.get(order_item__order=self.order)
+        self.client.post(reverse('finance_payouts'), {
+            'action': 'mark_paid',
+            'payout_ids': [str(payout.id)],
+            'batch_reference': 'BANK-DETAIL-001',
+            'batch_note': 'Detail test batch',
+        })
+        batch = PayoutBatch.objects.get(reference='BANK-DETAIL-001')
+
+        response = self.client.get(reverse('finance_payout_batch_detail', args=[batch.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['batch'], batch)
+        self.assertEqual(response.context['payout_count'], 1)
+        self.assertEqual(response.context['gross_total'], Decimal('2500.00'))
+        self.assertEqual(response.context['net_total'], Decimal('2500.00'))
+        self.assertContains(response, 'BANK-DETAIL-001')
+        self.assertContains(response, 'Merchant Phone')
+
+        export_response = self.client.get(
+            reverse('finance_payout_batch_detail', args=[batch.id]),
+            {'export': 'csv'},
+        )
+        csv_body = export_response.content.decode()
+
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response['Content-Type'], 'text/csv')
+        self.assertIn('BANK-DETAIL-001', csv_body)
+        self.assertIn('Merchant Phone', csv_body)
+
     def test_merchant_can_view_own_store_orders(self):
         other_product = Product.objects.get(slug='other-phone')
         other_order = Order.objects.create(

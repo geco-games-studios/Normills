@@ -1040,9 +1040,9 @@ def _filtered_finance_payouts(request):
     }
 
 
-def _payout_csv_response(payouts):
+def _payout_csv_response(payouts, filename='merchant-payouts.csv'):
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="merchant-payouts.csv"'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     writer = csv.writer(response)
     writer.writerow([
         'Payout ID',
@@ -1161,6 +1161,31 @@ def finance_payouts(request):
         'held_total': _merchant_net_payout_total(payout for payout in all_payouts if payout.status == 'held'),
         'filtered_total': _merchant_net_payout_total(payout_list),
         'recent_batches': PayoutBatch.objects.select_related('processed_by')[:8],
+    })
+
+
+@finance_admin_required
+def finance_payout_batch_detail(request, batch_id):
+    batch = get_object_or_404(PayoutBatch.objects.select_related('processed_by'), id=batch_id)
+    payouts = batch.payouts.select_related(
+        'store',
+        'batch',
+        'order_item__order',
+        'order_item__product',
+    ).order_by('store__name', 'order_item__order_id')
+
+    if request.GET.get('export') == 'csv':
+        return _payout_csv_response(payouts, f'payout-batch-{batch.reference}.csv')
+
+    payout_list = list(payouts)
+
+    return render(request, 'finance_payout_batch_detail.html', {
+        'batch': batch,
+        'payouts': payout_list,
+        'payout_count': len(payout_list),
+        'gross_total': _merchant_payout_total(payout_list),
+        'platform_fee_total': _merchant_platform_fee_total(payout_list),
+        'net_total': _merchant_net_payout_total(payout_list),
     })
 
 
