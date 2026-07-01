@@ -304,12 +304,13 @@ class PayGoApplicationAdmin(admin.ModelAdmin):
         'term_months',
         'outstanding_balance',
         'missed_payment_count',
+        'applicant_phone',
         'approved_by',
         'decided_at',
         'created_at',
     ]
     list_filter = ['status', 'created_at', 'decided_at', 'product__store']
-    search_fields = ['id', 'customer__username', 'customer__email', 'product__name', 'decision_note']
+    search_fields = ['id', 'customer__username', 'customer__email', 'product__name', 'applicant_phone', 'applicant_note', 'decision_note']
     readonly_fields = ['created_at', 'updated_at', 'decided_at', 'outstanding_balance', 'missed_payment_count']
     inlines = [PayGoRepaymentInline]
 

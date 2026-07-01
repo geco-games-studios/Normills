@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}PayGo #{{ application.id }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl">
+    <a href="{% url 'paygo_applications' %}" class="text-sm font-bold text-gray-600 underline">Back to My PayGo</a>
+    <section class="mt-6 border border-gray-200 bg-white p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">PayGo #{{ application.id }}</p>
+                <h1 class="mt-1 text-2xl font-black text-gray-950">{{ application.product.name }}</h1>
+            </div>
+            <span class="inline-flex self-start border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ application.get_status_display }}</span>
+        </div>
+
+        <div class="mt-6 grid gap-3 text-sm text-gray-700 sm:grid-cols-2">
+            <p><span class="font-bold text-gray-950">Requested price:</span> K{{ application.requested_price|floatformat:2 }}</p>
+            <p><span class="font-bold text-gray-950">Deposit required:</span> K{{ application.deposit_required|floatformat:2 }}</p>
+            <p><span class="font-bold text-gray-950">Deposit paid:</span> K{{ application.deposit_paid|floatformat:2 }}</p>
+            <p><span class="font-bold text-gray-950">Outstanding balance:</span> K{{ application.outstanding_balance|floatformat:2 }}</p>
+            <p><span class="font-bold text-gray-950">Term:</span> {{ application.term_months }} month{{ application.term_months|pluralize }}</p>
+            <p><span class="font-bold text-gray-950">Missed payments:</span> {{ application.missed_payment_count }}</p>
+            {% if application.decision_note %}
+            <p class="sm:col-span-2"><span class="font-bold text-gray-950">Finance note:</span> {{ application.decision_note }}</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="mt-6 border border-gray-200 bg-white p-5">
+        <h2 class="text-lg font-black text-gray-950">Repayment Schedule</h2>
+        <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+                <thead class="border-b border-gray-200 text-xs font-black uppercase tracking-[.12em] text-gray-500">
+                    <tr>
+                        <th class="px-3 py-3">No.</th>
+                        <th class="px-3 py-3">Due date</th>
+                        <th class="px-3 py-3">Due</th>
+                        <th class="px-3 py-3">Paid</th>
+                        <th class="px-3 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for repayment in application.repayments.all %}
+                    <tr>
+                        <td class="px-3 py-3">{{ repayment.sequence }}</td>
+                        <td class="px-3 py-3">{{ repayment.due_date|date:"Y-m-d" }}</td>
+                        <td class="px-3 py-3">K{{ repayment.amount_due|floatformat:2 }}</td>
+                        <td class="px-3 py-3">K{{ repayment.amount_paid|floatformat:2 }}</td>
+                        <td class="px-3 py-3">{{ repayment.get_status_display }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-3 py-6 text-center text-gray-500">Repayment schedule appears after finance approval and deposit activation.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

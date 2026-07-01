@@ -23,9 +23,9 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication
 from .ml import recommend_products_from_context
-from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm, prepare_product_image
+from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm, PayGoApplicationForm, prepare_product_image
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
@@ -897,6 +897,12 @@ def product_detail(request, slug):
 
     recommended_products = get_personalized_products(request, exclude_product=product)
     product_url = request.build_absolute_uri()
+    paygo_application = None
+    if request.user.is_authenticated:
+        paygo_application = PayGoApplication.objects.filter(
+            customer=request.user,
+            product=product,
+        ).exclude(status__in=['rejected', 'cancelled', 'completed']).order_by('-created_at').first()
 
     return render(request, 'product_details.html', {
         'product': product,
@@ -904,6 +910,66 @@ def product_detail(request, slug):
         'supporting_images': supporting_images,
         'recommended_products': recommended_products,
         'product_url': product_url,
+        'paygo_application': paygo_application,
+    })
+
+
+@login_required
+def paygo_apply(request, slug):
+    product = get_object_or_404(Product, slug=slug, available=True)
+    if not product.paygo_is_available:
+        messages.error(request, 'PayGo is not currently available for this product.')
+        return redirect('product_detail', slug=product.slug)
+
+    existing_application = PayGoApplication.objects.filter(
+        customer=request.user,
+        product=product,
+    ).exclude(status__in=['rejected', 'cancelled', 'completed']).order_by('-created_at').first()
+    if existing_application:
+        messages.info(request, 'You already have an active PayGo request for this product.')
+        return redirect('paygo_detail', application_id=existing_application.id)
+
+    if request.method == 'POST':
+        form = PayGoApplicationForm(request.POST, user=request.user)
+        form.instance.product = product
+        form.instance.customer = request.user
+        if form.is_valid():
+            application = form.save(commit=False)
+            application.product = product
+            application.customer = request.user
+            application.requested_price = product.price
+            application.deposit_required = product.paygo_min_deposit_amount
+            application.term_months = product.paygo_term_months
+            application.outstanding_balance = product.price
+            application.save()
+            messages.success(request, 'PayGo request submitted. Finance will review it and update the status here.')
+            return redirect('paygo_detail', application_id=application.id)
+    else:
+        form = PayGoApplicationForm(user=request.user)
+
+    return render(request, 'paygo_apply.html', {
+        'product': product,
+        'form': form,
+    })
+
+
+@login_required
+def paygo_applications(request):
+    applications = PayGoApplication.objects.filter(customer=request.user).select_related('product').prefetch_related('repayments')
+    return render(request, 'paygo_applications.html', {
+        'applications': applications,
+    })
+
+
+@login_required
+def paygo_detail(request, application_id):
+    application = get_object_or_404(
+        PayGoApplication.objects.select_related('product', 'approved_by').prefetch_related('repayments'),
+        id=application_id,
+        customer=request.user,
+    )
+    return render(request, 'paygo_detail.html', {
+        'application': application,
     })
 
 

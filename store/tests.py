@@ -1206,3 +1206,74 @@ class PayGoModelTests(TestCase):
         self.assertEqual(application.status, 'completed')
         self.assertEqual(application.outstanding_balance, Decimal('0.00'))
         self.assertEqual(application.credit_score_after, 532)
+
+    def test_product_detail_shows_paygo_cta_for_eligible_product(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('product_detail', args=[self.product.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'PayGo eligible')
+        self.assertContains(response, 'Apply for PayGo')
+        self.assertContains(response, 'Start with K300.00')
+
+    def test_customer_can_submit_paygo_application(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.post(reverse('paygo_apply', args=[self.product.slug]), {
+            'applicant_phone': '260977111222',
+            'applicant_note': 'I can pay every month end.',
+        })
+
+        application = PayGoApplication.objects.get(customer=self.customer, product=self.product)
+        self.assertRedirects(response, reverse('paygo_detail', args=[application.id]))
+        self.assertEqual(application.status, 'submitted')
+        self.assertEqual(application.requested_price, Decimal('1200.00'))
+        self.assertEqual(application.deposit_required, Decimal('300.00'))
+        self.assertEqual(application.term_months, 6)
+        self.assertEqual(application.applicant_phone, '260977111222')
+        self.assertEqual(application.applicant_note, 'I can pay every month end.')
+
+    def test_paygo_application_requires_login(self):
+        response = self.client.get(reverse('paygo_apply', args=[self.product.slug]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response['Location'])
+
+    def test_customer_sees_existing_paygo_application_instead_of_duplicate(self):
+        application = PayGoApplication.objects.create(
+            product=self.product,
+            customer=self.customer,
+            applicant_phone='260977111222',
+        )
+        self.client.force_login(self.customer)
+
+        response = self.client.post(reverse('paygo_apply', args=[self.product.slug]), {
+            'applicant_phone': '260977333444',
+        })
+
+        self.assertRedirects(response, reverse('paygo_detail', args=[application.id]))
+        self.assertEqual(PayGoApplication.objects.filter(customer=self.customer, product=self.product).count(), 1)
+
+    def test_customer_can_view_paygo_application_detail_and_list(self):
+        application = PayGoApplication.objects.create(
+            product=self.product,
+            customer=self.customer,
+            applicant_phone='260977111222',
+            deposit_paid=Decimal('300.00'),
+        )
+        application.approve(self.finance_user, note='Approved for MVP manual review.')
+        application.activate_after_deposit()
+        application.create_repayment_schedule(timezone.localdate())
+        self.client.force_login(self.customer)
+
+        detail_response = self.client.get(reverse('paygo_detail', args=[application.id]))
+        list_response = self.client.get(reverse('paygo_applications'))
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, 'Repayment Schedule')
+        self.assertContains(detail_response, 'Approved for MVP manual review.')
+        self.assertContains(detail_response, 'K900.00')
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, 'My PayGo Requests')
+        self.assertContains(list_response, 'PayGo Phone')

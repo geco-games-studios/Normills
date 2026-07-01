@@ -8,7 +8,7 @@ from django.utils.text import slugify
 from PIL import Image
 from users.models import User
 from users.phone_verification import normalize_phone
-from .models import Brand, Category, Order, Product
+from .models import Brand, Category, Order, PayGoApplication, Product
 
 
 MAX_PRODUCT_IMAGE_SIZE = 8 * 1024 * 1024
@@ -259,3 +259,37 @@ class CheckoutForm(forms.Form):
         widget=forms.RadioSelect,
         required=True
     )
+
+
+class PayGoApplicationForm(forms.ModelForm):
+    class Meta:
+        model = PayGoApplication
+        fields = ('applicant_phone', 'applicant_note')
+        labels = {
+            'applicant_phone': 'Phone number for PayGo review',
+            'applicant_note': 'Anything finance should know',
+        }
+        widgets = {
+            'applicant_note': forms.Textarea(attrs={'rows': 4}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        profile_phone = ''
+        if user is not None:
+            profile_phone = getattr(getattr(user, 'client_profile', None), 'phone_number', '') or ''
+        self.fields['applicant_phone'].initial = self.initial.get('applicant_phone') or profile_phone
+        self.fields['applicant_phone'].required = True
+        self.fields['applicant_note'].required = False
+
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                'class',
+                'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
+            )
+
+    def clean_applicant_phone(self):
+        phone = (self.cleaned_data.get('applicant_phone') or '').strip()
+        if len(''.join(ch for ch in phone if ch.isdigit())) < 9:
+            raise forms.ValidationError('Enter a reachable phone number for the PayGo review.')
+        return phone

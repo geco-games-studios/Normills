@@ -19,6 +19,20 @@
         <h1 class="text-2xl font-bold">{{ product.name }}</h1>
         <div id="product-context" data-product-name="{{ product.name }}" class="hidden"></div>
         <p class="text-xl font-semibold mt-2">K{{ product.price }}</p>
+        {% if product.paygo_is_available %}
+        <div class="mt-5 border border-black bg-white p-4">
+            <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">PayGo eligible</p>
+            <h2 class="mt-1 text-lg font-black text-gray-950">Start with K{{ product.paygo_min_deposit_amount|floatformat:2 }}</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-700">
+                Apply for PayGo review and repay about K{{ product.paygo_estimated_installment|floatformat:2 }} monthly for {{ product.paygo_term_months }} month{{ product.paygo_term_months|pluralize }} after approval.
+            </p>
+            {% if paygo_application %}
+            <a href="{% url 'paygo_detail' paygo_application.id %}" class="mt-4 inline-flex w-full items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">View PayGo Request</a>
+            {% else %}
+            <a href="{% url 'paygo_apply' product.slug %}" class="mt-4 inline-flex w-full items-center justify-center bg-black px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Apply for PayGo</a>
+            {% endif %}
+        </div>
+        {% endif %}
         
         {% if product.description %}
         <div class="mt-4 text-gray-700">

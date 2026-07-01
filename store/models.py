@@ -662,6 +662,8 @@ class PayGoApplication(models.Model):
     term_months = models.PositiveSmallIntegerField(default=0)
     outstanding_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     missed_payment_count = models.PositiveSmallIntegerField(default=0)
+    applicant_phone = models.CharField(max_length=30, blank=True)
+    applicant_note = models.TextField(blank=True)
     credit_score_before = models.PositiveSmallIntegerField(null=True, blank=True)
     credit_score_after = models.PositiveSmallIntegerField(null=True, blank=True)
     credit_points_awarded = models.PositiveSmallIntegerField(default=0)

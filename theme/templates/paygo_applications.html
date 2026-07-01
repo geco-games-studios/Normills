@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}My PayGo Requests{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl">
+    <h1 class="text-3xl font-black text-gray-950">My PayGo Requests</h1>
+    <div class="mt-6 space-y-4">
+        {% for application in applications %}
+        <a href="{% url 'paygo_detail' application.id %}" class="block border border-gray-200 bg-white p-5 hover:border-black">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">PayGo #{{ application.id }}</p>
+                    <h2 class="mt-1 text-xl font-black text-gray-950">{{ application.product.name }}</h2>
+                    <p class="mt-2 text-sm text-gray-600">Deposit K{{ application.deposit_required|floatformat:2 }} · {{ application.term_months }} month{{ application.term_months|pluralize }} · Balance K{{ application.outstanding_balance|floatformat:2 }}</p>
+                </div>
+                <span class="inline-flex self-start border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ application.get_status_display }}</span>
+            </div>
+        </a>
+        {% empty %}
+        <div class="border border-gray-200 bg-white p-8 text-center">
+            <h2 class="text-lg font-black text-gray-950">No PayGo requests yet</h2>
+            <p class="mt-2 text-sm text-gray-600">Eligible products will show an Apply for PayGo button on the product page.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
