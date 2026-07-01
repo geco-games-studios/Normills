@@ -169,6 +169,9 @@
                 {% if user.can_access_finance_admin %}
                 <a href="{% url 'finance_payouts' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Finance Payouts</a>
                 {% endif %}
+                {% if user.can_access_delivery_centre %}
+                <a href="{% url 'delivery_orders' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Delivery Centre</a>
+                {% endif %}
                 {% if user.can_access_platform_admin %}
                 <a href="{% url 'admin_dashboard' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Admin Dashboard</a>
                 {% endif %}

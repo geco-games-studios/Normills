@@ -88,6 +88,10 @@ class User(AbstractUser):
         return self.is_superuser or self.role == self.Role.FINANCE_ADMINISTRATOR
 
     @property
+    def can_access_delivery_centre(self):
+        return self.is_superuser or self.role == self.Role.DELIVERY_PARTNER
+
+    @property
     def can_access_moderation(self):
         return self.is_superuser or self.role in {self.Role.ADMINISTRATOR, self.Role.MODERATOR, self.Role.SUPPORT_OFFICER}
 

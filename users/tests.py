@@ -3,7 +3,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from .permissions import finance_admin_required, merchant_required, moderator_required, platform_admin_required
+from .permissions import delivery_partner_required, finance_admin_required, merchant_required, moderator_required, platform_admin_required
 
 
 class EmailOrPhoneBackendTests(TestCase):
@@ -75,6 +75,24 @@ class UserRoleTests(TestCase):
         self.assertTrue(moderator.can_access_moderation)
         self.assertFalse(moderator.can_access_finance_admin)
 
+    def test_delivery_partner_role_accesses_delivery_centre_only(self):
+        User = get_user_model()
+        delivery_partner = User.objects.create_user(
+            username='delivery',
+            password='password',
+            role=User.Role.DELIVERY_PARTNER,
+        )
+        merchant = User.objects.create_user(
+            username='merchant-user',
+            password='password',
+            role=User.Role.MERCHANT,
+        )
+
+        self.assertTrue(delivery_partner.can_access_delivery_centre)
+        self.assertFalse(delivery_partner.can_access_merchant_centre)
+        self.assertFalse(delivery_partner.can_access_finance_admin)
+        self.assertFalse(merchant.can_access_delivery_centre)
+
     def test_administrator_role_can_access_platform_admin(self):
         User = get_user_model()
         administrator = User.objects.create_user(
@@ -127,6 +145,14 @@ class RolePermissionDecoratorTests(TestCase):
 
         self.assertEqual(finance_admin_required(self._ok_view)(self._request_for(finance_user)).status_code, 200)
         self.assertEqual(finance_admin_required(self._ok_view)(self._request_for(moderator)).status_code, 403)
+
+    def test_delivery_partner_required_allows_only_delivery_scope(self):
+        User = get_user_model()
+        delivery_partner = User.objects.create_user(username='delivery', role=User.Role.DELIVERY_PARTNER)
+        merchant = User.objects.create_user(username='merchant', role=User.Role.MERCHANT)
+
+        self.assertEqual(delivery_partner_required(self._ok_view)(self._request_for(delivery_partner)).status_code, 200)
+        self.assertEqual(delivery_partner_required(self._ok_view)(self._request_for(merchant)).status_code, 403)
 
     def test_moderator_required_allows_support_scope(self):
         User = get_user_model()

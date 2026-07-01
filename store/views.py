@@ -34,7 +34,7 @@ from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
 from users.models import ClientProfile
-from users.permissions import finance_admin_required, merchant_required, platform_admin_required
+from users.permissions import delivery_partner_required, finance_admin_required, merchant_required, platform_admin_required
 from users.phone_verification import normalize_phone as normalize_account_phone, send_phone_verification_code
 
 import logging
@@ -1331,6 +1331,63 @@ def merchant_order_update(request, order_id):
         messages.error(request, 'Unknown order action.')
 
     return redirect(request.POST.get('next') or 'merchant_orders')
+
+
+def _delivery_orders_for_user(user):
+    return Order.objects.filter(
+        Q(status='dispatched') | Q(status='delivered', delivery_partner=user),
+        Q(delivery_partner__isnull=True) | Q(delivery_partner=user),
+    ).prefetch_related('items__product').select_related('delivery_partner', 'delivery_confirmed_by').order_by('-updated')
+
+
+@delivery_partner_required
+def delivery_orders(request):
+    orders = list(_delivery_orders_for_user(request.user))
+    available_orders = [order for order in orders if order.status == 'dispatched' and not order.delivery_partner_id]
+    assigned_orders = [order for order in orders if order.delivery_partner_id == request.user.id and order.status == 'dispatched']
+    completed_orders = [order for order in orders if order.delivery_partner_id == request.user.id and order.status == 'delivered']
+
+    return render(request, 'delivery_orders.html', {
+        'orders': orders,
+        'available_count': len(available_orders),
+        'assigned_count': len(assigned_orders),
+        'completed_count': len(completed_orders),
+    })
+
+
+@delivery_partner_required
+def delivery_order_update(request, order_id):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Delivery updates require POST.')
+
+    order = get_object_or_404(Order, id=order_id)
+    action = request.POST.get('action')
+
+    if action == 'claim':
+        if order.status != 'dispatched':
+            messages.error(request, f'Order #{order.id} is not ready for delivery.')
+        elif order.delivery_partner_id and order.delivery_partner_id != request.user.id:
+            messages.error(request, f'Order #{order.id} is already assigned.')
+        else:
+            order.delivery_partner = request.user
+            order.save(update_fields=['delivery_partner'])
+            messages.success(request, f'Order #{order.id} assigned to you.')
+    elif action == 'mark_delivered':
+        if order.delivery_partner_id != request.user.id:
+            messages.error(request, f'Claim order #{order.id} before marking it delivered.')
+        elif order.status != 'dispatched':
+            messages.error(request, f'Order #{order.id} cannot be marked delivered from its current status.')
+        else:
+            order.status = 'delivered'
+            order.delivered_at = timezone.now()
+            order.delivery_confirmed_by = request.user
+            order.delivery_notes = (request.POST.get('delivery_notes') or order.delivery_notes or '').strip()
+            order.save(update_fields=['status', 'delivered_at', 'delivery_confirmed_by', 'delivery_notes'])
+            messages.success(request, f'Order #{order.id} marked as delivered.')
+    else:
+        messages.error(request, 'Choose a valid delivery action.')
+
+    return redirect('delivery_orders')
 
 
 @merchant_required

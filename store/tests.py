@@ -86,6 +86,16 @@ class MerchantDashboardTests(TestCase):
             password='password',
             role=User.Role.FINANCE_ADMINISTRATOR,
         )
+        self.delivery_user = User.objects.create_user(
+            username='delivery',
+            password='password',
+            role=User.Role.DELIVERY_PARTNER,
+        )
+        self.other_delivery_user = User.objects.create_user(
+            username='other-delivery',
+            password='password',
+            role=User.Role.DELIVERY_PARTNER,
+        )
         self.owner_profile = self.merchant_user.store_owner_profile
         self.owner_profile.store_name = 'Merchant Store'
         self.owner_profile.phone_number = '260977123456'
@@ -921,6 +931,75 @@ class MerchantDashboardTests(TestCase):
         self.assertRedirects(response, reverse('merchant_orders'))
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, 'paid')
+
+    def test_customer_cannot_access_delivery_orders(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('delivery_orders'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_delivery_partner_can_claim_dispatched_order(self):
+        self.order.status = 'dispatched'
+        self.order.dispatch_reference = 'Courier-123'
+        self.order.save(update_fields=['status', 'dispatch_reference'])
+        self.client.force_login(self.delivery_user)
+
+        response = self.client.get(reverse('delivery_orders'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Order #')
+        self.assertContains(response, 'Claim delivery')
+        self.assertContains(response, 'Courier-123')
+
+        response = self.client.post(reverse('delivery_order_update', args=[self.order.id]), {
+            'action': 'claim',
+        })
+
+        self.assertRedirects(response, reverse('delivery_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.delivery_partner, self.delivery_user)
+        self.assertEqual(self.order.status, 'dispatched')
+
+    def test_delivery_partner_can_mark_assigned_order_delivered_and_release_payout(self):
+        self.order.status = 'dispatched'
+        self.order.dispatch_reference = 'Courier-123'
+        self.order.delivery_partner = self.delivery_user
+        self.order.save(update_fields=['status', 'dispatch_reference', 'delivery_partner'])
+        self.client.force_login(self.delivery_user)
+
+        response = self.client.post(reverse('delivery_order_update', args=[self.order.id]), {
+            'action': 'mark_delivered',
+            'delivery_notes': 'Handed to Customer One.',
+        })
+
+        self.assertRedirects(response, reverse('delivery_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'delivered')
+        self.assertIsNotNone(self.order.delivered_at)
+        self.assertEqual(self.order.delivery_confirmed_by, self.delivery_user)
+        self.assertEqual(self.order.delivery_notes, 'Handed to Customer One.')
+
+        self.client.force_login(self.merchant_user)
+        self.client.get(reverse('merchant_payouts'))
+        payout = MerchantPayout.objects.get(order_item__order=self.order)
+        self.assertEqual(payout.status, 'ready')
+
+    def test_delivery_partner_cannot_complete_unassigned_order(self):
+        self.order.status = 'dispatched'
+        self.order.save(update_fields=['status'])
+        self.client.force_login(self.other_delivery_user)
+
+        response = self.client.post(reverse('delivery_order_update', args=[self.order.id]), {
+            'action': 'mark_delivered',
+            'delivery_notes': 'Attempted by another rider.',
+        })
+
+        self.assertRedirects(response, reverse('delivery_orders'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'dispatched')
+        self.assertIsNone(self.order.delivered_at)
+        self.assertEqual(self.order.delivery_notes, '')
 
     def test_merchant_cannot_update_another_store_order(self):
         other_product = Product.objects.get(slug='other-phone')

@@ -33,6 +33,11 @@ finance_admin_required = role_required(
     'Financial administrator access only.',
 )
 
+delivery_partner_required = role_required(
+    lambda user: getattr(user, 'can_access_delivery_centre', False),
+    'Delivery partner access only.',
+)
+
 moderator_required = role_required(
     lambda user: getattr(user, 'can_access_moderation', False),
     'Moderator or support access only.',

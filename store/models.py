@@ -359,6 +359,21 @@ class Order(models.Model):
     stock_deducted_at = models.DateTimeField(null=True, blank=True)
     dispatch_reference = models.CharField(max_length=120, blank=True)
     fulfillment_notes = models.TextField(blank=True)
+    delivery_partner = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_deliveries',
+    )
+    delivery_confirmed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='confirmed_deliveries',
+    )
+    delivery_notes = models.TextField(blank=True)
 
     class Meta:
         ordering = ['-created']

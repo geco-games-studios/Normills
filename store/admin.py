@@ -155,13 +155,15 @@ class OrderAdmin(admin.ModelAdmin):
         'admin_payment_status',
         'payment_confirmed',
         'delivery_method',
+        'delivery_partner',
+        'delivered_at',
         'lenco_status',
         'payment_reference',
         'created',
         'total',
     ]
-    list_filter = ['status', 'payment_method', 'payment_status', 'payment_confirmed', 'delivery_method', 'created']
-    search_fields = ['id', 'email', 'phone', 'payment_reference', 'transaction_id']
+    list_filter = ['status', 'payment_method', 'payment_status', 'payment_confirmed', 'delivery_method', 'delivery_partner', 'created']
+    search_fields = ['id', 'email', 'phone', 'payment_reference', 'transaction_id', 'dispatch_reference', 'delivery_notes']
     readonly_fields = ['created', 'updated', 'payment_reference', 'payment_details', 'stock_deducted_at']
     actions = ['refresh_lenco_payment_status']
     inlines = [OrderItemInline]
