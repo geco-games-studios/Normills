@@ -1,9 +1,11 @@
 import json
 import logging
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import quote
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from manager.models import Store
@@ -12,6 +14,7 @@ from .sms_client import SMSClient
 
 logger = logging.getLogger(__name__)
 MONEY_PLACES = Decimal('0.01')
+ONE_HUNDRED = Decimal('100.00')
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -92,6 +95,10 @@ class Product(models.Model):
     publication_status = models.CharField(max_length=20, choices=PUBLICATION_STATUS_CHOICES, default='published')
     available = models.BooleanField(default=True)
     show_selling_fast = models.BooleanField(default=False)
+    paygo_eligible = models.BooleanField(default=False)
+    paygo_min_deposit_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('20.00'))
+    paygo_term_months = models.PositiveSmallIntegerField(default=3)
+    paygo_credit_improvement_points = models.PositiveSmallIntegerField(default=0)
     season = models.CharField(max_length=20, choices=SEASON_CHOICES, blank=True, null=True)
     fabric = models.CharField(max_length=20, choices=FABRIC_CHOICES, blank=True, null=True)
     color = models.CharField(max_length=20, choices=COLOR_CHOICES, blank=True, null=True)
@@ -116,6 +123,21 @@ class Product(models.Model):
     @property
     def is_published(self):
         return self.publication_status == 'published'
+
+    @property
+    def paygo_is_available(self):
+        return self.paygo_eligible and self.available and self.is_published and self.stock > 0 and self.price > 0
+
+    @property
+    def paygo_min_deposit_amount(self):
+        return (self.price * self.paygo_min_deposit_percent / ONE_HUNDRED).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+
+    @property
+    def paygo_estimated_installment(self):
+        if not self.paygo_term_months:
+            return Decimal('0.00')
+        financed_amount = max(self.price - self.paygo_min_deposit_amount, Decimal('0.00'))
+        return (financed_amount / Decimal(self.paygo_term_months)).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
 
 
 class ProductImage(models.Model):
@@ -617,6 +639,188 @@ class MerchantPayout(models.Model):
                 'paid_at',
                 'updated_at',
             ])
+
+
+class PayGoApplication(models.Model):
+    STATUS_CHOICES = (
+        ('submitted', 'Submitted'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('active', 'Active'),
+        ('in_arrears', 'In arrears'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='paygo_applications')
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='paygo_applications')
+    order = models.OneToOneField(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='paygo_application')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
+    requested_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    term_months = models.PositiveSmallIntegerField(default=0)
+    outstanding_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    missed_payment_count = models.PositiveSmallIntegerField(default=0)
+    credit_score_before = models.PositiveSmallIntegerField(null=True, blank=True)
+    credit_score_after = models.PositiveSmallIntegerField(null=True, blank=True)
+    credit_points_awarded = models.PositiveSmallIntegerField(default=0)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_paygo_applications')
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"PayGo #{self.id or 'new'} - {self.product.name}"
+
+    def clean(self):
+        if self.status in {'submitted', 'approved', 'active'} and not self.product.paygo_is_available:
+            raise ValidationError({'product': 'This product is not currently eligible for PayGo.'})
+        if self.deposit_paid < 0:
+            raise ValidationError({'deposit_paid': 'Deposit paid cannot be negative.'})
+        if self.deposit_required < 0:
+            raise ValidationError({'deposit_required': 'Deposit required cannot be negative.'})
+        if self.requested_price < 0:
+            raise ValidationError({'requested_price': 'Requested price cannot be negative.'})
+        effective_term_months = self.term_months or self.product.paygo_term_months
+        if effective_term_months < 1:
+            raise ValidationError({'term_months': 'PayGo term must be at least one month.'})
+
+    def save(self, *args, **kwargs):
+        if not self.requested_price:
+            self.requested_price = self.product.price
+        if not self.deposit_required:
+            self.deposit_required = self.product.paygo_min_deposit_amount
+        if not self.term_months:
+            self.term_months = self.product.paygo_term_months
+        if not self.outstanding_balance:
+            self.recalculate_balance(save=False)
+        super().save(*args, **kwargs)
+
+    def approve(self, user, note=''):
+        self.status = 'approved'
+        self.approved_by = user
+        self.decided_at = timezone.now()
+        self.decision_note = note
+        self.credit_points_awarded = self.product.paygo_credit_improvement_points
+        self.save(update_fields=[
+            'status',
+            'approved_by',
+            'decided_at',
+            'decision_note',
+            'credit_points_awarded',
+            'updated_at',
+        ])
+
+    def reject(self, user, note=''):
+        self.status = 'rejected'
+        self.approved_by = user
+        self.decided_at = timezone.now()
+        self.decision_note = note
+        self.save(update_fields=['status', 'approved_by', 'decided_at', 'decision_note', 'updated_at'])
+
+    def activate_after_deposit(self, order=None):
+        if self.deposit_paid < self.deposit_required:
+            raise ValidationError('PayGo deposit must be paid before activation.')
+        self.status = 'active'
+        if order is not None:
+            self.order = order
+        self.recalculate_balance(save=False)
+        self.save(update_fields=['status', 'order', 'outstanding_balance', 'updated_at'])
+
+    def recalculate_balance(self, save=True):
+        paid_repayments = (
+            sum(repayment.amount_paid for repayment in self.repayments.filter(status='paid'))
+            if self.pk
+            else Decimal('0.00')
+        )
+        total_paid = self.deposit_paid + paid_repayments
+        self.outstanding_balance = max(self.requested_price - total_paid, Decimal('0.00')).quantize(
+            MONEY_PLACES,
+            rounding=ROUND_HALF_UP,
+        )
+        self.missed_payment_count = self.repayments.filter(status='missed').count() if self.pk else 0
+        if self.outstanding_balance == Decimal('0.00') and self.status in {'active', 'in_arrears'}:
+            self.status = 'completed'
+            self.credit_score_after = (
+                self.credit_score_before + self.credit_points_awarded
+                if self.credit_score_before is not None
+                else None
+            )
+        elif self.missed_payment_count and self.status == 'active':
+            self.status = 'in_arrears'
+        if save:
+            self.save(update_fields=[
+                'outstanding_balance',
+                'missed_payment_count',
+                'status',
+                'credit_score_after',
+                'updated_at',
+            ])
+
+    def create_repayment_schedule(self, first_due_date):
+        PayGoRepayment.objects.filter(application=self).delete()
+        financed_amount = max(self.requested_price - self.deposit_required, Decimal('0.00'))
+        monthly_amount = (financed_amount / Decimal(self.term_months)).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+        repayments = []
+        for sequence in range(1, self.term_months + 1):
+            repayments.append(PayGoRepayment(
+                application=self,
+                sequence=sequence,
+                due_date=first_due_date + timedelta(days=30 * (sequence - 1)),
+                amount_due=monthly_amount,
+            ))
+        return PayGoRepayment.objects.bulk_create(repayments)
+
+
+class PayGoRepayment(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('missed', 'Missed'),
+        ('waived', 'Waived'),
+    )
+
+    application = models.ForeignKey(PayGoApplication, on_delete=models.CASCADE, related_name='repayments')
+    sequence = models.PositiveSmallIntegerField()
+    due_date = models.DateField()
+    amount_due = models.DecimalField(max_digits=10, decimal_places=2)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    paid_at = models.DateTimeField(null=True, blank=True)
+    reference = models.CharField(max_length=120, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['application', 'sequence']
+        unique_together = ('application', 'sequence')
+
+    def __str__(self):
+        return f"PayGo #{self.application_id} repayment {self.sequence}"
+
+    @property
+    def outstanding_amount(self):
+        return max(self.amount_due - self.amount_paid, Decimal('0.00')).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+
+    def mark_paid(self, amount=None, reference=''):
+        self.amount_paid = amount if amount is not None else self.amount_due
+        self.reference = reference or self.reference
+        self.status = 'paid'
+        self.paid_at = timezone.now()
+        self.save(update_fields=['amount_paid', 'reference', 'status', 'paid_at', 'updated_at'])
+        self.application.recalculate_balance()
+
+    def mark_missed(self, note=''):
+        self.status = 'missed'
+        self.note = note or self.note
+        self.save(update_fields=['status', 'note', 'updated_at'])
+        self.application.recalculate_balance()
 
 
 class PayoutBatch(models.Model):

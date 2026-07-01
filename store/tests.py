@@ -2,6 +2,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -18,6 +19,7 @@ from .payment import (
     process_lenco_payment,
 )
 from .models import Category, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductImage
+from .models import PayGoApplication, PayGoRepayment
 
 
 class LencoPaymentHelperTests(SimpleTestCase):
@@ -1087,3 +1089,120 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(response.status_code, 404)
         other_order.refresh_from_db()
         self.assertEqual(other_order.status, 'paid')
+
+
+class PayGoModelTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.customer = User.objects.create_user(username='paygo-customer', password='password')
+        self.finance_user = User.objects.create_user(
+            username='paygo-finance',
+            password='password',
+            role=User.Role.FINANCE_ADMINISTRATOR,
+        )
+        self.merchant_user = User.objects.create_user(
+            username='paygo-merchant',
+            password='password',
+            role=User.Role.MERCHANT,
+            is_store_owner=True,
+        )
+        owner_profile = self.merchant_user.store_owner_profile
+        owner_profile.store_name = 'PayGo Merchant'
+        owner_profile.phone_number = '260977123456'
+        owner_profile.address = 'Mazabuka'
+        owner_profile.save()
+        self.store = Store.objects.create(
+            name='PayGo Merchant',
+            slug='paygo-merchant',
+            owner=owner_profile,
+        )
+        self.category = Category.objects.create(name='PayGo Phones', slug='paygo-phones')
+        self.product = Product.objects.create(
+            name='PayGo Phone',
+            slug='paygo-phone',
+            category=self.category,
+            store=self.store,
+            price=Decimal('1200.00'),
+            image='products/paygo-phone.jpg',
+            stock=5,
+            paygo_eligible=True,
+            paygo_min_deposit_percent=Decimal('25.00'),
+            paygo_term_months=6,
+            paygo_credit_improvement_points=12,
+        )
+
+    def test_product_paygo_terms_calculate_deposit_and_installment(self):
+        self.assertTrue(self.product.paygo_is_available)
+        self.assertEqual(self.product.paygo_min_deposit_amount, Decimal('300.00'))
+        self.assertEqual(self.product.paygo_estimated_installment, Decimal('150.00'))
+
+    def test_paygo_application_defaults_from_product_terms(self):
+        application = PayGoApplication.objects.create(
+            product=self.product,
+            customer=self.customer,
+            credit_score_before=520,
+        )
+
+        self.assertEqual(application.requested_price, Decimal('1200.00'))
+        self.assertEqual(application.deposit_required, Decimal('300.00'))
+        self.assertEqual(application.term_months, 6)
+        self.assertEqual(application.outstanding_balance, Decimal('1200.00'))
+        self.assertEqual(application.status, 'submitted')
+
+    def test_paygo_application_rejects_ineligible_product(self):
+        self.product.paygo_eligible = False
+        self.product.save(update_fields=['paygo_eligible'])
+        application = PayGoApplication(product=self.product, customer=self.customer)
+
+        with self.assertRaises(ValidationError):
+            application.full_clean()
+
+    def test_paygo_approval_activation_and_schedule(self):
+        application = PayGoApplication.objects.create(
+            product=self.product,
+            customer=self.customer,
+            credit_score_before=520,
+        )
+
+        application.approve(self.finance_user, note='Approved for MVP manual review.')
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'approved')
+        self.assertEqual(application.approved_by, self.finance_user)
+        self.assertEqual(application.credit_points_awarded, 12)
+
+        application.deposit_paid = Decimal('300.00')
+        application.activate_after_deposit()
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'active')
+        self.assertEqual(application.outstanding_balance, Decimal('900.00'))
+
+        repayments = application.create_repayment_schedule(timezone.localdate())
+        self.assertEqual(len(repayments), 6)
+        self.assertEqual(PayGoRepayment.objects.filter(application=application).count(), 6)
+        self.assertEqual(application.repayments.first().amount_due, Decimal('150.00'))
+
+    def test_paygo_missed_and_completed_repayments_update_health(self):
+        application = PayGoApplication.objects.create(
+            product=self.product,
+            customer=self.customer,
+            credit_score_before=520,
+            deposit_paid=Decimal('300.00'),
+        )
+        application.approve(self.finance_user)
+        application.activate_after_deposit()
+        application.create_repayment_schedule(timezone.localdate())
+
+        first_repayment = application.repayments.first()
+        first_repayment.mark_missed('Customer missed first due date.')
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'in_arrears')
+        self.assertEqual(application.missed_payment_count, 1)
+
+        first_repayment.mark_paid(reference='PAYGO-001')
+        for repayment in application.repayments.exclude(id=first_repayment.id):
+            repayment.mark_paid()
+
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'completed')
+        self.assertEqual(application.outstanding_balance, Decimal('0.00'))
+        self.assertEqual(application.credit_score_after, 532)

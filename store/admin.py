@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -110,9 +110,9 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'subcategory', 'brand', 'price', 'stock', 'offline_stock', 'low_stock_threshold', 'available', 'show_selling_fast', 'created', 'updated']
-    list_filter = ['available', 'show_selling_fast', 'created', 'updated', 'category', 'brand']
-    list_editable = ['subcategory', 'price', 'stock', 'offline_stock', 'low_stock_threshold', 'available', 'show_selling_fast']
+    list_display = ['name', 'category', 'subcategory', 'brand', 'price', 'stock', 'offline_stock', 'low_stock_threshold', 'available', 'show_selling_fast', 'paygo_eligible', 'paygo_min_deposit_percent', 'paygo_term_months', 'created', 'updated']
+    list_filter = ['available', 'show_selling_fast', 'paygo_eligible', 'created', 'updated', 'category', 'brand']
+    list_editable = ['subcategory', 'price', 'stock', 'offline_stock', 'low_stock_threshold', 'available', 'show_selling_fast', 'paygo_eligible', 'paygo_min_deposit_percent', 'paygo_term_months']
     prepopulated_fields = {'slug': ('name',)}
     inlines = [ProductVariantInline, ProductImageInline]
 
@@ -283,6 +283,43 @@ class PayoutBatchAdmin(admin.ModelAdmin):
     list_filter = ['paid_at', 'created_at', 'processed_by']
     search_fields = ['reference', 'note', 'processed_by__username']
     readonly_fields = ['reference', 'processed_by', 'gross_total', 'platform_fee_total', 'net_total', 'note', 'paid_at', 'created_at']
+
+
+class PayGoRepaymentInline(admin.TabularInline):
+    model = PayGoRepayment
+    extra = 0
+    readonly_fields = ['created_at', 'updated_at', 'paid_at']
+
+
+@admin.register(PayGoApplication)
+class PayGoApplicationAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'customer',
+        'product',
+        'status',
+        'requested_price',
+        'deposit_required',
+        'deposit_paid',
+        'term_months',
+        'outstanding_balance',
+        'missed_payment_count',
+        'approved_by',
+        'decided_at',
+        'created_at',
+    ]
+    list_filter = ['status', 'created_at', 'decided_at', 'product__store']
+    search_fields = ['id', 'customer__username', 'customer__email', 'product__name', 'decision_note']
+    readonly_fields = ['created_at', 'updated_at', 'decided_at', 'outstanding_balance', 'missed_payment_count']
+    inlines = [PayGoRepaymentInline]
+
+
+@admin.register(PayGoRepayment)
+class PayGoRepaymentAdmin(admin.ModelAdmin):
+    list_display = ['application', 'sequence', 'due_date', 'amount_due', 'amount_paid', 'outstanding_amount', 'status', 'paid_at']
+    list_filter = ['status', 'due_date', 'paid_at']
+    search_fields = ['application__id', 'application__customer__username', 'reference', 'note']
+    readonly_fields = ['created_at', 'updated_at', 'paid_at']
 
 
 @admin.register(StockAdjustment)
