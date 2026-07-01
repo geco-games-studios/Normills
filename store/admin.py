@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment, DealRequest
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -321,6 +321,14 @@ class PayGoRepaymentAdmin(admin.ModelAdmin):
     list_filter = ['status', 'due_date', 'paid_at']
     search_fields = ['application__id', 'application__customer__username', 'reference', 'note']
     readonly_fields = ['created_at', 'updated_at', 'paid_at']
+
+
+@admin.register(DealRequest)
+class DealRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'customer', 'product', 'store', 'offered_price', 'quantity', 'status', 'agreed_price', 'responded_by', 'converted_order', 'updated_at']
+    list_filter = ['status', 'store', 'created_at', 'updated_at']
+    search_fields = ['id', 'customer__username', 'product__name', 'customer_terms', 'merchant_response', 'agreed_terms']
+    readonly_fields = ['created_at', 'updated_at', 'responded_at', 'converted_order']
 
 
 @admin.register(StockAdjustment)

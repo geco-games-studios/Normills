@@ -22,6 +22,9 @@
                 
                 <div class="ml-4 flex-1">
                     <h2 class="text-lg font-medium text-gray-900">{{ item.product.name }}</h2>
+                    {% if item.source_deal %}
+                    <p class="mt-1 inline-flex border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">Deal #{{ item.source_deal.id }} at K{{ item.negotiated_price|floatformat:2 }} each</p>
+                    {% endif %}
                     
                     {% if item.variant %}
                     <p class="mt-1 text-sm text-gray-500">

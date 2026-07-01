@@ -12,6 +12,7 @@
         </div>
         <div class="flex flex-col gap-2 sm:flex-row">
             <a href="{% url 'merchant_orders' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Orders</a>
+            <a href="{% url 'merchant_deals' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Deals</a>
             <a href="{% url 'merchant_payouts' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Payouts</a>
             <a href="{% url 'merchant_product_create' %}" class="inline-flex items-center justify-center bg-black px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Add product</a>
             <a href="{% url 'home' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">View storefront</a>
@@ -42,6 +43,10 @@
         <div class="border border-gray-200 bg-white p-4">
             <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Ready payout</p>
             <p class="mt-3 text-3xl font-black text-gray-950">K{{ ready_for_payout|floatformat:2 }}</p>
+        </div>
+        <div class="border border-gray-200 bg-white p-4">
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Open deals</p>
+            <p class="mt-3 text-3xl font-black text-gray-950">{{ open_deal_count }}</p>
         </div>
     </section>
 
@@ -80,6 +85,42 @@
             {% else %}
             <div class="mt-4 border border-dashed border-gray-300 p-6 text-center">
                 <p class="text-sm font-bold text-gray-700">No store orders yet.</p>
+            </div>
+            {% endif %}
+
+            <div class="flex items-center justify-between gap-4">
+                <h2 class="mt-8 text-lg font-black uppercase tracking-[.12em] text-gray-950">Recent deals</h2>
+                <a href="{% url 'merchant_deals' %}" class="text-xs font-black uppercase tracking-[.12em] text-gray-700 underline">View all</a>
+            </div>
+
+            {% if recent_deals %}
+            <div class="mt-4 overflow-x-auto border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-left text-xs font-black uppercase tracking-[.14em] text-gray-500">
+                        <tr>
+                            <th class="px-4 py-3">Deal</th>
+                            <th class="px-4 py-3">Product</th>
+                            <th class="px-4 py-3">Offer</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                        {% for deal in recent_deals %}
+                        <tr>
+                            <td class="px-4 py-4 font-bold text-gray-950">#{{ deal.id }}</td>
+                            <td class="px-4 py-4 text-gray-600">{{ deal.product.name }}</td>
+                            <td class="px-4 py-4 text-gray-900">K{{ deal.offered_price|floatformat:2 }}</td>
+                            <td class="px-4 py-4">{{ deal.get_status_display }}</td>
+                            <td class="px-4 py-4"><a href="{% url 'merchant_deal_detail' deal.id %}" class="text-xs font-black uppercase tracking-[.12em] text-gray-700 underline">Review</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="mt-4 border border-dashed border-gray-300 p-6 text-center">
+                <p class="text-sm font-bold text-gray-700">No open deals yet.</p>
             </div>
             {% endif %}
 

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Start Deal - {{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl">
+    <a href="{% url 'product_detail' product.slug %}" class="text-sm font-bold text-gray-600 underline">Back to product</a>
+    <div class="mt-6 grid gap-8 lg:grid-cols-[1fr_1.1fr]">
+        <section class="border border-gray-200 bg-white p-5">
+            <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Start Deal</p>
+            <h1 class="mt-2 text-2xl font-black text-gray-950">{{ product.name }}</h1>
+            <p class="mt-2 text-xl font-black text-gray-950">Listed at K{{ product.price|floatformat:2 }}</p>
+            <p class="mt-4 text-sm leading-6 text-gray-700">Send the merchant an offer. If they accept or counter, the agreed deal can be moved into checkout.</p>
+        </section>
+
+        <section class="border border-gray-200 bg-white p-5">
+            <h2 class="text-lg font-black text-gray-950">Send offer</h2>
+            <form method="post" class="mt-5 space-y-5">
+                {% csrf_token %}
+                {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}" class="block text-sm font-bold text-gray-900">{{ field.label }}</label>
+                    <div class="mt-2">{{ field }}</div>
+                    {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
+                    {% if field.errors %}<p class="mt-2 text-sm text-red-700">{{ field.errors|striptags }}</p>{% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="w-full bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Send Deal Request</button>
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}

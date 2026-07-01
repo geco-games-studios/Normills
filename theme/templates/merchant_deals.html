@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Merchant Deals | Normils{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Merchant Centre</p>
+            <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">Deals</h1>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Review customer offers, respond with terms, and make accepted deals checkout-ready.</p>
+        </div>
+        <a href="{% url 'merchant_dashboard' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Dashboard</a>
+    </div>
+
+    <section class="mt-6 overflow-x-auto border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50 text-left text-xs font-black uppercase tracking-[.14em] text-gray-500">
+                <tr>
+                    <th class="px-4 py-3">Deal</th>
+                    <th class="px-4 py-3">Product</th>
+                    <th class="px-4 py-3">Customer</th>
+                    <th class="px-4 py-3">Offer</th>
+                    <th class="px-4 py-3">Agreed</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 bg-white">
+                {% for deal in deals %}
+                <tr>
+                    <td class="px-4 py-4 font-bold text-gray-950">#{{ deal.id }}</td>
+                    <td class="px-4 py-4 text-gray-600">{{ deal.product.name }}</td>
+                    <td class="px-4 py-4 text-gray-600">{{ deal.customer.get_full_name|default:deal.customer.username }}</td>
+                    <td class="px-4 py-4 text-gray-900">K{{ deal.offered_price|floatformat:2 }}</td>
+                    <td class="px-4 py-4 text-gray-900">{% if deal.agreed_price %}K{{ deal.agreed_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td class="px-4 py-4">{{ deal.get_status_display }}</td>
+                    <td class="px-4 py-4"><a href="{% url 'merchant_deal_detail' deal.id %}" class="text-xs font-black uppercase tracking-[.12em] text-gray-700 underline">Review</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No deals yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+{% endblock %}

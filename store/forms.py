@@ -1,5 +1,6 @@
 import re
 from io import BytesIO
+from decimal import Decimal
 from django import forms
 from django.core.files.base import ContentFile
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
@@ -8,7 +9,7 @@ from django.utils.text import slugify
 from PIL import Image
 from users.models import User
 from users.phone_verification import normalize_phone
-from .models import Brand, Category, Order, PayGoApplication, Product
+from .models import Brand, Category, DealRequest, Order, PayGoApplication, Product
 
 
 MAX_PRODUCT_IMAGE_SIZE = 8 * 1024 * 1024
@@ -293,3 +294,74 @@ class PayGoApplicationForm(forms.ModelForm):
         if len(''.join(ch for ch in phone if ch.isdigit())) < 9:
             raise forms.ValidationError('Enter a reachable phone number for the PayGo review.')
         return phone
+
+
+class DealRequestForm(forms.ModelForm):
+    class Meta:
+        model = DealRequest
+        fields = ('offered_price', 'quantity', 'customer_terms')
+        labels = {
+            'offered_price': 'Your offer',
+            'customer_terms': 'Terms or note to merchant',
+        }
+        widgets = {
+            'customer_terms': forms.Textarea(attrs={'rows': 4}),
+        }
+
+    def __init__(self, *args, product=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.product = product
+        self.fields['quantity'].min_value = 1
+        self.fields['offered_price'].min_value = Decimal('0.01')
+        if product is not None:
+            self.fields['offered_price'].initial = product.price
+            self.fields['quantity'].max_value = product.stock
+            self.fields['quantity'].help_text = f"{product.stock} available online."
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                'class',
+                'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
+            )
+
+    def clean_quantity(self):
+        quantity = self.cleaned_data.get('quantity') or 1
+        if self.product is not None and quantity > self.product.stock:
+            raise forms.ValidationError(f"Only {self.product.stock} available online.")
+        return quantity
+
+
+class MerchantDealResponseForm(forms.ModelForm):
+    action = forms.ChoiceField(choices=(('accept', 'Accept'), ('counter', 'Counter'), ('reject', 'Reject')))
+
+    class Meta:
+        model = DealRequest
+        fields = ('action', 'agreed_price', 'agreed_terms', 'merchant_response')
+        labels = {
+            'agreed_price': 'Agreed price',
+            'agreed_terms': 'Agreed terms',
+            'merchant_response': 'Merchant response',
+        }
+        widgets = {
+            'agreed_terms': forms.Textarea(attrs={'rows': 3}),
+            'merchant_response': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['agreed_price'].required = False
+        self.fields['agreed_price'].min_value = Decimal('0.01')
+        self.fields['agreed_terms'].required = False
+        self.fields['merchant_response'].required = False
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                'class',
+                'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        action = cleaned_data.get('action')
+        agreed_price = cleaned_data.get('agreed_price')
+        if action in {'accept', 'counter'} and not agreed_price:
+            self.add_error('agreed_price', 'Enter the agreed price for this deal.')
+        return cleaned_data

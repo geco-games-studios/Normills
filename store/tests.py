@@ -18,7 +18,7 @@ from .payment import (
     normalize_lenco_response,
     process_lenco_payment,
 )
-from .models import Category, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductImage
+from .models import Cart, Category, DealRequest, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductImage
 from .models import PayGoApplication, PayGoRepayment
 
 
@@ -221,6 +221,107 @@ class MerchantDashboardTests(TestCase):
         self.assertContains(response, 'delivery')
         self.assertContains(response, 'Delivered at')
         self.assertContains(response, 'Handed to Customer One.')
+
+    def test_product_detail_shows_start_deal_cta(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('product_detail', args=[self.product.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Start Deal')
+        self.assertContains(response, 'Negotiate before checkout')
+
+    def test_customer_can_submit_deal_request(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.post(reverse('deal_start', args=[self.product.slug]), {
+            'offered_price': '2200.00',
+            'quantity': '1',
+            'customer_terms': 'Can collect this afternoon if accepted.',
+        })
+
+        deal = DealRequest.objects.get(customer=self.customer, product=self.product)
+        self.assertRedirects(response, reverse('deal_detail', args=[deal.id]))
+        self.assertEqual(deal.status, 'requested')
+        self.assertEqual(deal.store, self.store)
+        self.assertEqual(deal.offered_price, Decimal('2200.00'))
+        self.assertEqual(deal.customer_terms, 'Can collect this afternoon if accepted.')
+
+    def test_merchant_can_accept_deal_request(self):
+        deal = DealRequest.objects.create(
+            product=self.product,
+            customer=self.customer,
+            store=self.store,
+            offered_price=Decimal('2200.00'),
+            quantity=1,
+            customer_terms='Can collect this afternoon if accepted.',
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_deal_detail', args=[deal.id]), {
+            'action': 'accept',
+            'agreed_price': '2200.00',
+            'agreed_terms': 'Collect today before 17:00.',
+            'merchant_response': 'Accepted.',
+        })
+
+        self.assertRedirects(response, reverse('merchant_deal_detail', args=[deal.id]))
+        deal.refresh_from_db()
+        self.assertEqual(deal.status, 'accepted')
+        self.assertEqual(deal.agreed_price, Decimal('2200.00'))
+        self.assertEqual(deal.agreed_terms, 'Collect today before 17:00.')
+        self.assertEqual(deal.responded_by, self.merchant_user)
+
+    def test_customer_can_convert_accepted_deal_to_checkout_cart(self):
+        deal = DealRequest.objects.create(
+            product=self.product,
+            customer=self.customer,
+            store=self.store,
+            offered_price=Decimal('2200.00'),
+            quantity=1,
+            customer_terms='Can collect this afternoon if accepted.',
+        )
+        deal.accept(self.merchant_user, agreed_price=Decimal('2200.00'), agreed_terms='Collect today before 17:00.')
+        self.client.force_login(self.customer)
+
+        response = self.client.post(reverse('deal_convert_to_checkout', args=[deal.id]))
+
+        self.assertRedirects(response, reverse('checkout'))
+        cart = Cart.objects.get(user=self.customer)
+        cart_item = cart.items.get(source_deal=deal)
+        self.assertEqual(cart_item.negotiated_price, Decimal('2200.00'))
+        self.assertEqual(cart_item.subtotal, Decimal('2200.00'))
+
+    def test_checkout_converts_accepted_deal_to_order_with_agreed_price(self):
+        deal = DealRequest.objects.create(
+            product=self.product,
+            customer=self.customer,
+            store=self.store,
+            offered_price=Decimal('2200.00'),
+            quantity=1,
+            customer_terms='Can collect this afternoon if accepted.',
+        )
+        deal.accept(self.merchant_user, agreed_price=Decimal('2200.00'), agreed_terms='Collect today before 17:00.')
+        self.client.force_login(self.customer)
+        self.client.post(reverse('deal_convert_to_checkout', args=[deal.id]))
+
+        response = self.client.post(reverse('checkout'), {
+            'first_name': 'Customer',
+            'last_name': 'One',
+            'email': 'customer@example.com',
+            'phone': '260977000000',
+            'delivery_method': 'pickup',
+            'payment_method': 'cash',
+        }, HTTP_ACCEPT='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        deal.refresh_from_db()
+        self.assertEqual(deal.status, 'converted')
+        self.assertIsNotNone(deal.converted_order)
+        order_item = deal.converted_order.items.get()
+        self.assertEqual(order_item.price, Decimal('2200.00'))
+        self.assertIn(f'Deal #{deal.id}', order_item.variant_info)
+        self.assertEqual(deal.converted_order.subtotal, Decimal('2200.00'))
 
     def test_merchant_can_access_own_dashboard_summary(self):
         self.client.force_login(self.merchant_user)

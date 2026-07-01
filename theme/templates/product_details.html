@@ -33,6 +33,17 @@
             {% endif %}
         </div>
         {% endif %}
+
+        <div class="mt-5 border border-gray-200 bg-white p-4">
+            <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Start Deal</p>
+            <h2 class="mt-1 text-lg font-black text-gray-950">Negotiate before checkout</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-700">Send the merchant an offer for price or terms before you pay.</p>
+            {% if active_deal %}
+            <a href="{% url 'deal_detail' active_deal.id %}" class="mt-4 inline-flex w-full items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">View Deal</a>
+            {% else %}
+            <a href="{% url 'deal_start' product.slug %}" class="mt-4 inline-flex w-full items-center justify-center border border-black px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-950">Start Deal</a>
+            {% endif %}
+        </div>
         
         {% if product.description %}
         <div class="mt-4 text-gray-700">

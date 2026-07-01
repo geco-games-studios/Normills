@@ -23,9 +23,9 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication, DealRequest
 from .ml import recommend_products_from_context
-from .forms import CustomUserCreationForm, CheckoutForm, MerchantProductForm, PayGoApplicationForm, prepare_product_image
+from .forms import CustomUserCreationForm, CheckoutForm, DealRequestForm, MerchantDealResponseForm, MerchantProductForm, PayGoApplicationForm, prepare_product_image
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
@@ -898,11 +898,16 @@ def product_detail(request, slug):
     recommended_products = get_personalized_products(request, exclude_product=product)
     product_url = request.build_absolute_uri()
     paygo_application = None
+    active_deal = None
     if request.user.is_authenticated:
         paygo_application = PayGoApplication.objects.filter(
             customer=request.user,
             product=product,
         ).exclude(status__in=['rejected', 'cancelled', 'completed']).order_by('-created_at').first()
+        active_deal = DealRequest.objects.filter(
+            customer=request.user,
+            product=product,
+        ).exclude(status__in=['rejected', 'cancelled', 'converted']).order_by('-updated_at').first()
 
     return render(request, 'product_details.html', {
         'product': product,
@@ -911,6 +916,7 @@ def product_detail(request, slug):
         'recommended_products': recommended_products,
         'product_url': product_url,
         'paygo_application': paygo_application,
+        'active_deal': active_deal,
     })
 
 
@@ -973,6 +979,88 @@ def paygo_detail(request, application_id):
     })
 
 
+@login_required
+def deal_start(request, slug):
+    product = get_object_or_404(Product, slug=slug, available=True)
+    if product.stock <= 0:
+        messages.error(request, 'This product is out of stock.')
+        return redirect('product_detail', slug=product.slug)
+
+    existing_deal = DealRequest.objects.filter(
+        customer=request.user,
+        product=product,
+    ).exclude(status__in=['rejected', 'cancelled', 'converted']).order_by('-updated_at').first()
+    if existing_deal:
+        messages.info(request, 'You already have an open deal for this product.')
+        return redirect('deal_detail', deal_id=existing_deal.id)
+
+    if request.method == 'POST':
+        form = DealRequestForm(request.POST, product=product)
+        if form.is_valid():
+            deal = form.save(commit=False)
+            deal.product = product
+            deal.customer = request.user
+            deal.store = product.store
+            deal.save()
+            messages.success(request, 'Deal request sent to the merchant.')
+            return redirect('deal_detail', deal_id=deal.id)
+    else:
+        form = DealRequestForm(product=product)
+
+    return render(request, 'deal_start.html', {
+        'product': product,
+        'form': form,
+    })
+
+
+@login_required
+def deal_list(request):
+    deals = DealRequest.objects.filter(customer=request.user).select_related('product', 'store').order_by('-updated_at')
+    return render(request, 'deal_list.html', {
+        'deals': deals,
+    })
+
+
+@login_required
+def deal_detail(request, deal_id):
+    deal = get_object_or_404(
+        DealRequest.objects.select_related('product', 'store', 'responded_by', 'converted_order'),
+        id=deal_id,
+        customer=request.user,
+    )
+    return render(request, 'deal_detail.html', {
+        'deal': deal,
+    })
+
+
+@login_required
+def deal_convert_to_checkout(request, deal_id):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Deal checkout conversion requires POST.')
+    deal = get_object_or_404(DealRequest, id=deal_id, customer=request.user)
+    if not deal.is_checkout_ready:
+        messages.error(request, 'This deal is not ready for checkout yet.')
+        return redirect('deal_detail', deal_id=deal.id)
+    if deal.product.stock < deal.quantity:
+        messages.error(request, f'Only {deal.product.stock} of {deal.product.name} available.')
+        return redirect('deal_detail', deal_id=deal.id)
+
+    cart = get_or_create_cart(request)
+    cart.items.exclude(source_deal=deal).delete()
+    cart_item, _created = CartItem.objects.update_or_create(
+        cart=cart,
+        source_deal=deal,
+        defaults={
+            'product': deal.product,
+            'variant': None,
+            'quantity': deal.quantity,
+            'negotiated_price': deal.agreed_price,
+        },
+    )
+    messages.success(request, f'Deal #{deal.id} is ready in checkout at K{cart_item.subtotal:.2f}.')
+    return redirect('checkout')
+
+
 @merchant_required
 def merchant_dashboard(request):
     owner_profile = getattr(request.user, 'store_owner_profile', None)
@@ -981,6 +1069,7 @@ def merchant_dashboard(request):
     orders = Order.objects.filter(items__product__store__in=stores).prefetch_related('items__product').distinct()
     paid_items = list(_merchant_paid_order_items(stores))
     payouts = list(_sync_merchant_payouts(stores))
+    open_deals = DealRequest.objects.filter(store__in=stores).exclude(status__in=['rejected', 'cancelled', 'converted']).select_related('customer', 'product', 'store').order_by('-updated_at')
 
     total_revenue = _merchant_item_total(paid_items)
     ready_for_payout = _merchant_net_payout_total(
@@ -999,6 +1088,8 @@ def merchant_dashboard(request):
         'low_stock_count': low_stock_count,
         'total_revenue': total_revenue,
         'ready_for_payout': ready_for_payout,
+        'open_deal_count': open_deals.count(),
+        'recent_deals': list(open_deals[:5]),
     })
 
 
@@ -1045,6 +1136,65 @@ def _merchant_payout_queryset(stores):
         'order_item__order',
         'order_item__product',
     ).order_by('-created_at')
+
+
+def _merchant_deal_queryset(stores):
+    return DealRequest.objects.filter(store__in=stores).select_related(
+        'customer',
+        'product',
+        'store',
+        'responded_by',
+    ).order_by('-updated_at')
+
+
+@merchant_required
+def merchant_deals(request):
+    stores = _merchant_stores_for_user(request.user)
+    deals = _merchant_deal_queryset(stores)
+    return render(request, 'merchant_deals.html', {
+        'deals': deals,
+    })
+
+
+@merchant_required
+def merchant_deal_detail(request, deal_id):
+    stores = _merchant_stores_for_user(request.user)
+    deal = get_object_or_404(_merchant_deal_queryset(stores), id=deal_id)
+    if request.method == 'POST':
+        form = MerchantDealResponseForm(request.POST, instance=deal)
+        if form.is_valid():
+            action = form.cleaned_data['action']
+            if action == 'accept':
+                deal.accept(
+                    request.user,
+                    agreed_price=form.cleaned_data['agreed_price'],
+                    agreed_terms=form.cleaned_data.get('agreed_terms', ''),
+                    response=form.cleaned_data.get('merchant_response', ''),
+                )
+                messages.success(request, f'Deal #{deal.id} accepted.')
+            elif action == 'counter':
+                deal.counter(
+                    request.user,
+                    agreed_price=form.cleaned_data['agreed_price'],
+                    agreed_terms=form.cleaned_data.get('agreed_terms', ''),
+                    response=form.cleaned_data.get('merchant_response', ''),
+                )
+                messages.success(request, f'Deal #{deal.id} countered.')
+            elif action == 'reject':
+                deal.reject(request.user, response=form.cleaned_data.get('merchant_response', ''))
+                messages.success(request, f'Deal #{deal.id} rejected.')
+            return redirect('merchant_deal_detail', deal_id=deal.id)
+    else:
+        form = MerchantDealResponseForm(initial={
+            'action': 'accept',
+            'agreed_price': deal.agreed_price or deal.offered_price,
+            'agreed_terms': deal.agreed_terms or deal.customer_terms,
+        }, instance=deal)
+
+    return render(request, 'merchant_deal_detail.html', {
+        'deal': deal,
+        'form': form,
+    })
 
 
 def _sync_merchant_payouts(stores):
@@ -2849,7 +2999,7 @@ def checkout(request):
             _remember_order_for_session(request, order)
             
             # Add order items
-            for cart_item in cart.items.all():
+            for cart_item in cart.items.select_related('source_deal', 'product', 'variant').all():
                 variant_info = ""
                 if cart_item.variant:
                     variant_parts = []
@@ -2858,8 +3008,13 @@ def checkout(request):
                     if cart_item.variant.size:
                         variant_parts.append(cart_item.variant.size)
                     variant_info = " / ".join(variant_parts)
+                if cart_item.source_deal_id:
+                    deal_terms = cart_item.source_deal.agreed_terms or cart_item.source_deal.customer_terms
+                    variant_info = f"Deal #{cart_item.source_deal_id}"
+                    if deal_terms:
+                        variant_info = f"{variant_info}: {deal_terms[:80]}"
                 
-                item_price = cart_item.product.price
+                item_price = cart_item.negotiated_price if cart_item.negotiated_price is not None else cart_item.product.price
                 if cart_item.variant:
                     item_price += cart_item.variant.price_adjustment
                 
@@ -2870,6 +3025,10 @@ def checkout(request):
                     price=item_price,
                     quantity=cart_item.quantity
                 )
+                if cart_item.source_deal_id:
+                    cart_item.source_deal.status = 'converted'
+                    cart_item.source_deal.converted_order = order
+                    cart_item.source_deal.save(update_fields=['status', 'converted_order', 'updated_at'])
             
             # Chat checkout should answer immediately once the order is stored.
             if not is_chat_checkout and form.cleaned_data['payment_method'] != 'cash':

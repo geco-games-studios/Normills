@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Merchant Deal #{{ deal.id }} | Normils{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <a href="{% url 'merchant_deals' %}" class="text-sm font-bold text-gray-600 underline">Back to deals</a>
+    <section class="mt-6 border border-gray-200 bg-white p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Deal #{{ deal.id }}</p>
+                <h1 class="mt-1 text-2xl font-black text-gray-950">{{ deal.product.name }}</h1>
+            </div>
+            <span class="inline-flex self-start border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ deal.get_status_display }}</span>
+        </div>
+
+        <div class="mt-6 grid gap-3 text-sm text-gray-700 sm:grid-cols-2">
+            <p><span class="font-bold text-gray-950">Customer:</span> {{ deal.customer.get_full_name|default:deal.customer.username }}</p>
+            <p><span class="font-bold text-gray-950">Quantity:</span> {{ deal.quantity }}</p>
+            <p><span class="font-bold text-gray-950">Listed price:</span> K{{ deal.product.price|floatformat:2 }}</p>
+            <p><span class="font-bold text-gray-950">Customer offer:</span> K{{ deal.offered_price|floatformat:2 }}</p>
+            {% if deal.customer_terms %}<p class="sm:col-span-2"><span class="font-bold text-gray-950">Customer terms:</span> {{ deal.customer_terms }}</p>{% endif %}
+        </div>
+
+        <form method="post" class="mt-6 grid gap-5">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                <label for="{{ field.id_for_label }}" class="block text-sm font-bold text-gray-900">{{ field.label }}</label>
+                <div class="mt-2">{{ field }}</div>
+                {% if field.errors %}<p class="mt-2 text-sm text-red-700">{{ field.errors|striptags }}</p>{% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Save Response</button>
+        </form>
+    </section>
+</main>
+{% endblock %}

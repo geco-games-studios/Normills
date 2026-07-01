@@ -177,6 +177,7 @@
                 {% endif %}
                 <a href="{% url 'profile' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Edit Account</a>
                 <a href="{% url 'paygo_applications' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">My PayGo</a>
+                <a href="{% url 'deal_list' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">My Deals</a>
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
                     <button class="w-full bg-black px-4 py-3 text-sm font-black uppercase tracking-[.16em] text-white">Logout</button>

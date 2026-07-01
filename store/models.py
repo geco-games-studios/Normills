@@ -305,13 +305,15 @@ class CartItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
+    negotiated_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    source_deal = models.ForeignKey('DealRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
     
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
     
     @property
     def subtotal(self):
-        base_price = self.product.price
+        base_price = self.negotiated_price if self.negotiated_price is not None else self.product.price
         if self.variant:
             base_price += self.variant.price_adjustment
         return base_price * self.quantity
@@ -823,6 +825,90 @@ class PayGoRepayment(models.Model):
         self.note = note or self.note
         self.save(update_fields=['status', 'note', 'updated_at'])
         self.application.recalculate_balance()
+
+
+class DealRequest(models.Model):
+    STATUS_CHOICES = (
+        ('requested', 'Requested'),
+        ('countered', 'Countered'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('converted', 'Converted to checkout'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='deal_requests')
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='deal_requests')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='deal_requests')
+    offered_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
+    customer_terms = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested')
+    merchant_response = models.TextField(blank=True)
+    agreed_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    agreed_terms = models.TextField(blank=True)
+    responded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='responded_deals')
+    responded_at = models.DateTimeField(null=True, blank=True)
+    converted_order = models.OneToOneField(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='source_deal')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Deal #{self.id or 'new'} - {self.product.name}"
+
+    @property
+    def is_checkout_ready(self):
+        return self.status == 'accepted' and self.agreed_price is not None
+
+    @property
+    def total_agreed_amount(self):
+        if self.agreed_price is None:
+            return Decimal('0.00')
+        return (self.agreed_price * self.quantity).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+
+    def accept(self, user, agreed_price=None, agreed_terms='', response=''):
+        self.status = 'accepted'
+        self.responded_by = user
+        self.responded_at = timezone.now()
+        self.agreed_price = agreed_price if agreed_price is not None else self.offered_price
+        self.agreed_terms = agreed_terms or self.customer_terms
+        self.merchant_response = response or self.merchant_response
+        self.save(update_fields=[
+            'status',
+            'responded_by',
+            'responded_at',
+            'agreed_price',
+            'agreed_terms',
+            'merchant_response',
+            'updated_at',
+        ])
+
+    def counter(self, user, agreed_price, agreed_terms='', response=''):
+        self.status = 'countered'
+        self.responded_by = user
+        self.responded_at = timezone.now()
+        self.agreed_price = agreed_price
+        self.agreed_terms = agreed_terms
+        self.merchant_response = response
+        self.save(update_fields=[
+            'status',
+            'responded_by',
+            'responded_at',
+            'agreed_price',
+            'agreed_terms',
+            'merchant_response',
+            'updated_at',
+        ])
+
+    def reject(self, user, response=''):
+        self.status = 'rejected'
+        self.responded_by = user
+        self.responded_at = timezone.now()
+        self.merchant_response = response
+        self.save(update_fields=['status', 'responded_by', 'responded_at', 'merchant_response', 'updated_at'])
 
 
 class PayoutBatch(models.Model):
