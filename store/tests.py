@@ -361,6 +361,23 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Add product')
+        self.assertContains(response, 'Fast mobile listing')
+        self.assertContains(response, 'Listing essentials')
+        self.assertContains(response, 'Optional details')
+        self.assertContains(response, 'Product title')
+        self.assertContains(response, 'Online quantity')
+        self.assertContains(response, 'Save draft')
+        self.assertContains(response, 'Publish product')
+
+    def test_single_store_product_create_form_hides_store_selector(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('merchant_product_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'Store: {self.store.name}')
+        self.assertContains(response, f'name="store" value="{self.store.id}"', html=False)
+        self.assertNotContains(response, '<select name="store"', html=False)
 
     def test_merchant_can_publish_product_to_own_store(self):
         self.client.force_login(self.merchant_user)

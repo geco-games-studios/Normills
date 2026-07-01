@@ -148,6 +148,8 @@ class EmailOrPhoneAuthenticationForm(AuthenticationForm):
 
 class MerchantProductForm(forms.ModelForm):
     image = forms.ImageField(required=True)
+    ESSENTIAL_FIELDS = ('image', 'name', 'price', 'category', 'stock')
+    ADVANCED_FIELDS = ('store', 'brand', 'offline_stock', 'low_stock_threshold', 'available', 'description')
 
     class Meta:
         model = Product
@@ -171,7 +173,12 @@ class MerchantProductForm(forms.ModelForm):
     def __init__(self, *args, stores=None, require_image=True, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['image'].required = require_image
+        self.single_store = None
         self.fields['store'].queryset = stores if stores is not None else self.fields['store'].queryset.none()
+        if stores is not None and len(stores) == 1:
+            self.single_store = stores[0]
+            self.fields['store'].initial = self.single_store
+            self.fields['store'].widget = forms.HiddenInput()
         self.fields['category'].queryset = Category.objects.order_by('name')
         self.fields['brand'].queryset = Brand.objects.order_by('name')
         self.fields['brand'].required = False
@@ -179,6 +186,16 @@ class MerchantProductForm(forms.ModelForm):
         self.fields['stock'].min_value = 0
         self.fields['offline_stock'].min_value = 0
         self.fields['low_stock_threshold'].min_value = 0
+        self.fields['image'].label = 'Main product photo'
+        self.fields['name'].label = 'Product title'
+        self.fields['stock'].label = 'Online quantity'
+        self.fields['offline_stock'].label = 'In-store quantity'
+        self.fields['low_stock_threshold'].label = 'Low stock alert'
+        self.fields['available'].label = 'Make visible when published'
+        self.fields['image'].help_text = 'Use a clear square-ish photo. JPG, PNG, or WebP under 8 MB.'
+        self.fields['stock'].help_text = 'How many customers can buy online now.'
+        self.fields['offline_stock'].help_text = 'Optional stock kept for walk-in or manual sales.'
+        self.fields['description'].help_text = 'Optional. Add size, condition, warranty, or delivery notes.'
 
         for field in self.fields.values():
             if isinstance(field.widget, forms.CheckboxInput):
@@ -188,6 +205,21 @@ class MerchantProductForm(forms.ModelForm):
                 'class',
                 'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
             )
+        self.fields['image'].widget.attrs.update({
+            'accept': 'image/jpeg,image/png,image/webp',
+            'data-preview-input': 'main-product-photo',
+        })
+        self.fields['name'].widget.attrs.setdefault('placeholder', 'e.g. Navy denim dress')
+        self.fields['price'].widget.attrs.update({'inputmode': 'decimal', 'placeholder': '0.00'})
+        self.fields['stock'].widget.attrs.update({'inputmode': 'numeric', 'placeholder': '0'})
+        self.fields['offline_stock'].widget.attrs.update({'inputmode': 'numeric', 'placeholder': '0'})
+        self.fields['low_stock_threshold'].widget.attrs.update({'inputmode': 'numeric', 'placeholder': '5'})
+
+    def essential_fields(self):
+        return [self[field_name] for field_name in self.ESSENTIAL_FIELDS if field_name in self.fields]
+
+    def advanced_fields(self):
+        return [self[field_name] for field_name in self.ADVANCED_FIELDS if field_name in self.fields]
 
     def save(self, commit=True):
         product = super().save(commit=False)
