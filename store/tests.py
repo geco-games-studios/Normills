@@ -20,7 +20,7 @@ from .payment import (
     normalize_lenco_response,
     process_lenco_payment,
 )
-from .models import Cart, Category, DealRequest, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductAdCreative, ProductImage
+from .models import Cart, Category, DealRequest, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductAdCreative, ProductImage, SupportTicket
 from .models import PayGoApplication, PayGoRepayment
 
 
@@ -445,6 +445,98 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(order_item.price, Decimal('2200.00'))
         self.assertIn(f'Deal #{deal.id}', order_item.variant_info)
         self.assertEqual(deal.converted_order.subtotal, Decimal('2200.00'))
+
+    def test_customer_can_submit_order_support_ticket(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.post(
+            f"{reverse('support_ticket_create')}?order={self.order.id}",
+            {
+                'category': 'payment_issue',
+                'subject': 'Payment not reflecting',
+                'description': 'I paid but the order still looks pending.',
+            },
+        )
+
+        ticket = SupportTicket.objects.get(subject='Payment not reflecting')
+        self.assertRedirects(response, reverse('support_ticket_detail', args=[ticket.id]))
+        self.assertEqual(ticket.created_by, self.customer)
+        self.assertEqual(ticket.order, self.order)
+        self.assertEqual(ticket.category, 'payment_issue')
+
+    def test_customer_cannot_reference_another_customers_order_ticket(self):
+        other_customer = User.objects.create_user(username='other-customer', password='password')
+        self.client.force_login(other_customer)
+
+        response = self.client.get(f"{reverse('support_ticket_create')}?order={self.order.id}")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_support_queue_requires_moderation_role(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('support_ticket_queue'))
+
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(self.finance_user)
+        response = self.client.get(reverse('support_ticket_queue'))
+
+        self.assertEqual(response.status_code, 403)
+
+        support_user = User.objects.create_user(username='support-agent', password='password', role=User.Role.SUPPORT_OFFICER)
+        self.client.force_login(support_user)
+        response = self.client.get(reverse('support_ticket_queue'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Support queue')
+
+    def test_support_user_can_update_ticket_status_and_assignment(self):
+        support_user = User.objects.create_user(username='support-agent', password='password', role=User.Role.SUPPORT_OFFICER)
+        ticket = SupportTicket.objects.create(
+            created_by=self.customer,
+            order=self.order,
+            category='order_issue',
+            subject='Order problem',
+            description='The parcel has not arrived.',
+        )
+        self.client.force_login(support_user)
+
+        response = self.client.post(reverse('support_ticket_update', args=[ticket.id]), {
+            'status': 'resolved',
+            'priority': 'high',
+            'assigned_to': support_user.id,
+            'resolution_note': 'Merchant confirmed replacement dispatch.',
+        })
+
+        self.assertRedirects(response, reverse('support_ticket_detail', args=[ticket.id]))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, 'resolved')
+        self.assertEqual(ticket.priority, 'high')
+        self.assertEqual(ticket.assigned_to, support_user)
+        self.assertIsNotNone(ticket.resolved_at)
+        self.assertEqual(ticket.resolution_note, 'Merchant confirmed replacement dispatch.')
+
+    def test_merchant_can_view_ticket_for_own_store(self):
+        ticket = SupportTicket.objects.create(
+            created_by=self.customer,
+            store=self.store,
+            product=self.product,
+            category='merchant_report',
+            subject='Product report',
+            description='Customer says the listing needs review.',
+        )
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('support_ticket_detail', args=[ticket.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Product report')
+
+        self.client.force_login(self.other_merchant_user)
+        response = self.client.get(reverse('support_ticket_detail', args=[ticket.id]))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_merchant_can_access_own_dashboard_summary(self):
         self.client.force_login(self.merchant_user)

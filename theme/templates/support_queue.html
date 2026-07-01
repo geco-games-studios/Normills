@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Support Queue | Normils{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Moderation</p>
+            <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">Support queue</h1>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Review payment issues, order issues, refunds, returns, Deal disputes, PayGo issues, and reports.</p>
+        </div>
+        <a href="{% url 'support_tickets' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">My tickets</a>
+    </div>
+
+    <form method="get" class="mt-6 grid gap-3 border border-gray-200 bg-gray-50 p-4 sm:grid-cols-3">
+        <label class="text-xs font-black uppercase tracking-[.16em] text-gray-500">
+            Status
+            <select name="status" class="mt-2 w-full border border-gray-300 px-4 py-3 text-base">
+                <option value="">All statuses</option>
+                {% for value,label in status_choices %}
+                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="text-xs font-black uppercase tracking-[.16em] text-gray-500">
+            Category
+            <select name="category" class="mt-2 w-full border border-gray-300 px-4 py-3 text-base">
+                <option value="">All categories</option>
+                {% for value,label in category_choices %}
+                <option value="{{ value }}" {% if category == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="self-end bg-black px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Filter</button>
+    </form>
+
+    <div class="mt-6 overflow-hidden border border-gray-200 bg-white">
+        <table class="min-w-full divide-y divide-gray-200 text-left text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase tracking-[.12em] text-gray-500">
+                <tr>
+                    <th class="px-4 py-3">Ticket</th>
+                    <th class="px-4 py-3">Category</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Priority</th>
+                    <th class="px-4 py-3">Owner</th>
+                    <th class="px-4 py-3">Updated</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for ticket in tickets %}
+                <tr>
+                    <td class="px-4 py-4 font-bold text-gray-950">#{{ ticket.id }} {{ ticket.subject }}</td>
+                    <td class="px-4 py-4 text-gray-700">{{ ticket.get_category_display }}</td>
+                    <td class="px-4 py-4 text-gray-700">{{ ticket.get_status_display }}</td>
+                    <td class="px-4 py-4 text-gray-700">{{ ticket.get_priority_display }}</td>
+                    <td class="px-4 py-4 text-gray-700">{{ ticket.created_by|default:"-" }}</td>
+                    <td class="px-4 py-4 text-gray-700">{{ ticket.updated_at|date:"M j, H:i" }}</td>
+                    <td class="px-4 py-4"><a href="{% url 'support_ticket_detail' ticket.id %}" class="text-xs font-black uppercase tracking-[.12em] text-gray-700 underline">Review</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-4 py-10 text-center text-gray-500">No tickets match this filter.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
+{% endblock %}

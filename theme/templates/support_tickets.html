@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Support Tickets | Normils{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Support</p>
+            <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">My support tickets</h1>
+            <p class="mt-2 text-sm leading-6 text-gray-600">Track payment issues, order issues, returns, Deal disputes, PayGo issues, and reports.</p>
+        </div>
+        <div class="flex flex-col gap-2 sm:flex-row">
+            {% if can_moderate %}
+            <a href="{% url 'support_ticket_queue' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Support queue</a>
+            {% endif %}
+            <a href="{% url 'support_ticket_create' %}" class="inline-flex items-center justify-center bg-black px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Submit ticket</a>
+        </div>
+    </div>
+
+    <div class="mt-6 grid gap-3">
+        {% for ticket in tickets %}
+        <a href="{% url 'support_ticket_detail' ticket.id %}" class="block border border-gray-200 bg-white p-4 hover:border-black">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[.14em] text-gray-500">Ticket #{{ ticket.id }} · {{ ticket.get_category_display }}</p>
+                    <h2 class="mt-1 text-lg font-black text-gray-950">{{ ticket.subject }}</h2>
+                    <p class="mt-2 text-sm text-gray-600">
+                        {% if ticket.order %}Order #{{ ticket.order.id }} · {% endif %}
+                        {% if ticket.deal %}Deal #{{ ticket.deal.id }} · {% endif %}
+                        {% if ticket.paygo_application %}PayGo #{{ ticket.paygo_application.id }} · {% endif %}
+                        {% if ticket.store %}{{ ticket.store.name }}{% endif %}
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ ticket.get_status_display }}</span>
+                    <span class="border border-gray-200 bg-white px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-gray-700">{{ ticket.get_priority_display }}</span>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <div class="border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600">No support tickets yet.</div>
+        {% endfor %}
+    </div>
+</main>
+{% endblock %}

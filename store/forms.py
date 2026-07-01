@@ -9,7 +9,7 @@ from django.utils.text import slugify
 from PIL import Image
 from users.models import User
 from users.phone_verification import normalize_phone
-from .models import Brand, Category, DealRequest, Order, PayGoApplication, Product
+from .models import Brand, Category, DealRequest, Order, PayGoApplication, Product, SupportTicket
 
 
 MAX_PRODUCT_IMAGE_SIZE = 8 * 1024 * 1024
@@ -397,3 +397,43 @@ class MerchantDealResponseForm(forms.ModelForm):
         if action in {'accept', 'counter'} and not agreed_price:
             self.add_error('agreed_price', 'Enter the agreed price for this deal.')
         return cleaned_data
+
+
+class SupportTicketForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = ('category', 'subject', 'description')
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 5}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['subject'].widget.attrs.setdefault('placeholder', 'Short summary of the issue')
+        self.fields['description'].widget.attrs.setdefault('placeholder', 'Explain what happened, reference numbers, and what outcome you need.')
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                'class',
+                'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
+            )
+
+
+class SupportTicketUpdateForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = ('status', 'priority', 'assigned_to', 'resolution_note')
+        widgets = {
+            'resolution_note': forms.Textarea(attrs={'rows': 4}),
+        }
+
+    def __init__(self, *args, staff_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if staff_queryset is not None:
+            self.fields['assigned_to'].queryset = staff_queryset
+        self.fields['assigned_to'].required = False
+        self.fields['resolution_note'].required = False
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                'class',
+                'w-full border border-gray-300 px-4 py-3 text-base outline-none focus:border-black',
+            )

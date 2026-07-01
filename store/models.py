@@ -968,6 +968,60 @@ class DealRequest(models.Model):
         self.save(update_fields=['status', 'responded_by', 'responded_at', 'merchant_response', 'updated_at'])
 
 
+class SupportTicket(models.Model):
+    CATEGORY_CHOICES = (
+        ('payment_issue', 'Payment issue'),
+        ('order_issue', 'Order issue'),
+        ('refund_return', 'Refund or return'),
+        ('deal_dispute', 'Deal dispute'),
+        ('paygo_issue', 'PayGo issue'),
+        ('merchant_report', 'Merchant report'),
+        ('customer_report', 'Customer report'),
+        ('other', 'Other'),
+    )
+    STATUS_CHOICES = (
+        ('open', 'Open'),
+        ('in_review', 'In review'),
+        ('waiting_customer', 'Waiting for customer'),
+        ('waiting_merchant', 'Waiting for merchant'),
+        ('resolved', 'Resolved'),
+        ('closed', 'Closed'),
+    )
+    PRIORITY_CHOICES = (
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    )
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_support_tickets')
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    deal = models.ForeignKey(DealRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    paygo_application = models.ForeignKey(PayGoApplication, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    category = models.CharField(max_length=32, choices=CATEGORY_CHOICES)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default='open', db_index=True)
+    priority = models.CharField(max_length=12, choices=PRIORITY_CHOICES, default='normal', db_index=True)
+    subject = models.CharField(max_length=180)
+    description = models.TextField()
+    resolution_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Ticket #{self.id or 'new'} - {self.subject}"
+
+    @property
+    def is_resolved(self):
+        return self.status in {'resolved', 'closed'}
+
+
 class PayoutBatch(models.Model):
     reference = models.CharField(max_length=120, unique=True)
     processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payout_batches')

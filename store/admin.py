@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment, DealRequest, ProductAdTemplate, ProductAdCreative
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment, DealRequest, ProductAdTemplate, ProductAdCreative, SupportTicket
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -345,6 +345,14 @@ class DealRequestAdmin(admin.ModelAdmin):
     list_filter = ['status', 'store', 'created_at', 'updated_at']
     search_fields = ['id', 'customer__username', 'product__name', 'customer_terms', 'merchant_response', 'agreed_terms']
     readonly_fields = ['created_at', 'updated_at', 'responded_at', 'converted_order']
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    list_display = ['id', 'subject', 'category', 'status', 'priority', 'created_by', 'assigned_to', 'store', 'updated_at']
+    list_filter = ['status', 'priority', 'category', 'store', 'created_at', 'updated_at']
+    search_fields = ['id', 'subject', 'description', 'resolution_note', 'created_by__username', 'assigned_to__username', 'store__name']
+    readonly_fields = ['created_at', 'updated_at', 'resolved_at']
 
 
 @admin.register(StockAdjustment)

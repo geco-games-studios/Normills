@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Support Ticket | Normils{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="border-b border-gray-200 pb-6">
+        <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Support</p>
+        <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">Submit a support ticket</h1>
+        <p class="mt-2 text-sm leading-6 text-gray-600">Give the team enough detail to resolve the issue without back-and-forth.</p>
+    </div>
+
+    {% if order or deal or paygo_application or product %}
+    <div class="mt-6 border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-700">
+        {% if order %}<p><span class="font-bold text-gray-950">Linked order:</span> #{{ order.id }}</p>{% endif %}
+        {% if deal %}<p><span class="font-bold text-gray-950">Linked deal:</span> #{{ deal.id }}</p>{% endif %}
+        {% if paygo_application %}<p><span class="font-bold text-gray-950">Linked PayGo:</span> #{{ paygo_application.id }}</p>{% endif %}
+        {% if product %}<p><span class="font-bold text-gray-950">Linked product:</span> {{ product.name }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <form method="post" class="mt-6 space-y-5">
+        {% csrf_token %}
+        {% for field in form %}
+        <label class="block text-xs font-black uppercase tracking-[.16em] text-gray-500">
+            {{ field.label }}
+            <span class="mt-2 block">{{ field }}</span>
+            {% if field.errors %}
+            <span class="mt-1 block text-xs font-bold normal-case tracking-normal text-red-700">{{ field.errors|striptags }}</span>
+            {% endif %}
+        </label>
+        {% endfor %}
+        <div class="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:justify-between">
+            <a href="{% url 'support_tickets' %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Cancel</a>
+            <button type="submit" class="inline-flex items-center justify-center bg-black px-5 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Submit ticket</button>
+        </div>
+    </form>
+</main>
+{% endblock %}

@@ -175,7 +175,11 @@
                 {% if user.can_access_platform_admin %}
                 <a href="{% url 'admin_dashboard' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Admin Dashboard</a>
                 {% endif %}
+                {% if user.can_access_moderation %}
+                <a href="{% url 'support_ticket_queue' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Support Queue</a>
+                {% endif %}
                 <a href="{% url 'profile' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">Edit Account</a>
+                <a href="{% url 'support_tickets' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">My Support</a>
                 <a href="{% url 'paygo_applications' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">My PayGo</a>
                 <a href="{% url 'deal_list' %}" class="border border-gray-300 px-4 py-3 text-center text-sm font-black uppercase tracking-[.16em] text-gray-900">My Deals</a>
                 <form method="post" action="{% url 'logout' %}">

@@ -24,9 +24,9 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication, DealRequest, ProductAdCreative, ProductAdTemplate
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication, DealRequest, ProductAdCreative, ProductAdTemplate, SupportTicket
 from .ml import recommend_products_from_context
-from .forms import CustomUserCreationForm, CheckoutForm, DealRequestForm, MerchantDealResponseForm, MerchantProductForm, PayGoApplicationForm, prepare_product_image
+from .forms import CustomUserCreationForm, CheckoutForm, DealRequestForm, MerchantDealResponseForm, MerchantProductForm, PayGoApplicationForm, SupportTicketForm, SupportTicketUpdateForm, prepare_product_image
 from .ad_studio import generate_product_ad_image
 from store.sms_client import SMSClient
 from django.utils import timezone
@@ -36,7 +36,7 @@ from .sms_service import send_order_sms, send_order_receipt_sms
 from .whatsapp_service import send_admin_whatsapp_order_receipt
 from manager.models import Store
 from users.models import ClientProfile
-from users.permissions import delivery_partner_required, finance_admin_required, merchant_required, platform_admin_required
+from users.permissions import delivery_partner_required, finance_admin_required, merchant_required, moderator_required, platform_admin_required
 from users.phone_verification import normalize_phone as normalize_account_phone, send_phone_verification_code
 
 import logging
@@ -1110,6 +1110,211 @@ def deal_convert_to_checkout(request, deal_id):
     )
     messages.success(request, f'Deal #{deal.id} is ready in checkout at K{cart_item.subtotal:.2f}.')
     return redirect('checkout')
+
+
+def _support_staff_queryset():
+    UserModel = get_user_model()
+    return UserModel.objects.filter(
+        Q(is_superuser=True) |
+        Q(role__in=[
+            UserModel.Role.ADMINISTRATOR,
+            UserModel.Role.MODERATOR,
+            UserModel.Role.SUPPORT_OFFICER,
+        ])
+    ).order_by('username')
+
+
+def _ticket_is_visible_to_user(ticket, user):
+    if getattr(user, 'can_access_moderation', False):
+        return True
+    if ticket.created_by_id == user.id:
+        return True
+    owner_profile = getattr(user, 'store_owner_profile', None)
+    if not owner_profile or not ticket.store_id:
+        return False
+    return owner_profile.stores.filter(id=ticket.store_id).exists()
+
+
+def _user_owns_store(user, store_id):
+    owner_profile = getattr(user, 'store_owner_profile', None)
+    return bool(owner_profile and store_id and owner_profile.stores.filter(id=store_id).exists())
+
+
+def _user_can_reference_order(user, order):
+    if getattr(user, 'can_access_moderation', False) or order.user_id == user.id:
+        return True
+    owner_profile = getattr(user, 'store_owner_profile', None)
+    if not owner_profile:
+        return False
+    return order.items.filter(product__store__owner=owner_profile).exists()
+
+
+def _user_can_reference_deal(user, deal):
+    return (
+        getattr(user, 'can_access_moderation', False) or
+        deal.customer_id == user.id or
+        _user_owns_store(user, deal.store_id)
+    )
+
+
+def _user_can_reference_paygo(user, application):
+    return (
+        getattr(user, 'can_access_moderation', False) or
+        application.customer_id == user.id or
+        _user_owns_store(user, application.product.store_id)
+    )
+
+
+@login_required
+def support_tickets(request):
+    tickets = SupportTicket.objects.select_related(
+        'created_by',
+        'assigned_to',
+        'order',
+        'deal',
+        'paygo_application',
+        'product',
+        'store',
+    )
+    if not getattr(request.user, 'can_access_moderation', False):
+        owner_profile = getattr(request.user, 'store_owner_profile', None)
+        store_ids = list(owner_profile.stores.values_list('id', flat=True)) if owner_profile else []
+        tickets = tickets.filter(Q(created_by=request.user) | Q(store_id__in=store_ids)).distinct()
+    return render(request, 'support_tickets.html', {
+        'tickets': tickets.order_by('-updated_at'),
+        'can_moderate': getattr(request.user, 'can_access_moderation', False),
+    })
+
+
+@login_required
+def support_ticket_create(request):
+    initial = {}
+    order = None
+    deal = None
+    paygo_application = None
+    product = None
+    store = None
+
+    order_id = request.GET.get('order')
+    deal_id = request.GET.get('deal')
+    paygo_id = request.GET.get('paygo')
+    product_id = request.GET.get('product')
+    if order_id:
+        order = Order.objects.prefetch_related('items__product__store').filter(id=order_id).first()
+        if order:
+            if not _user_can_reference_order(request.user, order):
+                return HttpResponseForbidden('Support ticket reference denied.')
+            initial.update({'category': 'order_issue', 'subject': f'Order #{order.id} issue'})
+    if deal_id:
+        deal = DealRequest.objects.select_related('product', 'store').filter(id=deal_id).first()
+        if deal:
+            if not _user_can_reference_deal(request.user, deal):
+                return HttpResponseForbidden('Support ticket reference denied.')
+            product = deal.product
+            store = deal.store
+            initial.update({'category': 'deal_dispute', 'subject': f'Deal #{deal.id} dispute'})
+    if paygo_id:
+        paygo_application = PayGoApplication.objects.select_related('product', 'product__store').filter(id=paygo_id).first()
+        if paygo_application:
+            if not _user_can_reference_paygo(request.user, paygo_application):
+                return HttpResponseForbidden('Support ticket reference denied.')
+            product = paygo_application.product
+            store = product.store
+            initial.update({'category': 'paygo_issue', 'subject': f'PayGo #{paygo_application.id} issue'})
+    if product_id and not product:
+        product = Product.objects.select_related('store').filter(id=product_id).first()
+        if product:
+            store = product.store
+            initial.update({'category': 'merchant_report', 'subject': f'Report {product.name}'})
+
+    if request.method == 'POST':
+        form = SupportTicketForm(request.POST)
+        if form.is_valid():
+            ticket = form.save(commit=False)
+            ticket.created_by = request.user
+            ticket.order = order
+            ticket.deal = deal
+            ticket.paygo_application = paygo_application
+            ticket.product = product
+            ticket.store = store
+            ticket.save()
+            messages.success(request, 'Support ticket submitted.')
+            return redirect('support_ticket_detail', ticket_id=ticket.id)
+    else:
+        form = SupportTicketForm(initial=initial)
+
+    return render(request, 'support_ticket_form.html', {
+        'form': form,
+        'order': order,
+        'deal': deal,
+        'paygo_application': paygo_application,
+        'product': product,
+    })
+
+
+@login_required
+def support_ticket_detail(request, ticket_id):
+    ticket = get_object_or_404(SupportTicket.objects.select_related(
+        'created_by',
+        'assigned_to',
+        'order',
+        'deal',
+        'paygo_application',
+        'product',
+        'store',
+    ), id=ticket_id)
+    if not _ticket_is_visible_to_user(ticket, request.user):
+        return HttpResponseForbidden('Support ticket access denied.')
+    return render(request, 'support_ticket_detail.html', {
+        'ticket': ticket,
+        'can_moderate': getattr(request.user, 'can_access_moderation', False),
+        'update_form': SupportTicketUpdateForm(instance=ticket, staff_queryset=_support_staff_queryset()) if getattr(request.user, 'can_access_moderation', False) else None,
+    })
+
+
+@moderator_required
+def support_ticket_queue(request):
+    tickets = SupportTicket.objects.select_related(
+        'created_by',
+        'assigned_to',
+        'order',
+        'deal',
+        'paygo_application',
+        'product',
+        'store',
+    ).order_by('-updated_at')
+    status = request.GET.get('status') or ''
+    category = request.GET.get('category') or ''
+    if status:
+        tickets = tickets.filter(status=status)
+    if category:
+        tickets = tickets.filter(category=category)
+    return render(request, 'support_queue.html', {
+        'tickets': tickets,
+        'status': status,
+        'category': category,
+        'status_choices': SupportTicket.STATUS_CHOICES,
+        'category_choices': SupportTicket.CATEGORY_CHOICES,
+    })
+
+
+@moderator_required
+def support_ticket_update(request, ticket_id):
+    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    if request.method != 'POST':
+        return HttpResponseForbidden('Support ticket updates require POST.')
+    form = SupportTicketUpdateForm(request.POST, instance=ticket, staff_queryset=_support_staff_queryset())
+    if form.is_valid():
+        ticket = form.save(commit=False)
+        if ticket.status in {'resolved', 'closed'} and not ticket.resolved_at:
+            ticket.resolved_at = timezone.now()
+        if ticket.status not in {'resolved', 'closed'}:
+            ticket.resolved_at = None
+        ticket.save()
+        messages.success(request, f'Ticket #{ticket.id} updated.')
+    else:
+        messages.error(request, 'Review the support update fields.')
+    return redirect('support_ticket_detail', ticket_id=ticket.id)
 
 
 @merchant_required
