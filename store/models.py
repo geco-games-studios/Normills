@@ -139,6 +139,31 @@ class Product(models.Model):
         financed_amount = max(self.price - self.paygo_min_deposit_amount, Decimal('0.00'))
         return (financed_amount / Decimal(self.paygo_term_months)).quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
 
+    @property
+    def visible_trust_badges(self):
+        owner_user = getattr(getattr(self.store, 'owner', None), 'user', None)
+        owner_badges = set(getattr(owner_user, 'trust_badges', None) or [])
+        badges = []
+        definitions = [
+            (User.TrustBadge.VERIFIED_MERCHANT, 'Verified Merchant', 'border-blue-200 bg-blue-50 text-blue-800'),
+            (User.TrustBadge.PREMIUM_MERCHANT, 'Premium Merchant', 'border-yellow-200 bg-yellow-50 text-yellow-800'),
+            (User.TrustBadge.TOP_SELLER, 'Top Seller', 'border-purple-200 bg-purple-50 text-purple-800'),
+            (User.TrustBadge.FAST_DELIVERY, 'Fast Delivery', 'border-green-200 bg-green-50 text-green-800'),
+            (User.TrustBadge.TRUSTED_BUSINESS, 'Trusted Business', 'border-gray-300 bg-white text-gray-900'),
+        ]
+        if owner_user and owner_user.role == User.Role.VERIFIED_MERCHANT:
+            owner_badges.add(User.TrustBadge.VERIFIED_MERCHANT)
+        for key, label, classes in definitions:
+            if key in owner_badges:
+                badges.append({'key': key, 'label': label, 'classes': classes})
+        if self.paygo_is_available:
+            badges.append({
+                'key': User.TrustBadge.PAYGO_ELIGIBLE,
+                'label': 'PayGo Eligible',
+                'classes': 'border-black bg-black text-white',
+            })
+        return badges
+
 
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='supporting_images')

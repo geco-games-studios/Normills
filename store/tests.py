@@ -12,7 +12,7 @@ from django.utils import timezone
 from PIL import Image
 
 from manager.models import Store
-from users.models import StoreOwnerProfile
+from users.models import StoreOwnerProfile, User
 from .payment import (
     _format_zambian_phone,
     _lenco_authorization_header,
@@ -232,6 +232,51 @@ class MerchantDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Start Deal')
         self.assertContains(response, 'Negotiate before checkout')
+
+    def test_product_detail_shows_customer_facing_trust_badges(self):
+        self.merchant_user.role = User.Role.VERIFIED_MERCHANT
+        self.merchant_user.trust_badges = [
+            User.TrustBadge.PREMIUM_MERCHANT,
+            User.TrustBadge.TOP_SELLER,
+            User.TrustBadge.FAST_DELIVERY,
+            User.TrustBadge.TRUSTED_BUSINESS,
+        ]
+        self.merchant_user.save(update_fields=['role', 'trust_badges'])
+        self.product.paygo_eligible = True
+        self.product.paygo_min_deposit_percent = Decimal('20.00')
+        self.product.paygo_term_months = 4
+        self.product.save(update_fields=['paygo_eligible', 'paygo_min_deposit_percent', 'paygo_term_months'])
+
+        response = self.client.get(reverse('product_detail', args=[self.product.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Verified Merchant')
+        self.assertContains(response, 'Premium Merchant')
+        self.assertContains(response, 'Top Seller')
+        self.assertContains(response, 'Fast Delivery')
+        self.assertContains(response, 'Trusted Business')
+        self.assertContains(response, 'PayGo Eligible')
+
+    def test_listing_pages_show_trust_badges_on_product_cards(self):
+        self.merchant_user.trust_badges = [
+            User.TrustBadge.VERIFIED_MERCHANT,
+            User.TrustBadge.FAST_DELIVERY,
+        ]
+        self.merchant_user.save(update_fields=['trust_badges'])
+        self.product.paygo_eligible = True
+        self.product.save(update_fields=['paygo_eligible'])
+
+        home_response = self.client.get(reverse('home'))
+        category_response = self.client.get(reverse('category_detail', args=[self.category.slug]))
+
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, 'Verified Merchant')
+        self.assertContains(home_response, 'Fast Delivery')
+        self.assertContains(home_response, 'PayGo Eligible')
+        self.assertEqual(category_response.status_code, 200)
+        self.assertContains(category_response, 'Verified Merchant')
+        self.assertContains(category_response, 'Fast Delivery')
+        self.assertContains(category_response, 'PayGo Eligible')
 
     def test_product_detail_has_marketing_ready_share_message(self):
         response = self.client.get(

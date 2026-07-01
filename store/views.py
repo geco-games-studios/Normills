@@ -720,7 +720,7 @@ def _apply_storefront_filter(products, selected_filter, filter_buttons):
 
 def home(request):
     categories = Category.objects.all()
-    products = Product.objects.filter(available=True, stock__gt=0)
+    products = Product.objects.select_related('store', 'store__owner', 'store__owner__user').filter(available=True, stock__gt=0)
     brands = Brand.objects.all()
     filter_buttons = _storefront_filter_buttons()
     selected_filter = request.GET.get('filter') or ''
@@ -865,7 +865,7 @@ def category_detail(request, slug):
     categories = Category.objects.all()
     filter_buttons = _storefront_filter_buttons()
     selected_filter = request.GET.get('filter') or ''
-    products = category.products.filter(available=True, stock__gt=0)
+    products = category.products.select_related('store', 'store__owner', 'store__owner__user').filter(available=True, stock__gt=0)
     products = _apply_storefront_filter(products, selected_filter, filter_buttons)
     return render(request, 'category_detail.html', {
         'category': category,
@@ -923,7 +923,7 @@ def _can_generate_product_ad(user, product):
 
 def product_detail(request, slug):
     product = get_object_or_404(
-        Product.objects.select_related('store', 'store__owner').prefetch_related('supporting_images'),
+        Product.objects.select_related('store', 'store__owner', 'store__owner__user').prefetch_related('supporting_images'),
         slug=slug,
         available=True,
     )
