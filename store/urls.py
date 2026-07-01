@@ -38,6 +38,7 @@ urlpatterns = [
     path('merchant/products/new/', views.merchant_product_create, name='merchant_product_create'),
     path('merchant/products/<int:product_id>/edit/', views.merchant_product_edit, name='merchant_product_edit'),
     path('merchant/products/<int:product_id>/duplicate/', views.merchant_product_duplicate, name='merchant_product_duplicate'),
+    path('merchant/products/<int:product_id>/ads/generate/', views.merchant_product_generate_ad, name='merchant_product_generate_ad'),
     path('merchant/products/<int:product_id>/inventory/', views.merchant_product_inventory_update, name='merchant_product_inventory_update'),
     path('delivery/orders/', views.delivery_orders, name='delivery_orders'),
     path('delivery/orders/<int:order_id>/update/', views.delivery_order_update, name='delivery_order_update'),

@@ -24,9 +24,10 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication, DealRequest
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, WishlistItem, StockAdjustment, DashboardAnalyticReset, MerchantPayout, PayoutBatch, PayGoApplication, DealRequest, ProductAdCreative, ProductAdTemplate
 from .ml import recommend_products_from_context
 from .forms import CustomUserCreationForm, CheckoutForm, DealRequestForm, MerchantDealResponseForm, MerchantProductForm, PayGoApplicationForm, prepare_product_image
+from .ad_studio import generate_product_ad_image
 from store.sms_client import SMSClient
 from django.utils import timezone
 from datetime import timedelta
@@ -900,9 +901,29 @@ def _product_share_pack(product, product_url):
     }
 
 
+def _default_product_ad_template():
+    template, _created = ProductAdTemplate.objects.get_or_create(
+        slug='normils-portrait',
+        defaults={
+            'name': 'Normils Portrait Ad',
+            'background_color': '#f4efe6',
+            'accent_color': '#111827',
+            'frame_color': '#ffffff',
+            'text_color': '#111827',
+            'active': True,
+        },
+    )
+    return template
+
+
+def _can_generate_product_ad(user, product):
+    owner_profile = getattr(user, 'store_owner_profile', None)
+    return bool(owner_profile and product.store.owner_id == owner_profile.id)
+
+
 def product_detail(request, slug):
     product = get_object_or_404(
-        Product.objects.prefetch_related('supporting_images'),
+        Product.objects.select_related('store', 'store__owner').prefetch_related('supporting_images'),
         slug=slug,
         available=True,
     )
@@ -946,6 +967,7 @@ def product_detail(request, slug):
         'product_share': product_share,
         'paygo_application': paygo_application,
         'active_deal': active_deal,
+        'can_generate_ad': _can_generate_product_ad(request.user, product) if request.user.is_authenticated else False,
     })
 
 
@@ -1738,6 +1760,24 @@ def merchant_product_duplicate(request, product_id):
         ProductImage.objects.create(product=duplicate, image=image.image)
     messages.success(request, f'Draft duplicate created for {source.name}.')
     return redirect('merchant_product_edit', product_id=duplicate.id)
+
+
+@merchant_required
+def merchant_product_generate_ad(request, product_id):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Ad generation requires POST.')
+
+    stores = _merchant_stores_for_user(request.user)
+    product = get_object_or_404(Product.objects.select_related('store'), id=product_id, store__in=stores)
+    template = ProductAdTemplate.objects.filter(active=True).order_by('name').first() or _default_product_ad_template()
+    creative = ProductAdCreative(product=product, template=template, created_by=request.user)
+    creative.image = generate_product_ad_image(product, template)
+    creative.save()
+    messages.success(request, 'Portrait product ad generated.')
+    return render(request, 'product_ad_result.html', {
+        'product': product,
+        'creative': creative,
+    })
 
 
 @merchant_required

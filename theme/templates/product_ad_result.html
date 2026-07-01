@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Generated Product Ad | Merchant Centre{% endblock %}
+
+{% block content %}
+<main class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="border-b border-gray-200 pb-6">
+        <p class="text-xs font-black uppercase tracking-[.18em] text-gray-500">Ad Studio</p>
+        <h1 class="mt-2 text-3xl font-black tracking-[.04em] text-gray-950">Portrait ad generated</h1>
+        <p class="mt-2 text-sm leading-6 text-gray-600">Download this portrait creative for WhatsApp status, stories, and product campaigns.</p>
+    </div>
+
+    <div class="mt-6 grid gap-5 md:grid-cols-[minmax(0,18rem)_1fr]">
+        <a href="{{ creative.image.url }}" target="_blank" class="block border border-gray-200 bg-gray-50 p-3">
+            <img src="{{ creative.image.url }}" alt="{{ product.name }} ad" class="w-full border border-gray-200">
+        </a>
+        <section class="border border-gray-200 bg-white p-5">
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">{{ creative.template.name }}</p>
+            <h2 class="mt-2 text-xl font-black text-gray-950">{{ product.name }}</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-600">The ad uses the product photo, store name, current product price, and PayGo text when the product is eligible.</p>
+            <div class="mt-5 grid gap-3">
+                <a href="{{ creative.image.url }}" download class="inline-flex items-center justify-center bg-black px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-white">Download image</a>
+                <a href="{% url 'product_detail' product.slug %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Back to product</a>
+                <a href="{% url 'merchant_product_edit' product.id %}" class="inline-flex items-center justify-center border border-gray-300 px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-900">Back to edit</a>
+            </div>
+        </section>
+    </div>
+</main>
+{% endblock %}

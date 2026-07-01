@@ -1,5 +1,7 @@
 from decimal import Decimal
 from io import BytesIO
+import os
+import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -18,7 +20,7 @@ from .payment import (
     normalize_lenco_response,
     process_lenco_payment,
 )
-from .models import Cart, Category, DealRequest, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductImage
+from .models import Cart, Category, DealRequest, MerchantPayout, Order, OrderItem, PayoutBatch, Product, ProductAdCreative, ProductImage
 from .models import PayGoApplication, PayGoRepayment
 
 
@@ -264,6 +266,48 @@ class MerchantDashboardTests(TestCase):
         self.assertIn('PayGo available', share_message)
         self.assertIn('start with K500.00', share_message)
         self.assertIn('about K500.00/month for 4 months', share_message)
+
+    def test_owning_merchant_can_generate_portrait_product_ad(self):
+        self.client.force_login(self.merchant_user)
+
+        with tempfile.TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.product.image = self._uploaded_image('ad-product.jpg')
+            self.product.save(update_fields=['image'])
+
+            response = self.client.post(reverse('merchant_product_generate_ad', args=[self.product.id]))
+
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'Portrait ad generated')
+            self.assertContains(response, 'Download image')
+            creative = ProductAdCreative.objects.get(product=self.product)
+            self.assertEqual(creative.created_by, self.merchant_user)
+            self.assertEqual(creative.template.slug, 'normils-portrait')
+            self.assertTrue(os.path.exists(creative.image.path))
+            with Image.open(creative.image.path) as generated:
+                self.assertEqual(generated.size, (1080, 1920))
+
+    def test_merchant_cannot_generate_ad_for_another_store_product(self):
+        other_product = Product.objects.get(slug='other-phone')
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.post(reverse('merchant_product_generate_ad', args=[other_product.id]))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(ProductAdCreative.objects.filter(product=other_product).exists())
+
+    def test_product_detail_shows_generate_ad_for_owning_merchant_only(self):
+        self.client.force_login(self.merchant_user)
+
+        response = self.client.get(reverse('product_detail', args=[self.product.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Generate portrait ad')
+
+        self.client.force_login(self.other_merchant_user)
+        response = self.client.get(reverse('product_detail', args=[self.product.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Generate portrait ad')
 
     def test_customer_can_submit_deal_request(self):
         self.client.force_login(self.customer)

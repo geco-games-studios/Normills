@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment, DealRequest
+from .models import Category, Product, ProductVariant, ProductImage, ProductSubcategory, CashierContact, PaymentInfo, NewsletterSubscriber, SocialLink, StorefrontControl, Cart, CartItem, Order, OrderItem, Brand, BotConversation, LearnedKeyword, StockAdjustment, MerchantPayout, PayoutBatch, PayGoApplication, PayGoRepayment, DealRequest, ProductAdTemplate, ProductAdCreative
 from .payment import best_lenco_data, get_collection_status, lenco_data_items
 
 
@@ -99,6 +99,22 @@ class SocialLinkAdmin(admin.ModelAdmin):
 @admin.register(StorefrontControl)
 class StorefrontControlAdmin(admin.ModelAdmin):
     list_display = ['header_mode', 'new_in_message', 'updated_at']
+
+
+@admin.register(ProductAdTemplate)
+class ProductAdTemplateAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'active', 'background_color', 'accent_color', 'frame_color', 'updated_at']
+    list_editable = ['active', 'background_color', 'accent_color', 'frame_color']
+    prepopulated_fields = {'slug': ('name',)}
+    search_fields = ['name', 'slug']
+
+
+@admin.register(ProductAdCreative)
+class ProductAdCreativeAdmin(admin.ModelAdmin):
+    list_display = ['product', 'template', 'created_by', 'created_at']
+    list_filter = ['template', 'created_at']
+    search_fields = ['product__name', 'template__name', 'created_by__username']
+    readonly_fields = ['product', 'template', 'image', 'created_by', 'created_at']
 
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant

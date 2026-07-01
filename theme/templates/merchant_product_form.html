@@ -36,6 +36,7 @@
             {% else %}
             <span class="ml-2 text-gray-600">Not live</span>
             {% endif %}
+            <button type="submit" formaction="{% url 'merchant_product_generate_ad' product.id %}" formmethod="post" class="mt-4 inline-flex w-full items-center justify-center border border-black bg-white px-4 py-3 text-sm font-black uppercase tracking-[.14em] text-gray-950 sm:w-auto">Generate portrait ad</button>
         </div>
         {% endif %}
 

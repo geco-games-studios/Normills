@@ -152,6 +152,38 @@ class ProductImage(models.Model):
         return f"{self.product.name} image"
 
 
+class ProductAdTemplate(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    slug = models.SlugField(unique=True)
+    background_color = models.CharField(max_length=7, default='#f4efe6')
+    accent_color = models.CharField(max_length=7, default='#111827')
+    frame_color = models.CharField(max_length=7, default='#ffffff')
+    text_color = models.CharField(max_length=7, default='#111827')
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProductAdCreative(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='ad_creatives')
+    template = models.ForeignKey(ProductAdTemplate, on_delete=models.PROTECT, related_name='creatives')
+    image = models.ImageField(upload_to='product_ads/')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='generated_product_ads')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.product.name} ad"
+
+
 class ProductSubcategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=120, unique=True)
