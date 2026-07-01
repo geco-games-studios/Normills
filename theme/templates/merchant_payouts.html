@@ -63,6 +63,8 @@
                         <th class="px-4 py-3">Net payout</th>
                         <th class="px-4 py-3">Fulfillment</th>
                         <th class="px-4 py-3">Payout status</th>
+                        <th class="px-4 py-3">Batch reference</th>
+                        <th class="px-4 py-3">Paid at</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
@@ -88,6 +90,14 @@
                             <span class="inline-flex border border-yellow-200 bg-yellow-50 px-2 py-1 text-xs font-black uppercase tracking-[.12em] text-yellow-700">Pending</span>
                             {% endif %}
                         </td>
+                        <td class="px-4 py-4 text-gray-600">
+                            {% if payout.batch %}
+                            <span class="font-bold text-gray-950">{{ payout.batch.reference }}</span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-4 text-gray-600">{{ payout.paid_at|date:"Y-m-d H:i"|default:"-" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -613,17 +613,32 @@ class MerchantDashboardTests(TestCase):
         payout.refresh_from_db()
         self.assertEqual(payout.status, 'ready')
 
+        paid_at = timezone.now()
+        batch = PayoutBatch.objects.create(
+            reference='MERCHANT-BATCH-001',
+            processed_by=self.finance_user,
+            gross_total=Decimal('2500.00'),
+            platform_fee_total=Decimal('0.00'),
+            net_total=Decimal('2500.00'),
+            paid_at=paid_at,
+        )
         payout.status = 'paid'
-        payout.paid_at = timezone.now()
-        payout.save(update_fields=['status', 'paid_at'])
+        payout.paid_at = paid_at
+        payout.batch = batch
+        payout.save(update_fields=['status', 'paid_at', 'batch'])
         self.order.status = 'cleared'
         self.order.save(update_fields=['status'])
 
         response = self.client.get(reverse('merchant_payouts'))
         payout.refresh_from_db()
         self.assertEqual(payout.status, 'paid')
+        self.assertEqual(payout.batch, batch)
         self.assertEqual(response.context['ready_for_payout'], Decimal('0'))
         self.assertEqual(response.context['paid_out_total'], Decimal('2500.00'))
+        self.assertContains(response, 'Batch reference')
+        self.assertContains(response, 'Paid at')
+        self.assertContains(response, 'MERCHANT-BATCH-001')
+        self.assertContains(response, paid_at.strftime('%Y-%m-%d'))
 
     @override_settings(MERCHANT_PAYOUT_FEE_RATE='0.10')
     def test_merchant_payouts_calculate_platform_fee_and_net_amount(self):
