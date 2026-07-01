@@ -231,6 +231,40 @@ class MerchantDashboardTests(TestCase):
         self.assertContains(response, 'Start Deal')
         self.assertContains(response, 'Negotiate before checkout')
 
+    def test_product_detail_has_marketing_ready_share_message(self):
+        response = self.client.get(
+            reverse('product_detail', args=[self.product.slug]),
+            HTTP_HOST='localhost',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        share = response.context['product_share']
+        self.assertIn('Merchant Phone', share['message'])
+        self.assertIn('From Merchant Store', share['message'])
+        self.assertIn('Price: K2500.00', share['message'])
+        self.assertIn('http://localhost/product/merchant-phone/', share['message'])
+        self.assertIn('Shared from Normils Online.', share['message'])
+        self.assertContains(response, 'Marketing-ready sharing')
+        self.assertContains(response, 'WhatsApp share')
+        self.assertContains(response, 'Copy message')
+
+    def test_paygo_product_share_message_mentions_paygo_terms(self):
+        self.product.paygo_eligible = True
+        self.product.paygo_min_deposit_percent = Decimal('20.00')
+        self.product.paygo_term_months = 4
+        self.product.save(update_fields=['paygo_eligible', 'paygo_min_deposit_percent', 'paygo_term_months'])
+
+        response = self.client.get(
+            reverse('product_detail', args=[self.product.slug]),
+            HTTP_HOST='localhost',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        share_message = response.context['product_share']['message']
+        self.assertIn('PayGo available', share_message)
+        self.assertIn('start with K500.00', share_message)
+        self.assertIn('about K500.00/month for 4 months', share_message)
+
     def test_customer_can_submit_deal_request(self):
         self.client.force_login(self.customer)
 

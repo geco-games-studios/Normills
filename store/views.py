@@ -16,6 +16,7 @@ import re
 import threading
 import uuid
 import json
+from urllib.parse import quote
 from django.conf import settings
 from django.core.mail import send_mail
 from django.core.validators import validate_email
@@ -873,6 +874,32 @@ def category_detail(request, slug):
         'selected_filter': selected_filter,
     })
 
+
+def _product_share_pack(product, product_url):
+    lines = [
+        f"{product.name}",
+        f"From {product.store.name}",
+        f"Price: K{product.price:.2f}",
+    ]
+    if product.paygo_is_available:
+        lines.append(
+            f"PayGo available: start with K{product.paygo_min_deposit_amount:.2f} "
+            f"and about K{product.paygo_estimated_installment:.2f}/month "
+            f"for {product.paygo_term_months} month{'s' if product.paygo_term_months != 1 else ''}."
+        )
+    lines.extend([
+        f"View and order here: {product_url}",
+        "Shared from Normils Online.",
+    ])
+    message = "\n".join(lines)
+    return {
+        'message': message,
+        'whatsapp_url': f"https://wa.me/?text={quote(message)}",
+        'email_subject': f"{product.name} on Normils Online",
+        'email_body': message,
+    }
+
+
 def product_detail(request, slug):
     product = get_object_or_404(
         Product.objects.prefetch_related('supporting_images'),
@@ -896,7 +923,8 @@ def product_detail(request, slug):
     request.session['viewed_product_ids'] = viewed_product_ids
 
     recommended_products = get_personalized_products(request, exclude_product=product)
-    product_url = request.build_absolute_uri()
+    product_url = request.build_absolute_uri(f'/product/{product.slug}/')
+    product_share = _product_share_pack(product, product_url)
     paygo_application = None
     active_deal = None
     if request.user.is_authenticated:
@@ -915,6 +943,7 @@ def product_detail(request, slug):
         'supporting_images': supporting_images,
         'recommended_products': recommended_products,
         'product_url': product_url,
+        'product_share': product_share,
         'paygo_application': paygo_application,
         'active_deal': active_deal,
     })
