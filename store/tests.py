@@ -168,6 +168,58 @@ class MerchantDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_customer_order_confirmation_shows_tracking_steps(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('order_confirmation', args=[self.order.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Order tracking')
+        self.assertContains(response, 'Payment Awaiting')
+        self.assertContains(response, 'Paid')
+        self.assertContains(response, 'Packing')
+        self.assertContains(response, 'Dispatched')
+        self.assertContains(response, 'Delivered / Closed')
+
+    def test_customer_order_history_shows_tracking_steps(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('order_history'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Order tracking')
+        self.assertContains(response, f'Order #{self.order.id}')
+        self.assertContains(response, 'View Details')
+        self.assertContains(response, 'Delivered / Closed')
+
+    def test_customer_tracking_shows_delivery_details(self):
+        self.order.status = 'delivered'
+        self.order.dispatch_reference = 'Courier-123'
+        self.order.delivery_partner = self.delivery_user
+        self.order.delivery_confirmed_by = self.delivery_user
+        self.order.delivered_at = timezone.now()
+        self.order.delivery_notes = 'Handed to Customer One.'
+        self.order.save(update_fields=[
+            'status',
+            'dispatch_reference',
+            'delivery_partner',
+            'delivery_confirmed_by',
+            'delivered_at',
+            'delivery_notes',
+        ])
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('order_confirmation', args=[self.order.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Delivered')
+        self.assertContains(response, 'Dispatch reference')
+        self.assertContains(response, 'Courier-123')
+        self.assertContains(response, 'Delivery partner')
+        self.assertContains(response, 'delivery')
+        self.assertContains(response, 'Delivered at')
+        self.assertContains(response, 'Handed to Customer One.')
+
     def test_merchant_can_access_own_dashboard_summary(self):
         self.client.force_login(self.merchant_user)
 

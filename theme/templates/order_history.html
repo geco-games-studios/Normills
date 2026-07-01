@@ -27,6 +27,10 @@
             {% if order.payment_reference %}
             <p class="mb-4 text-xs text-gray-500">Payment reference: {{ order.payment_reference }}</p>
             {% endif %}
+
+            <div class="mb-4">
+                {% include "partials/order_tracking_steps.html" with order=order %}
+            </div>
             
             <div class="border-t border-gray-200 pt-4">
                 <div class="space-y-4">

@@ -1,0 +1,69 @@
+{% with current=order.status payment=order.payment_status %}
+<section class="border border-gray-200 bg-white p-5">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[.16em] text-gray-500">Order tracking</p>
+            <h2 class="mt-1 text-xl font-black text-gray-950">
+                {% if current == 'cancelled' %}
+                Cancelled
+                {% elif current == 'refunded' %}
+                Refunded
+                {% elif current == 'delivered' %}
+                Delivered
+                {% elif current == 'dispatched' %}
+                Dispatched
+                {% elif current == 'packing' %}
+                Packing
+                {% elif payment == 'completed' or order.payment_confirmed %}
+                Paid
+                {% else %}
+                Payment Awaiting
+                {% endif %}
+            </h2>
+        </div>
+        <span class="inline-flex self-start border px-3 py-1 text-xs font-black uppercase tracking-[.12em] {% if current == 'cancelled' or current == 'refunded' or payment == 'failed' %}border-red-200 bg-red-50 text-red-700{% elif current == 'delivered' %}border-green-200 bg-green-50 text-green-700{% else %}border-gray-200 bg-gray-50 text-gray-700{% endif %}">
+            {{ order.get_status_display }}
+        </span>
+    </div>
+
+    <ol class="mt-5 grid gap-3 md:grid-cols-5">
+        <li class="border p-3 {% if payment == 'completed' or order.payment_confirmed or current == 'packing' or current == 'dispatched' or current == 'delivered' %}border-green-200 bg-green-50{% elif current == 'payment_awaiting' or payment == 'processing' or payment == 'pending' %}border-black bg-gray-50{% else %}border-gray-200 bg-white{% endif %}">
+            <p class="text-xs font-black uppercase tracking-[.12em] text-gray-500">1. Payment Awaiting</p>
+            <p class="mt-1 text-sm text-gray-700">Order received and payment is being confirmed.</p>
+        </li>
+        <li class="border p-3 {% if payment == 'completed' or order.payment_confirmed or current == 'packing' or current == 'dispatched' or current == 'delivered' %}border-green-200 bg-green-50{% else %}border-gray-200 bg-white{% endif %}">
+            <p class="text-xs font-black uppercase tracking-[.12em] text-gray-500">2. Paid</p>
+            <p class="mt-1 text-sm text-gray-700">Payment confirmed and the order can move to packing.</p>
+        </li>
+        <li class="border p-3 {% if current == 'packing' %}border-black bg-gray-50{% elif current == 'dispatched' or current == 'delivered' %}border-green-200 bg-green-50{% else %}border-gray-200 bg-white{% endif %}">
+            <p class="text-xs font-black uppercase tracking-[.12em] text-gray-500">3. Packing</p>
+            <p class="mt-1 text-sm text-gray-700">Merchant is preparing the order for dispatch.</p>
+        </li>
+        <li class="border p-3 {% if current == 'dispatched' %}border-black bg-gray-50{% elif current == 'delivered' %}border-green-200 bg-green-50{% else %}border-gray-200 bg-white{% endif %}">
+            <p class="text-xs font-black uppercase tracking-[.12em] text-gray-500">4. Dispatched</p>
+            <p class="mt-1 text-sm text-gray-700">Order is with delivery or ready for handover.</p>
+        </li>
+        <li class="border p-3 {% if current == 'delivered' %}border-green-200 bg-green-50{% elif current == 'cancelled' or current == 'refunded' %}border-red-200 bg-red-50{% else %}border-gray-200 bg-white{% endif %}">
+            <p class="text-xs font-black uppercase tracking-[.12em] text-gray-500">5. Delivered / Closed</p>
+            <p class="mt-1 text-sm text-gray-700">Delivered, cancelled, or refunded orders close here.</p>
+        </li>
+    </ol>
+
+    <div class="mt-5 grid gap-3 text-sm text-gray-700 sm:grid-cols-2">
+        <p><span class="font-bold text-gray-950">Payment:</span> {% if payment == 'completed' %}Paid{% else %}{{ order.get_payment_status_display }}{% endif %}</p>
+        <p><span class="font-bold text-gray-950">Fulfillment:</span> {{ order.get_status_display }}</p>
+        {% if order.dispatch_reference %}
+        <p><span class="font-bold text-gray-950">Dispatch reference:</span> {{ order.dispatch_reference }}</p>
+        {% endif %}
+        {% if order.delivery_partner %}
+        <p><span class="font-bold text-gray-950">Delivery partner:</span> {{ order.delivery_partner.get_full_name|default:order.delivery_partner.username }}</p>
+        {% endif %}
+        {% if order.delivered_at %}
+        <p><span class="font-bold text-gray-950">Delivered at:</span> {{ order.delivered_at|date:"Y-m-d H:i" }}</p>
+        {% endif %}
+        {% if order.delivery_notes %}
+        <p class="sm:col-span-2"><span class="font-bold text-gray-950">Delivery note:</span> {{ order.delivery_notes }}</p>
+        {% endif %}
+    </div>
+</section>
+{% endwith %}

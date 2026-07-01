@@ -48,6 +48,10 @@
             {% endif %}
         </p>
     </div>
+
+    <div class="mb-6">
+        {% include "partials/order_tracking_steps.html" with order=order %}
+    </div>
     
     <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div class="flex justify-between items-center mb-4">
